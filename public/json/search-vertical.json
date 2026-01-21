@@ -1,0 +1,239 @@
+{
+  "pages": [
+    {
+      "name": "Menu inicial",
+      "icon": "ri-bar-chart-line",
+      "url": "/"
+    },
+    {
+      "name": "Informes de conductores (Servicios)",
+      "icon": "ri-donut-chart-line",
+      "url": "/infconductores"
+    },
+    {
+      "name": "Requisiciones (Servicios)",
+      "icon": "ri-layout-top-line",
+      "url": "/requisition1"
+    },
+    {
+      "name": "Rutas (Servicios)",
+      "icon": "ri-layout-5-line",
+      "url": "/rutas"
+    },
+    {
+      "name": "Vehiculos / Maquinarias (Servicios",
+      "icon": "ri-layout-2-line",
+      "url": "/vehiculos"
+    },
+    {
+      "name": "Conductores (Servicios)",
+      "icon": "ri-layout-4-line",
+      "url": "/conductores"
+    },
+    {
+      "name": "Artículos / Insumos (Pañol)",
+      "icon": "ri-layout-left-line",
+      "url": "/artic-insumos"
+    },
+    {
+      "name": "Mano de obra (Taller)",
+      "icon": "ri-layout-top-line",
+      "url": "  "
+    },
+    {
+      "name": "Rubros de artículos (Pañol)",
+      "icon": "ri-layout-top-2-line",
+      "url": "/rubros-insumos"
+    },
+    {
+      "name": "Grupos de artículos (Pañol)",
+      "icon": "ri-square-line",
+      "url": "/grupos-insumos"
+    },
+    {
+      "name": "Familias de artículos (Pañol)",
+      "icon": "ri-mail-line",
+      "url": "/familias-insumos"
+    },
+    {
+      "name": "Depositos (Pañol)",
+      "icon": "ri-mail-line",
+      "url": "/depositos"
+    },
+    {
+      "name": "Chat",
+      "icon": "ri-message-line",
+      "url": "app-chat.html"
+    },
+    {
+      "name": "Calendario",
+      "icon": "ri-calendar-line",
+      "url": "app-calendar.html"
+    },
+    {
+      "name": "Lista de Usuarios",
+      "icon": "ri-group-line",
+      "url": "app-user-list.html"
+    },
+    {
+      "name": "Ver cuenta - Usuarios",
+      "icon": "ri-eye-line",
+      "url": "app-user-view-account.html"
+    },
+    {
+      "name": "Roles - Usuarios",
+      "icon": "ri-shield-user-line",
+      "url": "app-access-roles.html"
+    },
+    {
+      "name": "Listado de requisiciones - Servicios",
+      "icon": "ri-list-ordered-2",
+      "url": "/requisition1"
+    },
+    {
+      "name": "Agregar requisicion - Servicios",
+      "icon": "ri-list-ordered-2",
+      "url": "/add-requisition1/add"
+    },
+
+    {
+      "name": "Bandeja de entrada novedades - Taller",
+      "icon": "ri-file-edit-line",
+      "url": "/inbox"
+    },
+    {
+      "name": "Nueva requisición - Servicios",
+      "icon": "ri-file-add-line",
+      "url": "add-informe"
+    },
+    {
+      "name": "Perfil de usuario",
+      "icon": "ri-user-settings-line",
+      "url": "pages-profile-user.html"
+    },
+    {
+      "name": "Preguntas frecuentes",
+      "icon": "ri-question-line",
+      "url": "pages-faq.html"
+    },
+    {
+      "name": "Errores y soluciones",
+      "icon": "ri-error-warning-line",
+      "url": "pages-misc-error.html"
+    },
+    {
+      "name": "En Mantenimiento",
+      "icon": "ri-settings-2-line",
+      "url": "pages-misc-under-maintenance.html"
+    },
+    {
+      "name": "Proximamente",
+      "icon": "ri-time-line",
+      "url": "pages-misc-comingsoon.html"
+    },
+    {
+      "name": "Login",
+      "icon": "ri-login-box-line",
+      "url": "auth-login-cover.html"
+    },
+    {
+      "name": "Registración de nuevo usuario",
+      "icon": "ri-user-add-line",
+      "url": "auth-register-cover.html"
+    },
+    {
+      "name": "Verificar Email",
+      "icon": "ri-mail-check-line",
+      "url": "auth-verify-email-cover.html"
+    },
+    {
+      "name": "Resetear contraseña",
+      "icon": "ri-rotate-lock-line",
+      "url": "auth-reset-password-cover.html"
+    },
+    {
+      "name": "Olvide mi Password",
+      "icon": "ri-lock-line",
+      "url": "auth-forgot-password-cover.html"
+    },
+    {
+      "name": "Ayuda general del sistema",
+      "icon": "ri-question-line",
+      "url": "../front-pages/help-center-landing.html"
+    },
+    {
+      "name": "Estatisticas",
+      "icon": "ri-bar-chart-box-line",
+      "url": "cards-statistics.html"
+    },
+    {
+      "name": "Analiticas",
+      "icon": "ri-line-chart-fill",
+      "url": "cards-analytics.html"
+    },
+    {
+      "name": "Alertas del sistema",
+      "icon": "ri-alert-line",
+      "url": "ui-alerts.html"
+    }
+  ],
+  "files": [
+    {
+      "name": "Documentación",
+      "subtitle": "By Walter White",
+      "src": "img/icons/misc/search-doc.png",
+      "meta": "200kb",
+      "url": "app-file-manager.html"
+    }
+  ],
+  "members": [
+    {
+      "name": "Marcos Sabando",
+      "subtitle": "Compras",
+      "src": "img/avatars/1.png",
+      "url": "app-user-view-account.html"
+    },
+    {
+      "name": "Javier Gimenez",
+      "subtitle": "Administración",
+      "src": "img/avatars/1.png",
+      "url": "app-user-view-account.html"
+    },
+    {
+      "name": "Julio",
+      "subtitle": "Relleno",
+      "src": "img/avatars/2.png",
+      "url": "app-user-view-account.html"
+    },
+    {
+      "name": "Daniel Salazar",
+      "subtitle": "Administrador",
+      "src": "img/avatars/5.png",
+      "url": "app-user-view-account.html"
+    },
+    {
+      "name": "German Aramayo",
+      "subtitle": "Administrador",
+      "src": "img/avatars/7.png",
+      "url": "app-user-view-account.html"
+    },
+    {
+      "name": "Franco Yulan",
+      "subtitle": "Administrador",
+      "src": "img/avatars/3.png",
+      "url": "app-user-view-account.html"
+    },
+    {
+      "name": "Ariel",
+      "subtitle": "Administrador",
+      "src": "img/avatars/10.png",
+      "url": "app-user-view-account.html"
+    },
+    {
+      "name": "Debora Romero",
+      "subtitle": "RRHH",
+      "src": "img/avatars/12.png",
+      "url": "app-user-view-account.html"
+    }
+  ]
+}
