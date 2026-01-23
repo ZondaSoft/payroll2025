@@ -168,6 +168,21 @@ Route::middleware('auth')->group(function () {
 
     Route::post('sicoss/importar2', [SicossImportarController::class, 'importar'])
         ->name('sicoss.importar2');
+
+    Route::get('/import/status', function () {
+        return response()->json([
+            'ok' => \App\Models\ImportLiquidacionOk::count(),
+            'err' => \App\Models\ImportLiquidacionErr::count(),
+        ]);
+    });
+
+    Route::get('/sicoss/importar/exportar-ok', [SicossImportarController::class, 'exportarOk'])->name('sicoss.importar.exportarOk');
+    Route::get('/sicoss/importar/exportar-err', [SicossImportarController::class, 'exportarErr'])->name('sicoss.importar.exportarErr');
+    
+    Route::get('/sicoss/importar/resumen', [SicossImportarController::class, 'resumenLiq'])->name('sicoss.importar.resumen');
+    Route::get('/sicoss/importar/resumen/export-xlsx', [SicossImportarController::class, 'resumenLiqExportXlsx'])->name('sicoss.importar.resumen.export.xlsx');
+
+    Route::get('/sicoss/import-resultados', [SicossImportarController::class, 'resultadosImport'])->name('recibos.import.resultados');
 });
 
 require __DIR__.'/auth.php';

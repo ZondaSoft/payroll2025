@@ -4,7 +4,7 @@
 <link rel="stylesheet" href="{{ asset('css/bs-stepper.min.css') }}">
 <link rel="stylesheet" href="{{ asset('css/bd-wizard.css') }}">
 
-{{-- <style>
+<style>
     .form-control {
         background-color: #ffffff !important;
     }
@@ -21,7 +21,10 @@
         padding-left: 0px !important;
         padding-top: 13px !important;
     }
-</style> --}}
+    .content {
+        width: 450px;
+    }
+</style>
 @endsection
 
 <!-- Content -->
@@ -29,20 +32,15 @@
 
 <!-- Content -->
 
-@if($agregar == true)
-<form method="post" action="{{ asset( url('/sicoss/importar/add') ) }}" enctype="multipart/form-data">
-@else
-<form method="post" action="{{ asset( url('/sicoss/importar/edit/'.$legajo->id) ) }}" enctype="multipart/form-data">
-@endif
-
+<form method="post" id="formImportar" name="formImportar" action="{{ route('sicoss.importar2') }}" enctype="multipart/form-data">
 {{ csrf_field() }}
 
 @php
     $outline = "form-floating-outline";
 @endphp
 
-<div class="container-xxl flex-grow-1 container-p-y">
-  <div class="app-ecommerce">
+  <div class="container-xxl flex-grow-1 container-p-y">
+  
     <!-- Add Product -->
     <div class="d-flex flex-column flex-md-row justify-content-between align-items-start align-items-md-center mb-6 row-gap-4">
       <div class="d-flex flex-column justify-content-center">
@@ -50,34 +48,44 @@
       </div>
     </div>
 
+    <!-- Form with Tabs -->
     <div class="row">
+      <div class="col">
+        <!-- {{-- <h6 class="mt-4">Form with Tabs</h6> --}} -->
+        <div class="card mb-12">
+          <!-- <div class="card-header overflow-hidden">
+            <ul class="nav nav-tabs" role="tablist">
+              <li class="nav-item">
+                <a
+                  class="nav-link active"
+                  data-bs-toggle="tab"
+                  data-bs-target="#form-tabs-personal"
+                  role="tab"
+                  aria-selected="true">
+                  <span class="ri-user-line ri-20px d-sm-none"></span
+                  ><span class="d-none d-sm-block">Información Principal</span>
+                </a>
+              </li>
+            </ul>
+          </div> -->
 
-      <!-- Form with Tabs -->
-      <div class="row">
-        <div class="col">
-          {{-- <h6 class="mt-4">Form with Tabs</h6> --}}
-          <div class="card mb-6">
-            <!-- <div class="card-header overflow-hidden">
-              <ul class="nav nav-tabs" role="tablist">
-                <li class="nav-item">
-                  <a
-                    class="nav-link active"
-                    data-bs-toggle="tab"
-                    data-bs-target="#form-tabs-personal"
-                    role="tab"
-                    aria-selected="true">
-                    <span class="ri-user-line ri-20px d-sm-none"></span
-                    ><span class="d-none d-sm-block">Información Principal</span>
-                  </a>
-                </li>
-              </ul>
-            </div> -->
+          
+            
 
-            <div class="tab-content">
-              <div class="tab-pane fade active show" id="form-tabs-personal" role="tabpanel">
+              @if ($errors->any())
+                  <div class="alert alert-danger">
+                      <ul>
+                          @foreach ($errors->all() as $error)
+                              <li>{{ $error }}</li>
+                          @endforeach
+                      </ul>
+                  </div>
+              @endif
 
+              
+              <div class="col-xl-12">
                 @if ($errors->any())
-                    <div class="alert alert-danger">
+                    <div class="alert alert-danger" id="div_errors">
                         <ul>
                             @foreach ($errors->all() as $error)
                                 <li>{{ $error }}</li>
@@ -86,363 +94,314 @@
                     </div>
                 @endif
 
-                
-                <div class="col-xl-12">
-                        @if ($errors->any())
-                            <div class="alert alert-danger" id="div_errors">
-                                <ul>
-                                    @foreach ($errors->all() as $error)
-                                        <li>{{ $error }}</li>
-                                    @endforeach
-                                </ul>
-                            </div>
-                        @endif
-
-                        <div id="mensaje-procesando"
-                            style="display:none; position:fixed; top:50%; left:50%; transform:translate(-50%, -50%);
-                                    background:#fff; padding:20px; border-radius:10px; box-shadow:0 0 15px rgba(0,0,0,0.3);
-                                    font-size:18px; font-weight:bold;">
-                            Procesando...
-                        </div>
-
-                        <!-- Vertical Steppers -->
-                        <nav class="navbar navbar-expand-sm navbar-light bg-white">
-                            <div class="container mt-5 ml-5">
-                                <div id="wizard" style="height: 600px;">
-                                    <h3>Step 1 Title</h3>
-                                    <section class="pt-2">
-                                        <h5 class="bd-wizard-step-title mb-2">Paso 1</h5>
-                                        <!-- <h3 class="section-heading">Datos de la liquidación </h3> -->
-                                        <p>Datos de la liquidación</p>
-
-                                        <div class="col-md-12 pl-0 mt-5">
-                                            <div class="form-row">
-                                                <div class="col-lg-2 mb-2 mr-4">
-                                                    <label class="col-form-label">Periodo * </label>
-                                                    <div class="input-group " id="divPeriodo" data-provide="" keyboardNavigation="false" title="Ingrese un Nro. legajo">
-
-                                                        <input class="form-control"
-                                                            type="text"
-                                                            id="periodo2"
-                                                            name="periodo2"
-                                                            autocomplete="off"
-                                                            maxlength="7"
-                                                            style="padding-left: 16px;padding-right: 16px;padding-top: 6px;padding-bottom: 6px;width: 110px"
-                                                            value="{{ old('periodo2',$periodo2) }}"
-                                                            autofocus
-                                                        >
-
-                                                        <ul class="parsley-errors-list filled" id="labelError1" aria-hidden="false" hidden>
-                                                            <li class="parsley-required">Periodo obligatorio.</li>
-                                                        </ul>
-
-                                                    </div>
-                                                </div>
-
-                                                <div class="col-lg-3 mt-2 mb-2 mr-4">
-                                                    <label class="col-form-label" style="padding-top: 0px">Tipo Liquidación</label>
-                                                    <select class="form-control"
-                                                        id="tipoliq"
-                                                        name="tipoliq"
-                                                        style="padding-left: 16px;padding-right: 16px;padding-top: 6px;padding-bottom: 6px;height: 36px;">
-
-                                                        <option value="1">1-Normal</option>
-                                                        <option value="2">2-1era Quincena</option>
-                                                        <option value="3">3-2da Quincena</option>
-                                                        <option value="4">4-SAC</option>
-                                                        <option value="5">5-Liq. Final</option>
-                                                    </select>
-                                                </div>
-
-                                                <div class="col-lg-3 mb-3 mr-3">
-                                                    <label class="col-form-label" id="lblFecha">Fecha de liquidación * </label>
-                                                    <div class="input-group date"
-                                                        id="datetimepicker1"
-                                                        data-provide="datepicker"
-                                                        data-date-format="dd/mm/yyyy"
-                                                        keyboardNavigation="true"
-                                                        title="Seleccione fecha"
-                                                        autoclose="true">
-
-                                                        <input class="form-control"
-                                                            type="text"
-                                                            value="{{ old('fecha',$legajo->fecha) }}" name="fecha" id="fecha"
-                                                            enabled
-                                                            autocomplete="off"
-                                                            style="padding-left: 16px;padding-right: 16px;padding-top: 6px;padding-bottom: 6px;"
-                                                            >
-                                                        <span class="input-group-append input-group-addon" id="btn_fecha">
-                                                            <span class="input-group-text material-symbols-outlined">calendar_month</span>
-                                                        </span>
-                                                    </div>
-                                                </div>
-
-                                                <div class="col-lg-6 ml-2 mb-6">
-                                                    <div class="form-row">
-                                                        <label class="col-form-label" style="padding-bottom: 0px;">Comentarios</label>
-                                                        <textarea cols="6"
-                                                            placeholder=".." class="form-control pt-1" enabled maxlength="250"
-                                                            name="comenta1"
-                                                            id="comenta1"
-                                                            >{{ old('comenta1',$legajo->comenta1) }}</textarea>
-                                                        <br>
-                                                    </div>
-                                                </div>
-                                            </div>
-                                        </div>
-
-                                    </section>
-                                    <h3>Step 2 Title</h3>
-                                    <section class="pt-2">
-                                        <h5 class="bd-wizard-step-title mb-2">Paso 2</h5>
-                                        <!-- <h5 class="section-heading" style="margin-bottom: 5px">Elija por favor el archivo a importar</h5> -->
-                                        <p>Selección de libro excel con la liquidación</p>
-                                        <!-- <div class="form-group">
-                                        <label for="firstName" class="sr-only">First Name</label>
-                                        <input type="text" name="firstName" id="firstName" class="form-control" placeholder="First Name">
-                                        </div> -->
-                                        <div class="form-row mt-5">
-                                            <!-- Campos ocultos con datos del archivo -->
-                                            <div class="col-lg-4 mb-2 mr-4" hidden>
-                                                <label class="col-form-label">Nombre archivo * </label>
-                                                <div class="input-group " id="divPeriodo" data-provide="" keyboardNavigation="false" title="Ingrese un Nro. legajo">
-
-                                                    <input class="form-control"
-                                                        type="text"
-                                                        id="nom_arch"
-                                                        name="nom_arch"
-                                                        autocomplete="off"
-                                                        maxlength="255"
-                                                        style="padding-left: 16px;padding-right: 16px;padding-top: 6px;padding-bottom: 6px;"
-                                                        value="{{ old('nom_arch',$legajo->nom_arch) }}"
-                                                        readonly
-                                                        >
-                                                </div>
-                                            </div>
-
-
-                                            <div class="col-lg-4 mb-2 mr-4" hidden>
-                                                <label class="col-form-label">Tamaño archivo * </label>
-                                                <div class="input-group " id="divPeriodo" data-provide="" keyboardNavigation="false" title="Ingrese un Nro. legajo">
-
-                                                    <input class="form-control"
-                                                        type="text"
-                                                        id="tam_arch"
-                                                        name="tam_arch"
-                                                        autocomplete="off"
-                                                        maxlength="255"
-                                                        style="padding-left: 16px;padding-right: 16px;padding-top: 6px;padding-bottom: 6px;"
-                                                        value="{{ old('tam_arch',$legajo->tam_arch) }}"
-                                                        readonly
-                                                        >
-                                                </div>
-                                            </div>
-
-                                            <div class="form-group col-lg-12 row align-items-center">
-                                                <div class="col-md-12">
-                                                    <label for="file">Selecciona el archivo de liquidación a importar:</label>
-                                                    <input type="file"
-                                                        name="file"
-                                                        id="file"
-                                                        class="form-control @error('file') is-invalid @enderror"
-                                                        required
-                                                        accept=".xls,.xlsx,.xlsm,application/vnd.ms-excel,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" />
-                                                    <small class="form-text text-muted">El archivo debe ser una planilla de excel con el formato correcto.</small>
-                                                </div>
-                                                <div class="alert alert-danger ml-3" role="alert" hidden>
-                                                    <strong>Cuidado</strong> Debe seleccionar un archivo válido.
-                                                </div>
-
-                                                <div class="invalid-feedback d-block ml-3" id="fileError" style="display: none;"></div>
-
-
-                                            </div>
-
-                                            <div class="invalid-feedback">
-                                                {{ $errors->first('file') }}
-                                            </div>
-                                            <br>
-                                            <div class="alert alert-danger" id="errorsize" style="display: none;>
-                                                <ul>
-                                                    <li id="lierror">El archivo excede los 2 mb. </li>
-                                                </ul>
-                                            </div>
-                                            <div class="row g-12">
-                                            </div>
-                                            <br><br>
-                                        </div>
-                                    </section>
-                                    <h3>Step 3 Title</h3>
-                                    <section>
-                                        <h5 class="bd-wizard-step-title">Paso 3</h5>
-                                        <h2 class="section-heading mb-5" id="titleFinish" name="titleFinish">Procesando importación...</h2>
-
-                                        <div id="loadingDiv" name="loadingDiv" class="pt-0">
-                                            <div class="ball-grid-pulse">
-                                            <div></div>
-                                            <div></div>
-                                            <div></div>
-                                            <div></div>
-                                            <div></div>
-                                            <div></div>
-                                            <div></div>
-                                            <div></div>
-                                            <div></div>
-                                            </div>
-                                        </div>
-
-
-                                        <h6 class="font-weight-bold" id="registrosOk" name="registrosOk" hidden>
-                                            Esperando registros importados correctamente
-                                        </h6>
-
-                                        <button class="btn btn-primary btn-lg"
-                                            id="btn-ok"
-                                            name="btn-ok"
-                                            type="button"
-                                            hidden
-                                            >Descargar registros importados
-                                        </button>
-
-                                        <h6 class="font-weight-bold mt-4" id="registrosErr" name="registrosErr" hidden>
-                                            Esperando registros rechazados
-                                        </h6>
-
-                                        <button class="btn btn-primary btn-lg"
-                                            id="btn-err"
-                                            name="btn-err"
-                                            type="button"
-                                            hidden
-                                            >Descargar registros rechazados
-                                        </button>
-
-                                    </section>
-                                </div>
-                            </div>
-                        </nav>
-                        <!-- /.Vertical Steppers -->
-
-                        </div>
-
-                        <!----------------------------------------------
-                        //           Legajo - Novedad - Fechas
-                        //--------------------------------------------->
-                        <div class="col-lg-12 mb-1 mt-5">
-
-
-                            {{-- @if (session('error') or $errors->any() or session('success'))
-                                <div class="col-md-12 ml-0 pl-0">
-                                    <div class="card card-default mb-1 border-warning">
-                                        <div class="card-header text-white bg-warning" id="headingTwo">
-                                        <h5 class="mb-0">
-                                            <a class="text-inherit collapsed" data-toggle="collapse" data-target="#collapseTwo" aria-expanded="false" aria-controls="collapseTwo" href="">
-                                            Resultado de la importación</a>
-                                        </h5>
-                                        </div>
-                                        <div class="collapse show" id="collapseTwo" aria-labelledby="headingTwo" data-parent="#accordion">
-                                        <div class="col-md-10">
-                                            <div class="form-row">
-
-                                                <div class="col-md-10 mt-3 mb-3">
-                                                    <div class="form-row">
-
-                                                        @if (session('error') or $errors->any())
-                                                            <h4 class="mb-2">
-                                                                Problemas detectados :
-                                                            </h4>
-
-                                                            @if (session('error'))
-                                                                {{ session('error') }}
-                                                            @endif
-
-                                                            @if ($errors->any())
-                                                                <ul>
-                                                                    @foreach ($errors->all() as $error)
-                                                                        <li>{{ $error }}</li>
-                                                                    @endforeach
-                                                                </ul>
-                                                            @endif
-
-                                                            @error('file')
-                                                                <div class="invalid-feedback">
-                                                                    {{ $message }}
-                                                                </div>
-                                                            @enderror
-
-                                                        @endif
-
-                                                        @if (session('success'))
-                                                            <ul>
-                                                                <li>
-                                                                    <h4 class="mb-2">
-                                                                        1. {{ session('success') }} <br>
-                                                                        2. {{ session('rechazados') }}
-                                                                    </h4>
-                                                                </li>
-                                                            </ul>
-                                                        @endif
-
-
-                                                    </div>
-                                                </div>
-
-                                            </div>
-                                        </div>
-
-                                        </div>
-                                    </div>
-                                </div>
-                            @endif --}}
-
-                            </div>
-                        </div>
-
-                        @if (session('status'))
-                            <div class="alert alert-success" role="alert">
-                                {{ session('status') }}
-                            </div>
-                        @endif
-
-                        <!-- Formulario de carga de legajos -->
-                        <div class="row">
-                            <div class="col-lg-12 ml-4 mb-12 mt-1 ml-12">
-
-                                <h4 id="titleProgress" style="height: 30px; display: none;">Importando liquidación</h4>
-
-                                <!-- Barra de progreso -->
-                                <div class="progress mt-2" style="height: 30px; display: none;" id="progressContainer">
-                                    <div class="progress-bar progress-bar-striped progress-bar-animated"
-                                        role="progressbar"
-                                        style="width: 10%"
-                                        id="progressBar">
-                                        10%
-                                    </div>
-                                </div>
-
-                                <!-- Estado -->
-                                <div class="mt-2" id="progressStatus"></div>
-
-                            </div>
-                        </div>
-
-                        <!-- Alerta de OK -->
-                        <div class="alert alert-success mt-3" role="alert" style="display: none;" id="alertOk"></div>
-
-                        <!-- Alerta de errores -->
-                        <div class="alert alert-danger mt-3" role="alert" style="display: none;" id="alertErr"></div>
-
-
-
-
-
-
+                <div id="mensaje-procesando"
+                    style="display:none; position:fixed; top:50%; left:50%; transform:translate(-50%, -50%);
+                            background:#fff; padding:20px; border-radius:10px; box-shadow:0 0 15px rgba(0,0,0,0.3);
+                            font-size:18px; font-weight:bold;">
+                    Procesando...
                 </div>
 
-                <br><br><br>
+                <!-- Vertical Steppers -->
+                <nav class="navbar navbar-expand-sm navbar-light bg-white mt-8 pt-4">
+                    <div class="container mt-6 ml-5" style="margin-left: 56px;">
+                        <div id="wizard" style="height: 600px;">
+                            <h3 hidden>Step 1 Title</h3>
+                            <section class="pt-2">
+                                <h5 class="bd-wizard-step-title mb-2">Paso 1</h5>
+                                <!-- <h3 class="section-heading">Datos de la liquidación </h3> -->
+                                <p>Datos de la liquidación</p>
 
+                                <div class="col-md-12 pl-0 mt-5">
+                                    <div class="form-row">
+
+                                        <div class="col-lg-12 mt-4 mb-2 mr-4">
+                                            <label class="col-form-label" style="padding-top: 0px">Empresa</label>
+                                            <select class="form-control selected2"
+                                                id="empresa"
+                                                name="empresa"
+                                                style="padding-left: 16px;padding-right: 16px;padding-top: 6px;padding-bottom: 6px;height: 36px;">
+
+                                                @foreach ($empresas as $empresa)
+                                                    <option value="{{ $empresa->id }}">{{ $empresa->detalle }}</option>
+                                                @endforeach
+                                                
+                                            </select>
+                                        </div>
+
+
+                                        <div class="col-lg-3 mb-2 mr-4">
+                                            <label class="col-form-label">Periodo * </label>
+                                            <div class="input-group " id="divPeriodo" data-provide="" keyboardNavigation="false" title="Ingrese un Nro. legajo">
+
+                                                <input class="form-control"
+                                                    type="text"
+                                                    id="periodo2"
+                                                    name="periodo2"
+                                                    autocomplete="off"
+                                                    maxlength="7"
+                                                    style="padding-left: 16px;padding-right: 16px;padding-top: 6px;padding-bottom: 6px;width: 110px"
+                                                    value="{{ old('periodo2',$periodo2) }}"
+                                                    autofocus
+                                                >
+
+                                                <ul class="parsley-errors-list filled" id="labelError1" aria-hidden="false" hidden>
+                                                    <li class="parsley-required">Periodo obligatorio.</li>
+                                                </ul>
+
+                                            </div>
+                                        </div>
+
+                                        
+                                    </div>
+                                </div>
+
+                            </section>
+                            <h3>Step 2 Title</h3>
+                            <section class="pt-2">
+                                <h5 class="bd-wizard-step-title mb-2">Paso 2</h5>
+                                <!-- <h5 class="section-heading" style="margin-bottom: 5px">Elija por favor el archivo a importar</h5> -->
+                                <p>Selección de libro excel con la liquidación</p>
+                                <!-- <div class="form-group">
+                                <label for="firstName" class="sr-only">First Name</label>
+                                <input type="text" name="firstName" id="firstName" class="form-control" placeholder="First Name">
+                                </div> -->
+                                <div class="form-row mt-5">
+                                    <!-- Campos ocultos con datos del archivo -->
+                                    <div class="col-lg-4 mb-2 mr-4" hidden>
+                                        <label class="col-form-label">Nombre archivo * </label>
+                                        <div class="input-group " id="divPeriodo" data-provide="" keyboardNavigation="false" title="Ingrese un Nro. legajo">
+
+                                            <input class="form-control"
+                                                type="text"
+                                                id="nom_arch"
+                                                name="nom_arch"
+                                                autocomplete="off"
+                                                maxlength="255"
+                                                style="padding-left: 16px;padding-right: 16px;padding-top: 6px;padding-bottom: 6px;"
+                                                value="{{ old('nom_arch',$legajo->nom_arch) }}"
+                                                readonly
+                                                >
+                                        </div>
+                                    </div>
+
+
+                                    <div class="col-lg-4 mb-2 mr-4" hidden>
+                                        <label class="col-form-label">Tamaño archivo * </label>
+                                        <div class="input-group " id="divPeriodo" data-provide="" keyboardNavigation="false" title="Ingrese un Nro. legajo">
+
+                                            <input class="form-control"
+                                                type="text"
+                                                id="tam_arch"
+                                                name="tam_arch"
+                                                autocomplete="off"
+                                                maxlength="255"
+                                                style="padding-left: 16px;padding-right: 16px;padding-top: 6px;padding-bottom: 6px;"
+                                                value="{{ old('tam_arch',$legajo->tam_arch) }}"
+                                                readonly
+                                                >
+                                        </div>
+                                    </div>
+
+                                    <div class="form-group col-lg-12 row align-items-center">
+                                        <div class="col-md-12">
+                                            <label for="file">Selecciona el archivo de liquidación a importar:</label>
+                                            <input type="file"
+                                                name="file"
+                                                id="file"
+                                                class="form-control @error('file') is-invalid @enderror"
+                                                required
+                                                accept=".xls,.xlsx,.xlsm,application/vnd.ms-excel,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" />
+                                            <small class="form-text text-muted">El archivo debe ser una planilla de excel con el formato correcto.</small>
+                                        </div>
+                                        <div class="alert alert-danger ml-3" role="alert" hidden>
+                                            <strong>Cuidado</strong> Debe seleccionar un archivo válido.
+                                        </div>
+
+                                        <div class="invalid-feedback d-block ml-3" id="fileError" style="display: none;"></div>
+
+
+                                    </div>
+
+                                    <div class="invalid-feedback">
+                                        {{ $errors->first('file') }}
+                                    </div>
+                                    <br>
+                                    <div class="alert alert-danger" id="errorsize" style="display: none;>
+                                        <ul>
+                                            <li id="lierror">El archivo excede los 2 mb. </li>
+                                        </ul>
+                                    </div>
+                                    <div class="row g-12">
+                                    </div>
+                                    <br><br>
+                                </div>
+                            </section>
+                            <h3>Step 3 Title</h3>
+                            <section>
+                                <h5 class="bd-wizard-step-title">Paso 3</h5>
+                                <h2 class="section-heading mb-5" id="titleFinish" name="titleFinish">Procesando importación...</h2>
+
+                                <div id="loadingDiv" name="loadingDiv" class="pt-0">
+                                    <div class="ball-grid-pulse">
+                                    <div></div>
+                                    <div></div>
+                                    <div></div>
+                                    <div></div>
+                                    <div></div>
+                                    <div></div>
+                                    <div></div>
+                                    <div></div>
+                                    <div></div>
+                                    </div>
+                                </div>
+
+
+                                <h6 class="font-weight-bold" id="registrosOk" name="registrosOk" hidden>
+                                    Esperando registros importados correctamente
+                                </h6>
+
+                                <a class="btn btn-primary"
+                                    id="btn-ok"
+                                    name="btn-ok"
+                                    type="button"
+                                    hidden
+                                    mt-5
+                                    mb-4
+                                    href="{{ route('sicoss.importar.exportarOk') }}"
+                                    >Descargar registros importados
+                                </a>
+
+                                <h6 class="font-weight-bold mt-4" id="registrosErr" name="registrosErr" hidden>
+                                    Esperando registros rechazados
+                                </h6>
+
+                                <a class="btn btn-danger mt-4"
+                                    id="btn-err"
+                                    name="btn-err"
+                                    type="button"
+                                    hidden
+                                    mb-2
+                                    href="{{ route('sicoss.importar.exportarErr') }}">Descargar registros rechazados
+                                </a>
+
+                            </section>
+                        </div>
+                    </div>
+                </nav>
+                <!-- /.Vertical Steppers -->
+
+                      
+
+                <!----------------------------------------------
+                //           Legajo - Novedad - Fechas
+                //--------------------------------------------->
+                <div class="col-lg-12 mb-1 mt-5">
+
+                    <!-- {{-- @i f (session('error') or $errors->any() or session('success')) -->
+                        <div class="col-md-12 ml-0 pl-0">
+                            <div class="card card-default mb-1 border-warning">
+                                <div class="card-header text-white bg-warning" id="headingTwo">
+                                <h5 class="mb-0">
+                                    <a class="text-inherit collapsed" data-toggle="collapse" data-target="#collapseTwo" aria-expanded="false" aria-controls="collapseTwo" href="">
+                                    Resultado de la importación</a>
+                                </h5>
+                                </div>
+                                <div class="collapse show" id="collapseTwo" aria-labelledby="headingTwo" data-parent="#accordion">
+                                <div class="col-md-10">
+                                    <div class="form-row">
+
+                                        <div class="col-md-10 mt-3 mb-3">
+                                            <div class="form-row">
+
+                                                @if (session('error') or $errors->any())
+                                                    <h4 class="mb-2">
+                                                        Problemas detectados :
+                                                    </h4>
+
+                                                    @if (session('error'))
+                                                        {{ session('error') }}
+                                                    @endif
+
+                                                    @if ($errors->any())
+                                                        <ul>
+                                                            @foreach ($errors->all() as $error)
+                                                                <li>{{ $error }}</li>
+                                                            @endforeach
+                                                        </ul>
+                                                    @endif
+
+                                                    @error('file')
+                                                        <div class="invalid-feedback">
+                                                            {{ $message }}
+                                                        </div>
+                                                    @enderror
+
+                                                @endif
+
+                                                @if (session('success'))
+                                                    <ul>
+                                                        <li>
+                                                            <h4 class="mb-2">
+                                                                1. {{ session('success') }} <br>
+                                                                2. {{ session('rechazados') }}
+                                                            </h4>
+                                                        </li>
+                                                    </ul>
+                                                @endif
+
+
+                                            </div>
+                                        </div>
+
+                                    </div>
+                                </div>
+
+                                </div>
+                            </div>
+                        </div>
+                    <!-- @ endif --}} -->
+
+                </div>
+                    
+
+                @if (session('status'))
+                    <div class="alert alert-success" role="alert">
+                        {{ session('status') }}
+                    </div>
+                @endif
+
+                <!-- Formulario de carga de legajos -->
+                <div class="row">
+                    <div class="col-lg-12 ml-4 mb-12 mt-1 ml-12">
+
+                        <h4 id="titleProgress" style="height: 30px; display: none;">Importando liquidación</h4>
+
+                        <!-- Barra de progreso -->
+                        <div class="progress mt-2" style="height: 30px; display: none;" id="progressContainer">
+                            <div class="progress-bar progress-bar-striped progress-bar-animated"
+                                role="progressbar"
+                                style="width: 10%"
+                                id="progressBar">
+                                10%
+                            </div>
+                        </div>
+
+                        <!-- Estado -->
+                        <div class="mt-2" id="progressStatus"></div>
+
+                    </div>
+                </div>
+
+                <!-- Alerta de OK -->
+                <div class="alert alert-success mt-3" role="alert" style="display: none;" id="alertOk"></div>
+
+                <!-- Alerta de errores -->
+                <div class="alert alert-danger mt-3" role="alert" style="display: none;" id="alertErr"></div>
 
               </div>
-              
+
+              <br><br><br>
+
               <!-- <div class="tab-pane fade" id="form-tabs-social" role="tabpanel">
 
                   <div class="row g-6">
@@ -509,17 +468,13 @@
                   </div>
 
               </div> -->
-            </div>
-          </div>
-
+          
         </div>
+
       </div>
-
-
-
     </div>
   </div>
-</div>
+
 </form>
 <!-- / Content -->
 
@@ -652,12 +607,11 @@
         // Cambiar aria-hidden a true
         errorControl.setAttribute('aria-hidden', 'true');
 
-        if (!validarFechaLiquidacion())
-            return false;
+        //if (!validarFechaLiquidacion())
+        //    return false;
 
         return true;
     }
-
 
     function validarFechaLiquidacion() {
         const campoFecha = document.getElementById('fecha');
@@ -976,9 +930,9 @@
             formData.append('file', file);
             formData.append('_token', document.querySelector('meta[name="csrf-token"]').getAttribute('content'));
             formData.append('periodo2', document.getElementById('periodo2').value); // ej: 2025/06
-            formData.append('tipoliq', document.getElementById('tipoliq').value);   // ej: 1
-            formData.append('fecha', document.getElementById('fecha').value);       // ej: 16/08/2025
-            formData.append('comenta1', document.getElementById('comenta1').value);       // ej: 16/08/2025
+            formData.append('empresa', document.getElementById('empresa').value);   // ej: 1
+            //formData.append('fecha', document.getElementById('fecha').value);       // ej: 16/08/2025
+            //formData.append('comenta1', document.getElementById('comenta1').value);       // ej: 16/08/2025
             formData.append('nom_arch', document.getElementById('nom_arch').value);
             formData.append('tam_arch', document.getElementById('tam_arch').value);
 
