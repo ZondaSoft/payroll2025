@@ -156,7 +156,8 @@ class SicossImportarController extends Controller
 
         $fechaLiq = now();
 
-        $tipoliq = (int) $request->input('tipoliq');
+        //$tipoliq = (int) $request->input('tipoliq');
+        $idEmpresa = (int) $request->input('empresa');
 
         $comenta1 = $request->input('comenta1');
         $nom_arch = $request->input('nom_arch');
@@ -235,7 +236,7 @@ class SicossImportarController extends Controller
         $import = new NominasImport(
             $activeTitle,
             periodo: $periodo,         // YYYYMM
-            tipoliq: $tipoliq,        // int
+            idEmpresa: $idEmpresa,
             nom_arch: $nom_arch,
             tam_arch: $tam_arch
         );

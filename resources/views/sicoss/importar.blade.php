@@ -106,7 +106,7 @@
                     <div class="container mt-6 ml-5" style="margin-left: 56px;">
                         <div id="wizard" style="height: 600px;">
                             <h3 hidden>Step 1 Title</h3>
-                            <section class="pt-2">
+                            <section class="pt-2" hidden>
                                 <h5 class="bd-wizard-step-title mb-2">Paso 1</h5>
                                 <!-- <h3 class="section-heading">Datos de la liquidación </h3> -->
                                 <p>Datos de la liquidación</p>
@@ -156,8 +156,8 @@
                                 </div>
 
                             </section>
-                            <h3>Step 2 Title</h3>
-                            <section class="pt-2">
+                            <h3 hidden>Step 2 Title</h3>
+                            <section class="pt-2" hidden>
                                 <h5 class="bd-wizard-step-title mb-2">Paso 2</h5>
                                 <!-- <h5 class="section-heading" style="margin-bottom: 5px">Elija por favor el archivo a importar</h5> -->
                                 <p>Selección de libro excel con la liquidación</p>
@@ -236,8 +236,8 @@
                                     <br><br>
                                 </div>
                             </section>
-                            <h3>Step 3 Title</h3>
-                            <section>
+                            <h3 hidden>Step 3 Title</h3>
+                            <section class="pt-2" hidden>
                                 <h5 class="bd-wizard-step-title">Paso 3</h5>
                                 <h2 class="section-heading mb-5" id="titleFinish" name="titleFinish">Procesando importación...</h2>
 
@@ -1015,6 +1015,14 @@
             });
         }
     });
+
+    // Muestro los elementos del wizard ocultos al cargar toda la página web
+    document.addEventListener('DOMContentLoaded', function () {
+        document.querySelectorAll('.pt-2[hidden]').forEach(el => {
+            el.removeAttribute('hidden');
+        });
+    });
+
 </script>
 
 @endsection

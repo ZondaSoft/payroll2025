@@ -562,9 +562,8 @@
     function goToPreviousStep(wizard, options, state) {
         var index = $("#wizard").steps("getCurrentIndex");
 
-        console.log(index);
-
-        alert(window.location.pathname);
+        // console.log(index);
+        // alert(window.location.pathname);
 
         //if (window.location.pathname === '/recibos/add') {
         if (index == 2) {

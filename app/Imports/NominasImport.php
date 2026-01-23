@@ -22,11 +22,11 @@ class NominasImport implements WithMultipleSheets  // ToCollection
     public function __construct(
         private string|int $onlySheet = 0,
         private string $periodo = '',   // YYYYMM
-        private int $tipoliq = 1,
+        private int $idEmpresa = 1,
         private string $nom_arch = '',
         private int $tam_arch = 0
     ) {
-        $this->sheetImport = new NominasSheetImport($this->periodo, $this->tipoliq, $this->nom_arch, $this->tam_arch);
+        $this->sheetImport = new NominasSheetImport($this->periodo, $this->idEmpresa, $this->nom_arch, $this->tam_arch);
     }
 
     public function sheets(): array
