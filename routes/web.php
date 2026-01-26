@@ -11,7 +11,9 @@ use App\Http\Controllers\SicossCondicController;
 use App\Http\Controllers\SicossModalidadController;
 use App\Http\Controllers\SicossSituacionController;
 use App\Http\Controllers\SicossObrasSocialesController;
+use App\Http\Controllers\SicossSiniestroController;
 use App\Http\Controllers\SicossImportarController;
+use App\Http\Controllers\SicossLocalidadesController;
 use Inertia\Inertia;
 
 // Route::get('/', function () {
@@ -176,6 +178,49 @@ Route::middleware('auth')->group(function () {
         ]);
     });
 
+    // Sicoss: Siniestros
+    Route::get('sicoss/siniestros/search', [SicossSiniestroController::class, 'search'])
+        ->name('sicoss.siniestros.search');
+
+    Route::get('sicoss/siniestros/first', [SicossSiniestroController::class, 'first'])
+        ->name('sicoss.siniestros.first');
+
+    Route::get('sicoss/siniestros/last', [SicossSiniestroController::class, 'last'])
+        ->name('sicoss.siniestros.last');
+
+    Route::get('sicoss/siniestros/{SicossSinie}/previous', [SicossSiniestroController::class, 'previous'])
+        ->name('sicoss.siniestros.previous');
+
+    Route::get('sicoss/siniestros/{SicossSinie}/next', [SicossSiniestroController::class, 'next'])
+        ->name('sicoss.siniestros.next');
+
+    // Resource al final
+    Route::resource('sicoss/siniestros', SicossSiniestroController::class)
+        ->parameters(['siniestros' => 'siniestro'])
+        ->names('sicoss.siniestros');
+
+    // Sicoss: Zonas/Localidades
+    Route::get('sicoss/localidades/search', [SicossLocalidadesController::class, 'search'])
+        ->name('sicoss.localidades.search');
+
+    Route::get('sicoss/localidades/first', [SicossLocalidadesController::class, 'first'])
+        ->name('sicoss.localidades.first');
+
+    Route::get('sicoss/localidades/last', [SicossLocalidadesController::class, 'last'])
+        ->name('sicoss.localidades.last');
+
+    Route::get('sicoss/localidades/{SicossSinie}/previous', [SicossLocalidadesController::class, 'previous'])
+        ->name('sicoss.localidades.previous');
+
+    Route::get('sicoss/localidades/{SicossSinie}/next', [SicossLocalidadesController::class, 'next'])
+        ->name('sicoss.localidades.next');
+
+    // Resource al final
+    Route::resource('sicoss/localidades', SicossLocalidadesController::class)
+        ->parameters(['localidades' => 'siniestro'])
+        ->names('sicoss.localidades');
+
+    // Importaciones
     Route::get('/sicoss/importar/exportar-ok', [SicossImportarController::class, 'exportarOk'])->name('sicoss.importar.exportarOk');
     Route::get('/sicoss/importar/exportar-err', [SicossImportarController::class, 'exportarErr'])->name('sicoss.importar.exportarErr');
     

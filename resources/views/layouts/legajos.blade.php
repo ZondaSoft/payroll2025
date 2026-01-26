@@ -247,8 +247,8 @@
 
               <ul class="menu-sub">
                 <li class="menu-item {{ $active==63?'active':' ' }}">
-                  <a href="/sicoss/zonas" class="menu-link">
-                    <div data-i18n="Zonas">Zonas</div>
+                  <a href="/sicoss/localidades" class="menu-link">
+                    <div data-i18n="Zonas/Localidades">Zonas/Localidades</div>
                   </a>
                 </li>
               </ul>

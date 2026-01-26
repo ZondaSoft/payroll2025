@@ -16,7 +16,7 @@ $(function () {
     // ajax: '/tasks/json',
 
     dt_basic = dt_basic_table.DataTable({
-      ajax: '/zonas/json',
+      ajax: '/localidades/json',
       columns: [
         { data: '' },
         { data: 'id' },
@@ -80,8 +80,8 @@ $(function () {
                 // $initials = $name.match(/\b\w/g) || [];
                 // $initials = (($initials.shift() || '') + ($initials.pop() || '')).toUpperCase();
                 $initials = ''
-                //   $output = '<span class="avatar-initial rounded-circle bg-label-' + $state + '">' + $initials + '</span>';
-                $output = '';
+              //   $output = '<span class="avatar-initial rounded-circle bg-label-' + $state + '">' + $initials + '</span>';
+              $output = '';
             }
 
             // Daniel chequear
@@ -145,7 +145,7 @@ $(function () {
             var $id = full['id'];
 
             return (
-              '<a href="/zonas/' + $id + '" class="btn btn-sm btn-text-secondary rounded-pill btn-icon item-edit"><i class="ri-edit-box-line"></i></a>'
+              '<a href="/localidades/' + $id + '" class="btn btn-sm btn-text-secondary rounded-pill btn-icon item-edit"><i class="ri-edit-box-line"></i></a>'
             );
           }
         }
@@ -274,18 +274,18 @@ $(function () {
             var data = $.map(columns, function (col, i) {
               return col.title !== '' // ? Do not show row in modal popup if title is blank (for check box)
                 ? '<tr data-dt-row="' +
-                    col.rowIndex +
-                    '" data-dt-column="' +
-                    col.columnIndex +
-                    '">' +
-                    '<td>' +
-                    col.title +
-                    ':' +
-                    '</td> ' +
-                    '<td>' +
-                    col.data +
-                    '</td>' +
-                    '</tr>'
+                col.rowIndex +
+                '" data-dt-column="' +
+                col.columnIndex +
+                '">' +
+                '<td>' +
+                col.title +
+                ':' +
+                '</td> ' +
+                '<td>' +
+                col.data +
+                '</td>' +
+                '</tr>'
                 : '';
             }).join('');
 
@@ -294,7 +294,7 @@ $(function () {
         }
       }
     });
-    $('div.head-label').html('<h5 class="card-title mb-0">Buscar zonas de servicios</h5>');
+    $('div.head-label').html('<h5 class="card-title mb-0">Buscar Zonas/Localidades</h5>');
   }
 
   // Add New record
@@ -306,7 +306,7 @@ $(function () {
       $new_post = $('.add-new-record .dt-post').val(),
       $new_detalle = $('.add-new-record .dt-detalle').val(),
       $new_date = $('.add-new-record .dt-date').val() //,
-      //$new_salary = $('.add-new-record .dt-salary').val();
+    //$new_salary = $('.add-new-record .dt-salary').val();
 
     //alert($new_name);
 

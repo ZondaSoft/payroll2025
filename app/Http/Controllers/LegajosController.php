@@ -231,8 +231,68 @@ class LegajosController extends Controller
      */
     public function show(Sue001 $empleado)
     {
-        return Inertia::render('Empleados/Show', [
-            'empleado' => $empleado,
+        $legajo = $empleado;
+        $agregar = False;
+        $edicion = False;    // True: Muestra botones Grabar - Cancelar   //  False: Muestra botones: Agregar, Editar, Borrar
+        $active = 65;
+        //$now = Carbon::now();
+        $alta = '';
+        $rol = '';
+
+        // Obtener el usuario actual autenticado
+        $user = auth()->user();
+
+        // Recupero roles del usuario
+        $roles = $user->getRoleNames(); // Retorna una colección de roles
+        if ($roles) {
+            $rol = $roles->first();
+        }
+
+        // Tablas complementarias
+        $localidades = Sue019::orderBy('codigo')->get();
+        $grupos     = Sue086::orderBy('detalle')->whereNotNull('codigo')->where('codigo', '!=', "")->get();
+        $sectores   = Sue011::orderBy('detalle')->whereNotNull('codigo')->where('codigo', '!=', "")->get();
+        $situacionesLab = Sue005::orderBy('detalle')->whereNotNull('codigo')->where('codigo', '!=', "")->get();
+        $jornadas   = Sue010::orderBy('detalle')->whereNotNull('id')->get();
+        $ccostos    = Sue030::orderBy('detalle')->get();
+        $jerarquias = Sue014::orderBy('detalle')->get();
+        $categorias = Sue006::orderBy('detalle')->whereNotNull('codigo')->where('codigo', '!=', "")->get();
+        $cuadrillas = Sue054::orderBy('detalle')->get();
+        $obras      = Sue009::orderBy('detalle')->whereNotNull('codigo')->where('codigo', '!=', "")->get();
+        $sindicatos = Sue015::orderBy('detalle')->whereNotNull('codigo')->where('codigo', '!=', "")->get();
+        $convenios  = Sue007::orderBy('detalle')->get();
+        $contratos = Sue107::orderBy('detalle')->get(['codigo','detalle','duracion']);
+        $horarios   = Sue094::orderBy('detalle')->get();
+        $actividades = Sicoss01::orderBy('codigo')->get();
+        $condiciones = Sicoss05::orderBy('codigo')->get();
+        $contrataciones = Sicoss08::orderBy('codigo')->get();
+        $situaciones = Sicoss12::orderBy('codigo')->get();
+        $obras2 = SicossObras::orderBy('codigo')->get();
+        $zonas = SicossZona::orderBy('codigo')->get();
+        $sinie = SicossSinie::orderBy('codigo')->get();
+        $provincias = Sue012::orderBy('codigo')->where('codigo','!=','')->get();
+        $capacidades = Sue052::orderBy('codigo')->paginate(12);
+        $bancos = Fza002::orderBy('detalle')->get();
+        $sicossCodBajas = SicossCodigosBaja::orderBy('detalle')->get();
+        $historial = Sue074::orderBy('id')->where('legajo_codigo', '=', $empleado->codigo)->get();
+
+        return Inertia::render('Empleados/Index', [
+            'legajo' => $legajo,
+            'agregar' => $agregar,
+            'edicion' => $edicion,
+            'active' => $active,
+            'provincias' => $provincias,
+            'grupos' => $grupos,
+            'jerarquias' => $jerarquias,
+            'categorias' => $categorias,
+            'ccostos' => $ccostos,
+            'sectores' => $sectores,
+            'cuadrillas' => $cuadrillas,
+            'obras' => $obras2,
+            'sindicatos' => $sindicatos,
+            'convenios' => $convenios,
+            'contrataciones' => $contrataciones,
+            'situacionesLab' => $situacionesLab,
         ]);
     }
 

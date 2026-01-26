@@ -123,7 +123,7 @@ class NominasSheetImport implements ToModel, WithChunkReading
             if ($legajoExistente) {
                 // Recopilo datos antes de actualizarlos
                 $actividadAnterior = $legajoExistente->sicoss_activ;
-                $situacionAnterior = $legajoExistente->sicoss_situacion;
+                $situacionAnterior = $legajoExistente->sicoss_situa;
                 $modalidadAnterior = $legajoExistente->sicoss_modal;
                 $condicionAnterior = $legajoExistente->sicoss_condi;
                 $siniestroAnterior = $legajoExistente->sicoss_sini;
@@ -132,7 +132,7 @@ class NominasSheetImport implements ToModel, WithChunkReading
                 // Actualizo el legajo
                 $legajoExistente->update([
                     'sicoss_activ' => $actividad,
-                    'sicoss_situacion' => $situacion,
+                    'sicoss_situa' => $situacion,
                     'sicoss_modal' => $modalidad,
                     'sicoss_condi' => $condicion,
                     'sicoss_sini' => $siniestro,
@@ -143,26 +143,28 @@ class NominasSheetImport implements ToModel, WithChunkReading
                     $descripcion = 'Legajo actualizado';
 
                     if  ($actividadAnterior != $actividad)
-                        $descripcion = 'Legajo actualizado - Actividad: ' . $actividadAnterior . ' -> ' . $actividad;
+                        $descripcion = $descripcion . ' - Actividad: ' . $actividadAnterior . ' -> ' . $actividad;
 
                     if  ($situacionAnterior != $situacion)
-                        $descripcion = 'Legajo actualizado - Situación: ' . $situacionAnterior . ' -> ' . $situacion;
+                        $descripcion = ' - Situación: ' . $situacionAnterior . ' -> ' . $situacion;
 
                     if  ($modalidadAnterior != $modalidad)
-                        $descripcion = 'Legajo actualizado - Modalidad: ' . $modalidadAnterior . ' -> ' . $modalidad;
+                        $descripcion = ' - Modalidad: ' . $modalidadAnterior . ' -> ' . $modalidad;
 
                     if  ($condicionAnterior != $condicion)
-                        $descripcion = 'Legajo actualizado - Condición: ' . $condicionAnterior . ' -> ' . $condicion;
+                        $descripcion = ' - Condición: ' . $condicionAnterior . ' -> ' . $condicion;
 
                     if  ($siniestroAnterior != $siniestro)
-                        $descripcion = 'Legajo actualizado - Siniestro: ' . $siniestroAnterior . ' -> ' . $siniestro;
+                        $descripcion = ' - Siniestro: ' . $siniestroAnterior . ' -> ' . $siniestro;
 
                     if  ($localidadAnterior != $localidad)
-                        $descripcion = 'Legajo actualizado - Localidad: ' . $localidadAnterior . ' -> ' . $localidad;
-                    
+                        $descripcion = ' - Localidad: ' . $localidadAnterior . ' -> ' . $localidad;
+
                 } else {
-                    $descripcion = 'Legajo no actualizado';
+                    $descripcion = 'Legajo no actualizado (Todos los datos importados coinciden)';
                 }
+
+                $descripcion = mb_substr($descripcion, 0, 255);
 
                 // Grabo log del registro con exito
                 ImportLiquidacionOk::create([
