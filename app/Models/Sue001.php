@@ -23,8 +23,9 @@ class Sue001 extends Model
 	protected $fillable = ['codigo','detalle','nombres','num_doc','cuil','nacionali','fecha_naci','est_civil','sexo',
 		'domici','email','tel1','alta','baja','funcion','situacion','salud','cod_obraso','cod_sindic','cod_centro','area',
 		'convenio','zona','tipo_jornada','posicion','empresa','locali','grupo_emp','codsector','jornada_id','cod_jerarq','cod_categ',
-		'bruto','bruto_azul',
-		'reloj_usa'];
+		'bruto','bruto_azul','reloj_usa',
+		'sicoss_activ', 'sicoss_situacion', 'sicoss_modal', 'sicoss_condi', 'sicoss_sini', 'sicoss_zona'
+	];
 
 	protected $guarded = ['id','_token' ]; // every field to protect
 

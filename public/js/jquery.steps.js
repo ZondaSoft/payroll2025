@@ -545,6 +545,8 @@
         }
         //}
 
+        console.log("index", index);
+
         return paginationClick(wizard, options, state, increaseCurrentIndexBy(state, 1));
     }
 

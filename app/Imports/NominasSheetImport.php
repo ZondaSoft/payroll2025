@@ -96,14 +96,17 @@ class NominasSheetImport implements ToModel, WithChunkReading
             $legajoExistente = Sue001::where('cuil', $cuil)->first();
 
             if (!$legajoExistente) {
-                $this->rechazados++;
                 $this->count++;
 
-                // Grabo log del registro con error
-                ImportLiquidacionErr::create([
-                    'registro' => $this->count,
-                    'detalle' => "El CUIL importado no existe en la nomina de legajos activos : " . $cuil,
-                ]);
+                if ($this->count > 5) {
+                    $this->rechazados++;
+
+                    // Grabo log del registro con error
+                    ImportLiquidacionErr::create([
+                        'registro' => $this->count,
+                        'detalle' => "El CUIL importado no existe en la nomina de legajos activos : " . $cuil,
+                    ]);
+                }
 
                 return null;
             }
@@ -118,14 +121,13 @@ class NominasSheetImport implements ToModel, WithChunkReading
             $localidad = $row[11];
 
             if ($legajoExistente) {
-                // Grabo log del registro con exito
-                ImportLiquidacionOk::create([
-                    'registro' => $this->count,
-                    'legajo' => $legajo,
-                    'descripcion' => $descripcion,
-                    'importe' => 0,
-                    'detalle' => 'Importación exitosa',
-                ]);
+                // Recopilo datos antes de actualizarlos
+                $actividadAnterior = $legajoExistente->sicoss_activ;
+                $situacionAnterior = $legajoExistente->sicoss_situacion;
+                $modalidadAnterior = $legajoExistente->sicoss_modal;
+                $condicionAnterior = $legajoExistente->sicoss_condi;
+                $siniestroAnterior = $legajoExistente->sicoss_sini;
+                $localidadAnterior = $legajoExistente->sicoss_zona;
 
                 // Actualizo el legajo
                 $legajoExistente->update([
@@ -135,6 +137,40 @@ class NominasSheetImport implements ToModel, WithChunkReading
                     'sicoss_condi' => $condicion,
                     'sicoss_sini' => $siniestro,
                     'sicoss_zona' => $localidad,
+                ]);
+
+                if ($actividadAnterior != $actividad || $situacionAnterior != $situacion || $modalidadAnterior != $modalidad || $condicionAnterior != $condicion || $siniestroAnterior != $siniestro || $localidadAnterior != $localidad) {
+                    $descripcion = 'Legajo actualizado';
+
+                    if  ($actividadAnterior != $actividad)
+                        $descripcion = 'Legajo actualizado - Actividad: ' . $actividadAnterior . ' -> ' . $actividad;
+
+                    if  ($situacionAnterior != $situacion)
+                        $descripcion = 'Legajo actualizado - Situación: ' . $situacionAnterior . ' -> ' . $situacion;
+
+                    if  ($modalidadAnterior != $modalidad)
+                        $descripcion = 'Legajo actualizado - Modalidad: ' . $modalidadAnterior . ' -> ' . $modalidad;
+
+                    if  ($condicionAnterior != $condicion)
+                        $descripcion = 'Legajo actualizado - Condición: ' . $condicionAnterior . ' -> ' . $condicion;
+
+                    if  ($siniestroAnterior != $siniestro)
+                        $descripcion = 'Legajo actualizado - Siniestro: ' . $siniestroAnterior . ' -> ' . $siniestro;
+
+                    if  ($localidadAnterior != $localidad)
+                        $descripcion = 'Legajo actualizado - Localidad: ' . $localidadAnterior . ' -> ' . $localidad;
+                    
+                } else {
+                    $descripcion = 'Legajo no actualizado';
+                }
+
+                // Grabo log del registro con exito
+                ImportLiquidacionOk::create([
+                    'registro' => $this->count,
+                    'legajo' => $legajo,
+                    'descripcion' => $descripcion,
+                    'importe' => 0,
+                    'detalle' => $descripcion,
                 ]);
 
             } else {
