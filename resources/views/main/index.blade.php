@@ -121,6 +121,28 @@
                             </div>
                         <!-- @ endcan -->
 
+                            <div class="col-2" id="btnImportarSicoss" name="btnImportarSicoss">
+                                <div class="d-flex flex-column align-items-center">
+                                <div class="avatar">
+                                    <a href="/arca/importar" class="avatar-initial bg-label-success rounded-3">
+                                    <i class="ri-download-line ri-24px"></i>
+                                    </div>
+                                </a>
+                                <p class="mt-3 mb-1 text-center">Importar conceptos desde ARCA</p>
+                                </div>
+                            </div>
+
+                            <div class="col-2" id="btnImportarSicoss" name="btnImportarSicoss">
+                                <div class="d-flex flex-column align-items-center">
+                                <div class="avatar">
+                                    <a href="/arca/importar" class="avatar-initial bg-label-warning rounded-3">
+                                    <i class="ri-download-line ri-24px"></i>
+                                    </div>
+                                </a>
+                                <p class="mt-3 mb-1 text-center">Importar Liquidación de haberes</p>
+                                </div>
+                            </div>
+
                         <!-- @ can('services.requisition') -->
                             <div class="col-2" id="btnRequisicionServ" name="btnRequisicionServ">
                                 <div class="d-flex flex-column align-items-center">

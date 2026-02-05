@@ -164,20 +164,6 @@ Route::middleware('auth')->group(function () {
         ->parameters(['obras' => 'obra'])
         ->names('sicoss.obras');
 
-    // Sicoss importacion de datos de empleados
-    Route::get('sicoss/importar', [SicossImportarController::class, 'index'])
-        ->name('sicoss.importar');
-
-    Route::post('sicoss/importar2', [SicossImportarController::class, 'importar'])
-        ->name('sicoss.importar2');
-
-    Route::get('/import/status', function () {
-        return response()->json([
-            'ok' => \App\Models\ImportLiquidacionOk::count(),
-            'err' => \App\Models\ImportLiquidacionErr::count(),
-        ]);
-    });
-
     // Sicoss: Siniestros
     Route::get('sicoss/siniestros/search', [SicossSiniestroController::class, 'search'])
         ->name('sicoss.siniestros.search');
@@ -220,6 +206,22 @@ Route::middleware('auth')->group(function () {
         ->parameters(['localidades' => 'siniestro'])
         ->names('sicoss.localidades');
 
+    //--------------------------------------------
+    // Sicoss importacion de datos de empleados
+    //---------------------------------------------
+    Route::get('sicoss/importar', [SicossImportarController::class, 'index'])
+        ->name('sicoss.importar');
+
+    Route::post('sicoss/importar2', [SicossImportarController::class, 'importar'])
+        ->name('sicoss.importar2');
+
+    Route::get('/import/status', function () {
+        return response()->json([
+            'ok' => \App\Models\ImportLiquidacionOk::count(),
+            'err' => \App\Models\ImportLiquidacionErr::count(),
+        ]);
+    });
+
     // Importaciones
     Route::get('/sicoss/importar/exportar-ok', [SicossImportarController::class, 'exportarOk'])->name('sicoss.importar.exportarOk');
     Route::get('/sicoss/importar/exportar-err', [SicossImportarController::class, 'exportarErr'])->name('sicoss.importar.exportarErr');
@@ -227,7 +229,60 @@ Route::middleware('auth')->group(function () {
     Route::get('/sicoss/importar/resumen', [SicossImportarController::class, 'resumenLiq'])->name('sicoss.importar.resumen');
     Route::get('/sicoss/importar/resumen/export-xlsx', [SicossImportarController::class, 'resumenLiqExportXlsx'])->name('sicoss.importar.resumen.export.xlsx');
 
-    Route::get('/sicoss/import-resultados', [SicossImportarController::class, 'resultadosImport'])->name('recibos.import.resultados');
+    Route::get('/sicoss/import-resultados', [SicossImportarController::class, 'resultadosImport'])->name('sicoss.import.resultados');
+
+    //--------------------------------------------
+    // ARCA importacion de conceptos
+    //---------------------------------------------
+    Route::get('arca/importar', [SicossImportarController::class, 'index'])
+        ->name('arca.importar');
+
+    Route::post('arca/importar2', [SicossImportarController::class, 'importar'])
+        ->name('arca.importar2');
+
+    Route::get('/import/status', function () {
+        return response()->json([
+            'ok' => \App\Models\ImportLiquidacionOk::count(),
+            'err' => \App\Models\ImportLiquidacionErr::count(),
+        ]);
+    });
+
+    // Importaciones
+    Route::get('/arca/importar/exportar-ok', [SicossImportarController::class, 'exportarOk'])->name('arca.importar.exportarOk');
+    Route::get('/arca/importar/exportar-err', [SicossImportarController::class, 'exportarErr'])->name('arca.importar.exportarErr');
+    
+    Route::get('/arca/importar/resumen', [SicossImportarController::class, 'resumenLiq'])->name('arca.importar.resumen');
+    Route::get('/arca/importar/resumen/export-xlsx', [SicossImportarController::class, 'resumenLiqExportXlsx'])->name('arca.importar.resumen.export.xlsx');
+
+    Route::get('/arca/import-resultados', [SicossImportarController::class, 'resultadosImport'])->name('arca.import.resultados');
+
+    //--------------------------------------------
+    // Importacion de liquidaciones (BASEDAT)
+    //---------------------------------------------
+    Route::get('basedat/importar', [SicossImportarController::class, 'index'])
+        ->name('basedat.importar');
+
+    Route::post('basedat/importar2', [SicossImportarController::class, 'importar'])
+        ->name('basedat.importar2');
+
+    Route::get('/basedat/import/status', function () {
+        return response()->json([
+            'ok' => \App\Models\ImportLiquidacionOk::count(),
+            'err' => \App\Models\ImportLiquidacionErr::count(),
+        ]);
+    });
+
+    // Importaciones
+    Route::get('/basedat/importar/exportar-ok', [SicossImportarController::class, 'exportarOk'])->name('basedat.importar.exportarOk');
+    Route::get('/basedat/importar/exportar-err', [SicossImportarController::class, 'exportarErr'])->name('basedat.importar.exportarErr');
+    
+    Route::get('/basedat/importar/resumen', [SicossImportarController::class, 'resumenLiq'])->name('basedat.importar.resumen');
+    Route::get('/basedat/importar/resumen/export-xlsx', [SicossImportarController::class, 'resumenLiqExportXlsx'])->name('basedat.importar.resumen.export.xlsx');
+
+    Route::get('/basedat/import-resultados', [SicossImportarController::class, 'resultadosImport'])->name('basedat.import.resultados');
+
+
+    
 });
 
 require __DIR__.'/auth.php';
