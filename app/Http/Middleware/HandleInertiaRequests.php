@@ -62,6 +62,11 @@ class HandleInertiaRequests extends Middleware
             return 'layouts/legajos';
         }
 
+        // LSD
+        if ($request->is('lsd*')) {
+            return 'layouts/legajos';
+        }
+
         // Layout por defecto
         return 'guest';
     }

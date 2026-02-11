@@ -259,7 +259,7 @@
     // Definimos el callback (qué hacer después de subir el archivo)
     function miCallback(resultado) {
         if (resultado) {
-            // Consultar resultados en una llamada aparte
+            // Consultar resultados de la importacion de sicoss
             if (window.location.pathname === '/sicoss/importar') {
                 fetch("/sicoss/import-resultados")
                     .then(res => res.json())
@@ -335,6 +335,46 @@
                     })
                     .catch(err => console.error("Error al consultar resultados:", err));
             }
+
+            // Consultar resultados de la importacion de conceptos de ARCA
+            if (window.location.pathname === '/arca/importar') {
+                fetch("/arca/import-resultados")
+                    .then(res => res.json())
+                    .then(data => {
+                        // Actualizar contadores en el DOM
+
+                        // Mostrar y actualizar registros OK
+                        const registrosOk = document.getElementById('registrosOk');
+                        registrosOk.innerText = "Registros importados correctamente: " + data.count;
+                        registrosOk.removeAttribute('hidden');
+
+                        const btnOk = document.getElementById('btn-ok');
+                        btnOk.removeAttribute('hidden');
+                        btnOk.onclick = () => {
+                            window.location.href = "/arca/importar/exportar-ok";
+                        };
+
+                        // Mostrar y actualizar registros Err
+                        const registrosErr = document.getElementById('registrosErr');
+                        registrosErr.innerText = "Registros rechazados: " + data.rechazados;
+                        registrosErr.removeAttribute('hidden');
+
+                        const btnErr = document.getElementById('btn-err');
+                        btnErr.removeAttribute('hidden');
+                        btnErr.onclick = () => {
+                            window.location.href = "/arca/importar/exportar-err";
+                        };
+
+                        document.getElementById('titleFinish').innerText =
+                            'Proceso de importación finalizado';
+
+                        // Habilito botones del stepper
+                        $(".actions a[href$='#previous']").removeClass("disabled");
+                        $(".actions a[href$='#finish']").removeClass("disabled");
+                    })
+                    .catch(err => console.error("Error al consultar resultados:", err));
+            }
+            
         } else {
             document.getElementById('registrosOk').innerText =
                 '';

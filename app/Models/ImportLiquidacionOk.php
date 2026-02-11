@@ -13,6 +13,7 @@ class ImportLiquidacionOk extends Model
         'registro',
         'periodo',
         'legajo',
+        'cuil',
         'descripcion',
         'importe',
         'detalle',

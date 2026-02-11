@@ -12,7 +12,7 @@ return new class extends Migration
     public function up(): void
     {
         Schema::table('import_liquidacion_oks', function (Blueprint $table) {
-            $table->string('descripcion', 400)->nullable()->change();
+            $table->string('cuil', 13)->nullable()->after('legajo');
         });
     }
 
@@ -22,7 +22,7 @@ return new class extends Migration
     public function down(): void
     {
         Schema::table('import_liquidacion_oks', function (Blueprint $table) {
-            $table->string('descripcion', 50)->change();
+            $table->dropColumn('cuil');
         });
     }
 };

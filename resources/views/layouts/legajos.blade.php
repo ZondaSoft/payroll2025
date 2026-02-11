@@ -168,6 +168,36 @@
                 </li>
               </ul>
             </li>
+            <!-- Libro de sueldo digital -->
+            <li class="menu-item  {{ $active>=20?'active open':' ' }}">
+              <a href="javascript:void(0);" class="menu-link menu-toggle">
+                <i class="menu-icon tf-icons ri-bill-line"></i>
+                <div data-i18n="Libro Sueldo Digital">Libro Sueldo Digital</div>
+              </a>
+              <ul class="menu-sub">
+                <li class="menu-item {{ $active==9?'active':' ' }}">
+                  <a href="/sicoss/importar" class="menu-link">
+                    <div data-i18n="Importar legajos Sicoss">Importar legajos Sicoss</div>
+                  </a>
+                </li>
+                <li class="menu-item {{ $active==10?'active':' ' }}">
+                  <a href="/arca/importar" class="menu-link">
+                    <div data-i18n="Importar conceptos ARCA">Importar conceptos ARCA</div>
+                  </a>
+                </li>
+                <li class="menu-item {{ $active==10?'active':' ' }}">
+                  <a href="/basedat/importar" class="menu-link">
+                    <div data-i18n="Importar liquidación de haberes">Importar liquidación de haberes</div>
+                  </a>
+                </li>
+                <li class="menu-item {{ $active==10?'active':' ' }}">
+                  <a href="/lsd/generar" class="menu-link">
+                    <div data-i18n="Generar LSD">Generar LSD</div>
+                  </a>
+                </li>
+              </ul>
+            </li>
+
             <!-- Forms & Tables -->
             <li class="menu-header mt-5">
               <span class="menu-header-text" data-i18n="Informes">Informes</span>

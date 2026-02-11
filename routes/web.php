@@ -13,7 +13,9 @@ use App\Http\Controllers\SicossSituacionController;
 use App\Http\Controllers\SicossObrasSocialesController;
 use App\Http\Controllers\SicossSiniestroController;
 use App\Http\Controllers\SicossImportarController;
+use App\Http\Controllers\ArcaImportarController;
 use App\Http\Controllers\SicossLocalidadesController;
+use App\Http\Controllers\LsdController;
 use Inertia\Inertia;
 
 // Route::get('/', function () {
@@ -234,10 +236,13 @@ Route::middleware('auth')->group(function () {
     //--------------------------------------------
     // ARCA importacion de conceptos
     //---------------------------------------------
-    Route::get('arca/importar', [SicossImportarController::class, 'index'])
+    Route::get('arca/importar', [ArcaImportarController::class, 'index'])
         ->name('arca.importar');
 
-    Route::post('arca/importar2', [SicossImportarController::class, 'importar'])
+    Route::get('arca/empresa/{id}/cuit', [ArcaImportarController::class, 'obtenerCuit'])
+        ->name('arca.empresa.cuit');
+
+    Route::post('arca/importar2', [ArcaImportarController::class, 'importar'])
         ->name('arca.importar2');
 
     Route::get('/import/status', function () {
@@ -248,13 +253,12 @@ Route::middleware('auth')->group(function () {
     });
 
     // Importaciones
-    Route::get('/arca/importar/exportar-ok', [SicossImportarController::class, 'exportarOk'])->name('arca.importar.exportarOk');
-    Route::get('/arca/importar/exportar-err', [SicossImportarController::class, 'exportarErr'])->name('arca.importar.exportarErr');
+    Route::get('/arca/importar/exportar-ok', [ArcaImportarController::class, 'exportarOk'])->name('arca.importar.exportarOk');
+    Route::get('/arca/importar/exportar-err', [ArcaImportarController::class, 'exportarErr'])->name('arca.importar.exportarErr');
     
-    Route::get('/arca/importar/resumen', [SicossImportarController::class, 'resumenLiq'])->name('arca.importar.resumen');
-    Route::get('/arca/importar/resumen/export-xlsx', [SicossImportarController::class, 'resumenLiqExportXlsx'])->name('arca.importar.resumen.export.xlsx');
-
-    Route::get('/arca/import-resultados', [SicossImportarController::class, 'resultadosImport'])->name('arca.import.resultados');
+    Route::get('/arca/importar/resumen', [ArcaImportarController::class, 'resumenLiq'])->name('arca.importar.resumen');
+    Route::get('/arca/importar/resumen/export-xlsx', [ArcaImportarController::class, 'resumenLiqExportXlsx'])->name('arca.importar.resumen.export.xlsx');
+    Route::get('/arca/import-resultados', [ArcaImportarController::class, 'resultadosImport'])->name('arca.import.resultados');
 
     //--------------------------------------------
     // Importacion de liquidaciones (BASEDAT)
@@ -281,6 +285,17 @@ Route::middleware('auth')->group(function () {
 
     Route::get('/basedat/import-resultados', [SicossImportarController::class, 'resultadosImport'])->name('basedat.import.resultados');
 
+    //--------------------------------------------
+    // Libro de Sueldo Digital (LSD)
+    //---------------------------------------------
+    Route::prefix('lsd')->name('lsd.')->group(function () {
+        Route::get('/generar', [LsdController::class, 'generar'])->name('generar');
+        Route::post('/generar-emision', [LsdController::class, 'generarEmision'])->name('generar.emision');
+        Route::get('/emision/{id}', [LsdController::class, 'obtenerEmision'])->name('emision');
+        Route::put('/emision/{id}/estado', [LsdController::class, 'actualizarEstado'])->name('emision.estado');
+        Route::get('/listar', [LsdController::class, 'listar'])->name('listar');
+        Route::delete('/emision/{id}', [LsdController::class, 'eliminar'])->name('emision.eliminar');
+    });
 
     
 });

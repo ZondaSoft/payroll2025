@@ -135,7 +135,7 @@
                             <div class="col-2" id="btnImportarSicoss" name="btnImportarSicoss">
                                 <div class="d-flex flex-column align-items-center">
                                 <div class="avatar">
-                                    <a href="/arca/importar" class="avatar-initial bg-label-warning rounded-3">
+                                    <a href="/basedat/importar" class="avatar-initial bg-label-warning rounded-3">
                                     <i class="ri-download-line ri-24px"></i>
                                     </div>
                                 </a>
@@ -143,10 +143,10 @@
                                 </div>
                             </div>
 
-                        <!-- @ can('services.requisition') -->
+                            <!-- @ can('services.requisition') -->
                             <div class="col-2" id="btnRequisicionServ" name="btnRequisicionServ">
                                 <div class="d-flex flex-column align-items-center">
-                                <a href="/requisition1" class="avatar">
+                                <a href="/lsd/generar" class="avatar">
                                     <div class="avatar-initial bg-label-primary rounded-3">
                                     <i class="ri-file-text-line ri-24px"></i>
                                     </div>
@@ -157,20 +157,20 @@
 
                             <div class="col-1 arrow-line" style="margin-top: 20px;" hidden>
                             </div>
-                        <!-- @ endcan -->
+                            <!-- @ endcan -->
 
-                        <!-- @ can('services.ordenes') -->
-                            <!-- <div class="col-2" id="btnRequisicionServ" name="btnRequisicionServ">
-                                <div class="d-flex flex-column align-items-center">
-                                <a href="/servicios/orden-serv1" class="avatar">
-                                    <div class="avatar-initial bg-label-primary rounded-3">
-                                    <div class="ri-money-dollar-circle-line ri-24px"></div>
+                            <!-- @ can('services.ordenes') -->
+                                <!-- <div class="col-2" id="btnRequisicionServ" name="btnRequisicionServ">
+                                    <div class="d-flex flex-column align-items-center">
+                                    <a href="/servicios/orden-serv1" class="avatar">
+                                        <div class="avatar-initial bg-label-primary rounded-3">
+                                        <div class="ri-money-dollar-circle-line ri-24px"></div>
+                                        </div>
+                                    </a>
+                                    <p class="mt-3 mb-1 text-center">Ordenes de servicio</p>
                                     </div>
-                                </a>
-                                <p class="mt-3 mb-1 text-center">Ordenes de servicio</p>
-                                </div>
-                            </div> -->
-                        <!-- @ endcan -->
+                                </div> -->
+                            <!-- @ endcan -->
                     </div>
 
                 </div>

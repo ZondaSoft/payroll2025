@@ -111,14 +111,46 @@ class NominasSheetImport implements ToModel, WithChunkReading
                 return null;
             }
 
-            $legajo = $legajoExistente->legajo;
+            $legajo = $legajoExistente->codigo;
             $descripcion = 'Legajo actualizado';
-            $condicion = $row[7];
-            $situacion = $row[6];
-            $actividad = $row[8];
-            $modalidad = $row[9];
-            $siniestro = $row[10];
-            $localidad = $row[11];
+            $obra = $row[2];
+            $reduccion = $row[3];
+            if ($reduccion === 'Sí' || $reduccion === 'si' || $reduccion === 'SI') {
+                $reduccion = true;
+            } else {
+                $reduccion = false;
+            }
+            
+            $cobScvo = $row[4];
+            if ($cobScvo === 'Sí' || $cobScvo === 'si' || $cobScvo === 'SI') {
+                $cobScvo = true;
+            } else {
+                $cobScvo = false;
+            }
+
+            $situacion = $row[5];
+            $condicion = $row[6];
+            $actividad = $row[7];
+            $modalidad = $row[8];
+            $siniestro = $row[9];
+            $localidad = $row[10];
+            $porcReduccion = $row[11];
+            $conyugue = $row[12];
+            if ($conyugue === 'Sí' || $conyugue === 'si' || $conyugue === 'SI') {
+                $conyugue = true;
+            } else {
+                $conyugue = false;
+            }
+
+            $hijos = $row[13];
+            $adherente = $row[14];
+            
+            $situ_revista1 = $row[27];
+            $dia_revista1 = $row[28];
+            $situ_revista2 = $row[29];
+            $dia_revista2 = $row[30];
+            $situ_revista3 = $row[31];
+            $dia_revista3 = $row[32];
 
             if ($legajoExistente) {
                 // Recopilo datos antes de actualizarlos
@@ -128,6 +160,14 @@ class NominasSheetImport implements ToModel, WithChunkReading
                 $condicionAnterior = $legajoExistente->sicoss_condi;
                 $siniestroAnterior = $legajoExistente->sicoss_sini;
                 $localidadAnterior = $legajoExistente->sicoss_zona;
+                $obraAnterior = $legajoExistente->obra_sijp;
+                
+                $reduccionAnterior = $legajoExistente->sicoss_reduccion;
+                $cobScvoAnterior = $legajoExistente->sicoss_cob_scvo;
+                $porcReduccionAnterior = $legajoExistente->sicoss_porc_reduc;
+                $conyugueAnterior = $legajoExistente->sicoss_conyuge;
+                $hijosAnterior = $legajoExistente->sicoss_hijos;
+                $adherenteAnterior = $legajoExistente->sicoss_adherentes;
 
                 // Actualizo el legajo
                 $legajoExistente->update([
@@ -137,28 +177,62 @@ class NominasSheetImport implements ToModel, WithChunkReading
                     'sicoss_condi' => $condicion,
                     'sicoss_sini' => $siniestro,
                     'sicoss_zona' => $localidad,
+                    'obra_sijp' => $obra,
+                    'sicoss_reduccion' => $reduccion,
+                    'sicoss_cob_scvo' => $cobScvo,
+                    'sicoss_porc_reduc' => $porcReduccion,
+                    'sicoss_conyuge' => $conyugue,
+                    'sicoss_hijos' => $hijos,
+                    'sicoss_adherentes' => $adherente,
                 ]);
 
-                if ($actividadAnterior != $actividad || $situacionAnterior != $situacion || $modalidadAnterior != $modalidad || $condicionAnterior != $condicion || $siniestroAnterior != $siniestro || $localidadAnterior != $localidad) {
+                if ($actividadAnterior != $actividad || $situacionAnterior != $situacion || $modalidadAnterior != $modalidad 
+                    || $condicionAnterior != $condicion || $siniestroAnterior != $siniestro || $localidadAnterior != $localidad 
+                    || $obraAnterior != $obra || $reduccionAnterior != $reduccion || $cobScvoAnterior != $cobScvo 
+                    || $porcReduccionAnterior != $porcReduccion || $conyugueAnterior != $conyugue || $hijosAnterior != $hijos || $adherenteAnterior != $adherente) {
+
                     $descripcion = 'Legajo actualizado';
 
-                    if  ($actividadAnterior != $actividad)
+                    if ($actividadAnterior != $actividad)
                         $descripcion = $descripcion . ' - Actividad: ' . $actividadAnterior . ' -> ' . $actividad;
 
-                    if  ($situacionAnterior != $situacion)
-                        $descripcion = ' - Situación: ' . $situacionAnterior . ' -> ' . $situacion;
+                    if ($situacionAnterior != $situacion)
+                        $descripcion = $descripcion . ' - Situación: ' . $situacionAnterior . ' -> ' . $situacion;
 
-                    if  ($modalidadAnterior != $modalidad)
-                        $descripcion = ' - Modalidad: ' . $modalidadAnterior . ' -> ' . $modalidad;
+                    if ($modalidadAnterior != $modalidad)
+                        $descripcion = $descripcion . ' - Modalidad: ' . $modalidadAnterior . ' -> ' . $modalidad;
 
-                    if  ($condicionAnterior != $condicion)
-                        $descripcion = ' - Condición: ' . $condicionAnterior . ' -> ' . $condicion;
+                    if ($condicionAnterior != $condicion)
+                        $descripcion = $descripcion . ' - Condición: ' . $condicionAnterior . ' -> ' . $condicion;
 
-                    if  ($siniestroAnterior != $siniestro)
-                        $descripcion = ' - Siniestro: ' . $siniestroAnterior . ' -> ' . $siniestro;
+                    if ($siniestroAnterior != $siniestro)
+                        $descripcion = $descripcion . ' - Siniestro: ' . $siniestroAnterior . ' -> ' . $siniestro;
 
-                    if  ($localidadAnterior != $localidad)
-                        $descripcion = ' - Localidad: ' . $localidadAnterior . ' -> ' . $localidad;
+                    if ($localidadAnterior != $localidad)
+                        $descripcion = $descripcion . ' - Localidad: ' . $localidadAnterior . ' -> ' . $localidad;
+
+                    if ($obraAnterior != $obra)
+                        $descripcion = $descripcion . ' - Obra: ' . $obraAnterior . ' -> ' . $obra;
+
+                    if ($reduccionAnterior != $reduccion)
+                        $descripcion = $descripcion . ' - Reducción: ' . ($reduccionAnterior ? 'Sí' : 'No') . ' -> ' . ($reduccion ? 'Sí' : 'No');
+
+                    if ($cobScvoAnterior != $cobScvo)
+                        $descripcion = $descripcion . ' - Cob. Scvo: ' . ($cobScvoAnterior ? 'Sí' : 'No') . ' -> ' . ($cobScvo ? 'Sí' : 'No');
+
+                    if ($porcReduccionAnterior != $porcReduccion)
+                        $descripcion = $descripcion . ' - % Reducción: ' . ($porcReduccionAnterior ?? '0') . ' -> ' . ($porcReduccion ?? '0');
+
+                    if ($conyugueAnterior != $conyugue)
+                        $descripcion = $descripcion . ' - Cónyuge: ' . ($conyugueAnterior ? 'Sí' : 'No') . ' -> ' . ($conyugue ? 'Sí' : 'No');
+
+                    if ($hijosAnterior != $hijos)
+                        $descripcion = $descripcion . ' - Hijos: ' . ($hijosAnterior ? 'Sí' : 'No') . ' -> ' . ($hijos ? 'Sí' : 'No');
+
+                    if ($adherenteAnterior != $adherente)
+                        $descripcion = $descripcion . ' - Adherentes: ' . ($adherenteAnterior ? 'Sí' : 'No') . ' -> ' . ($adherente ? 'Sí' : 'No');
+
+
 
                 } else {
                     $descripcion = 'Legajo no actualizado (Todos los datos importados coinciden)';
@@ -170,6 +244,7 @@ class NominasSheetImport implements ToModel, WithChunkReading
                 ImportLiquidacionOk::create([
                     'registro' => $this->count,
                     'legajo' => $legajo,
+                    'cuil' => $cuil,
                     'descripcion' => $descripcion,
                     'importe' => 0,
                     'detalle' => $descripcion,
@@ -185,7 +260,7 @@ class NominasSheetImport implements ToModel, WithChunkReading
                 // Grabo log del registro con exito
                 ImportLiquidacionErr::create([
                     'registro' => $this->count,
-                    'detalle' => "Legajo no encontrado: " . $legajo,
+                    'detalle' => "CUIL no encontrado: " . $cuil,
                 ]);
             }
         }

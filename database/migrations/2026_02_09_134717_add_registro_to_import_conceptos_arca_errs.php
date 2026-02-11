@@ -11,8 +11,8 @@ return new class extends Migration
      */
     public function up(): void
     {
-        Schema::table('import_liquidacion_oks', function (Blueprint $table) {
-            $table->string('descripcion', 400)->nullable()->change();
+        Schema::table('import_conceptos_arca_errs', function (Blueprint $table) {
+            $table->integer('registro')->nullable()->after('id');
         });
     }
 
@@ -21,8 +21,8 @@ return new class extends Migration
      */
     public function down(): void
     {
-        Schema::table('import_liquidacion_oks', function (Blueprint $table) {
-            $table->string('descripcion', 50)->change();
+        Schema::table('import_conceptos_arca_errs', function (Blueprint $table) {
+            $table->dropColumn('registro');
         });
     }
 };

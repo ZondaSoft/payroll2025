@@ -24,7 +24,8 @@ class Sue001 extends Model
 		'domici','email','tel1','alta','baja','funcion','situacion','salud','cod_obraso','cod_sindic','cod_centro','area',
 		'convenio','zona','tipo_jornada','posicion','empresa','locali','grupo_emp','codsector','jornada_id','cod_jerarq','cod_categ',
 		'bruto','bruto_azul','reloj_usa',
-		'sicoss_activ', 'sicoss_situa', 'sicoss_modal', 'sicoss_condi', 'sicoss_sini', 'sicoss_zona'
+		'obra_sijp', 'sicoss_activ', 'sicoss_situa', 'sicoss_modal', 'sicoss_condi', 'sicoss_sini', 'sicoss_zona', 'sicoss_reduccion', 
+		'sicoss_cob_scvo', 'sicoss_porc_reduc', 'sicoss_conyuge', 'sicoss_hijos', 'sicoss_adherentes'
 	];
 
 	protected $guarded = ['id','_token' ]; // every field to protect

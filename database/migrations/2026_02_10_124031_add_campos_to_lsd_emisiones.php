@@ -11,8 +11,10 @@ return new class extends Migration
      */
     public function up(): void
     {
-        Schema::table('import_liquidacion_oks', function (Blueprint $table) {
-            $table->string('descripcion', 400)->nullable()->change();
+        Schema::table('lsd_emisiones', function (Blueprint $table) {
+            $table->string('archivo_txt', 255)->nullable()->after('archivo_xml');
+            $table->string('hash_txt', 64)->nullable(); // sha256 hex
+            $table->integer('cantidad_lineas')->default(0);
         });
     }
 
@@ -21,8 +23,8 @@ return new class extends Migration
      */
     public function down(): void
     {
-        Schema::table('import_liquidacion_oks', function (Blueprint $table) {
-            $table->string('descripcion', 50)->change();
+        Schema::table('lsd_emisiones', function (Blueprint $table) {
+            //
         });
     }
 };

@@ -32,7 +32,7 @@
 
 <!-- Content -->
 
-<form method="post" id="formImportar" name="formImportar" action="{{ route('sicoss.importar2') }}" enctype="multipart/form-data">
+<form method="post" id="formImportar" name="formImportar" action="{{ route('arca.importar2') }}" enctype="multipart/form-data">
 {{ csrf_field() }}
 
 @php
@@ -44,7 +44,7 @@
     <!-- Add Product -->
     <div class="d-flex flex-column flex-md-row justify-content-between align-items-start align-items-md-center mb-6 row-gap-4">
       <div class="d-flex flex-column justify-content-center">
-        <h4 class="mb-1">Importar nomina desde AFIP/ARCA</h4>
+        <h4 class="mb-1">Importar conceptos relacionados desde ARCA</h4>
       </div>
     </div>
 
@@ -119,6 +119,7 @@
                                             <select class="form-control selected2"
                                                 id="empresa"
                                                 name="empresa"
+                                                autofocus
                                                 style="padding-left: 16px;padding-right: 16px;padding-top: 6px;padding-bottom: 6px;height: 36px;">
 
                                                 @foreach ($empresas as $empresa)
@@ -129,23 +130,23 @@
                                         </div>
 
 
-                                        <div class="col-lg-3 mb-2 mr-4">
-                                            <label class="col-form-label">Periodo * </label>
-                                            <div class="input-group " id="divPeriodo" data-provide="" keyboardNavigation="false" title="Ingrese un Nro. legajo">
+                                        <div class="col-lg-6 mb-2 mr-4">
+                                            <label class="col-form-label">CUIT</label>
+                                            <div class="input-group " id="divCuit" data-provide="" keyboardNavigation="false" title="Ingrese un Nro. de CUIT">
 
                                                 <input class="form-control"
                                                     type="text"
-                                                    id="periodo2"
-                                                    name="periodo2"
+                                                    id="cuit"
+                                                    name="cuit"
                                                     autocomplete="off"
                                                     maxlength="7"
                                                     style="padding-left: 16px;padding-right: 16px;padding-top: 6px;padding-bottom: 6px;width: 110px"
-                                                    value="{{ old('periodo2',$periodo2) }}"
-                                                    autofocus
+                                                    value="{{ old('cuit', $cuit ?? '') }}"
+                                                    readonly
                                                 >
 
                                                 <ul class="parsley-errors-list filled" id="labelError1" aria-hidden="false" hidden>
-                                                    <li class="parsley-required">Periodo obligatorio.</li>
+                                                    <li class="parsley-required">CUIT obligatorio.</li>
                                                 </ul>
 
                                             </div>
@@ -160,7 +161,7 @@
                             <section class="pt-2" hidden>
                                 <h5 class="bd-wizard-step-title mb-2">Paso 2</h5>
                                 <!-- <h5 class="section-heading" style="margin-bottom: 5px">Elija por favor el archivo a importar</h5> -->
-                                <p>Selección de libro excel con la liquidación</p>
+                                <p>Selecciona el archivo de origen</p>
                                 <!-- <div class="form-group">
                                 <label for="firstName" class="sr-only">First Name</label>
                                 <input type="text" name="firstName" id="firstName" class="form-control" placeholder="First Name">
@@ -169,7 +170,7 @@
                                     <!-- Campos ocultos con datos del archivo -->
                                     <div class="col-lg-4 mb-2 mr-4" hidden>
                                         <label class="col-form-label">Nombre archivo * </label>
-                                        <div class="input-group " id="divPeriodo" data-provide="" keyboardNavigation="false" title="Ingrese un Nro. legajo">
+                                        <div class="input-group " id="divNomArch" data-provide="" keyboardNavigation="false" title="Ingrese un Nro. legajo">
 
                                             <input class="form-control"
                                                 type="text"
@@ -187,7 +188,7 @@
 
                                     <div class="col-lg-4 mb-2 mr-4" hidden>
                                         <label class="col-form-label">Tamaño archivo * </label>
-                                        <div class="input-group " id="divPeriodo" data-provide="" keyboardNavigation="false" title="Ingrese un Nro. legajo">
+                                        <div class="input-group " id="divTamanio" data-provide="" keyboardNavigation="false" title="Ingrese un Nro. legajo">
 
                                             <input class="form-control"
                                                 type="text"
@@ -204,14 +205,14 @@
 
                                     <div class="form-group col-lg-12 row align-items-center">
                                         <div class="col-md-12">
-                                            <label for="file">Selecciona el archivo de liquidación a importar:</label>
+                                            <label for="file">Selecciona el archivo de texto descargado desde la plataforma de ARCA:</label>
                                             <input type="file"
                                                 name="file"
                                                 id="file"
                                                 class="form-control @error('file') is-invalid @enderror"
                                                 required
-                                                accept=".xls,.xlsx,.xlsm,application/vnd.ms-excel,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" />
-                                            <small class="form-text text-muted">El archivo debe ser una planilla de excel con el formato correcto.</small>
+                                                accept=".txt" />
+                                            <small class="form-text text-muted">El archivo debe ser un archivo de texto separado por comas.</small>
                                         </div>
                                         <div class="alert alert-danger ml-3" role="alert" hidden>
                                             <strong>Cuidado</strong> Debe seleccionar un archivo válido.
@@ -267,7 +268,7 @@
                                     hidden
                                     mt-5
                                     mb-4
-                                    href="{{ route('sicoss.importar.exportarOk') }}"
+                                    href="{{ route('arca.importar.exportarOk') }}"
                                     >Descargar registros importados
                                 </a>
 
@@ -281,7 +282,7 @@
                                     type="button"
                                     hidden
                                     mb-2
-                                    href="{{ route('sicoss.importar.exportarErr') }}">Descargar registros rechazados
+                                    href="{{ route('arca.importar.exportarErr') }}">Descargar registros rechazados
                                 </a>
 
                             </section>
@@ -541,74 +542,43 @@
 <script src="{{ asset('js/bd-wizard.js') }}"></script>
 
 <script>
+    // Cargar CUIT al seleccionar empresa
+    document.addEventListener('DOMContentLoaded', function() {
+        const empresaSelect = document.getElementById('empresa');
+        const cuitInput = document.getElementById('cuit');
+
+        empresaSelect.addEventListener('change', function(e) {
+            const empresaId = e.target.value;
+
+            if (!empresaId) {
+                cuitInput.value = '';
+                return;
+            }
+
+            fetch(`/arca/empresa/${empresaId}/cuit`)
+                .then(response => {
+                    if (!response.ok) {
+                        throw new Error('No se pudo obtener el CUIT');
+                    }
+                    return response.json();
+                })
+                .then(data => {
+                    if (data.cuit) {
+                        cuitInput.value = data.cuit;
+                    }
+                })
+                .catch(error => {
+                    console.error('Error:', error);
+                    cuitInput.value = '';
+                });
+        });
+    });
+</script>
+
+<script>
   function checkcontrols() {
         var validacionFecha = true;
         var validacionPeriodo = true;
-
-        const inputPeriodo = document.getElementById('periodo2');
-        const valor = inputPeriodo.value.trim();
-        const regex = /^(\d{4})\/(0[1-9]|1[0-2])$/; // Formato yyyy/mm
-        const match = valor.match(regex);
-
-        const errorControl = document.getElementById('labelError1');
-        const errorItem = errorControl.querySelector('li.parsley-required');
-
-        if (!match) {
-            //alert("El período debe tener el formato yyyy/mm (ej: 2025/08).");
-            errorControl.style.display = 'block';
-            errorControl.removeAttribute('hidden');
-            errorControl.setAttribute('aria-hidden', 'false');
-
-            errorItem.style.display = 'block';
-            errorItem.removeAttribute('hidden');
-            errorItem.setAttribute('aria-hidden', 'false');
-            errorItem.textContent = 'El período debe tener el formato yyyy/mm (ej: 2025/08).';
-
-            inputPeriodo.focus();
-            return;
-        }
-
-        const anio = parseInt(match[1], 10);
-        const mes = parseInt(match[2], 10);
-        const anioActual = new Date().getFullYear();
-
-        if (anio < 1990 || anio > anioActual) {
-            //alert("El año debe estar entre 1990 y " + anioActual + ".");
-            errorControl.style.display = 'block';
-            errorControl.removeAttribute('hidden');
-            errorControl.setAttribute('aria-hidden', 'false');
-
-            errorItem.style.display = 'block';
-            errorItem.removeAttribute('hidden');
-            errorItem.setAttribute('aria-hidden', 'false');
-            errorItem.textContent = 'El año debe estar entre 1990 y ' + anioActual + '.';
-
-            inputPeriodo.focus();
-            return false;
-        }
-
-        if (mes < 1 || mes > 12) {
-            //alert("El mes debe estar entre 01 y 12.");
-            errorControl.style.display = 'block';
-            errorControl.removeAttribute('hidden');
-            errorControl.setAttribute('aria-hidden', 'false');
-
-            errorItem.style.display = 'block';
-            errorItem.removeAttribute('hidden');
-            errorItem.setAttribute('aria-hidden', 'false');
-            errorItem.textContent = 'El mes debe estar entre 01 y 12.';
-
-            inputPeriodo.focus();
-            return false;
-        }
-
-        // Agregar el atributo hidden
-        errorControl.setAttribute('hidden', true);
-        // Cambiar aria-hidden a true
-        errorControl.setAttribute('aria-hidden', 'true');
-
-        //if (!validarFechaLiquidacion())
-        //    return false;
 
         return true;
     }
@@ -732,14 +702,12 @@
 
         // Configuración
         const maxFileSize = 2 * 1024 * 1024; // 2MB en bytes
-        const allowedExtensions = ['xls', 'xlsx', 'xlsm'];
+        const allowedExtensions = ['txt'];
         const allowedMimeTypes = [
+            'text/csv',
+            'text/plain',
+            'application/csv',
             'application/vnd.ms-excel',
-            'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
-            'application/vnd.ms-excel.sheet.macroEnabled.12',
-            'application/wps-office.xls',
-            'application/wps-office.xlsx',
-            'application/wps-office.xlsm'
         ];
 
         // Función para validar el archivo
@@ -756,7 +724,7 @@
             const extension = file.name.split('.').pop().toLowerCase();
             //alert(extension);
             if (!allowedExtensions.includes(extension)) {
-                errores.push('El archivo debe ser de formato Excel (.xls o .xlsx o .xlsm)');
+                errores.push('El archivo debe ser de formato texto TXT o CSV');
             }
 
             // Verificar tipo MIME
@@ -775,8 +743,79 @@
                 errores.push('El archivo está vacío');
             }
 
+            /* ---------------------------
+            VALIDACIÓN CUIT EN NOMBRE
+            ----------------------------*/
+
+            const cuitArchivo = obtenerCuitDesdeNombreArchivo(file.name);
+
+            if (!cuitArchivo) {
+                errores.push('No se pudo detectar el CUIT en el nombre del archivo');
+            } else {
+
+                if (!validarCUIT(cuitArchivo)) {
+                    errores.push('El CUIT incluido en el nombre del archivo no es válido');
+                } else {
+
+                    const cuitFormulario = obtenerCuitFormulario();
+
+                    if (!cuitFormulario) {
+                        errores.push('Debe ingresar el CUIT de la empresa');
+                    } else if (cuitFormulario !== cuitArchivo) {
+                        errores.push(
+                            `El CUIT del archivo (${cuitArchivo}) no coincide con el CUIT ingresado (${cuitFormulario})`
+                        );
+                    }
+                }
+            }
+
             return errores;
         }
+
+        function obtenerCuitDesdeNombreArchivo(filename) {
+            const partes = filename.split('_');
+
+            // buscamos un bloque de 11 dígitos
+            const posibleCuit = partes.find(p => /^\d{11}$/.test(p));
+
+            return posibleCuit || null;
+        }
+
+        function obtenerCuitDesdeNombreArchivo(filename) {
+            const partes = filename.split('_');
+
+            // buscamos un bloque de 11 dígitos
+            const posibleCuit = partes.find(p => /^\d{11}$/.test(p));
+
+            return posibleCuit || null;
+        }
+
+        function obtenerCuitFormulario() {
+            const input = document.getElementById('cuit');
+            return input ? input.value.replace(/\D/g, '') : '';
+        }
+
+        
+        function validarCUIT(cuit) {
+
+            if (!/^\d{11}$/.test(cuit)) return false;
+
+            const coef = [5,4,3,2,7,6,5,4,3,2];
+            let suma = 0;
+
+            for (let i = 0; i < 10; i++) {
+                suma += parseInt(cuit[i]) * coef[i];
+            }
+
+            let resto = suma % 11;
+            let digito = 11 - resto;
+
+            if (digito === 11) digito = 0;
+            if (digito === 10) digito = 9;
+
+            return digito === parseInt(cuit[10]);
+        }
+
 
         // Función para mostrar errores
         function mostrarErrores(errores) {
@@ -929,7 +968,6 @@
             const formData = new FormData();
             formData.append('file', file);
             formData.append('_token', document.querySelector('meta[name="csrf-token"]').getAttribute('content'));
-            formData.append('periodo2', document.getElementById('periodo2').value); // ej: 2025/06
             formData.append('empresa', document.getElementById('empresa').value);   // ej: 1
             //formData.append('fecha', document.getElementById('fecha').value);       // ej: 16/08/2025
             //formData.append('comenta1', document.getElementById('comenta1').value);       // ej: 16/08/2025
@@ -940,7 +978,7 @@
             loadingDiv.removeAttribute('hidden');
 
             // Realizar upload con fetch
-            fetch("{{ route('sicoss.importar2') }}", {
+            fetch("{{ route('arca.importar2') }}", {
                 method: 'POST',
                 body: formData,
                 headers: {
