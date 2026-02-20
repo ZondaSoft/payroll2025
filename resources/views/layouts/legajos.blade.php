@@ -157,7 +157,7 @@
               </a>
               <ul class="menu-sub">
                 <li class="menu-item {{ $active==9?'active':' ' }}">
-                  <a href="/legajos" class="menu-link">
+                  <a href="{{ route('legajos.index') }}" class="menu-link">
                     <div data-i18n="Empleados activos">Empleados activos</div>
                   </a>
                 </li>
