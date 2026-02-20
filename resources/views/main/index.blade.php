@@ -94,7 +94,7 @@
                             <div class="col-2" id="btnInformeCond" name="btnInformeCond">
                                 <div class="d-flex flex-column align-items-center">
                                 <div class="avatar">
-                                    <a href="/legajos" class="avatar-initial bg-label-primary rounded-3">
+                                    <a href="{{ route('legajos.index') }}" class="avatar-initial bg-label-primary rounded-3">
                                     <i class="ri-user-line ri-24px"></i>
                                     </div>
                                 </a>
