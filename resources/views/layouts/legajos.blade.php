@@ -65,7 +65,7 @@
     <script src="{{ asset('/js/config.js') }}"></script>
 
     @routes
-
+    @vite('resources/js/app.js')
     @inertiaHead
   </head>
 
