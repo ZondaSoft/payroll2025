@@ -172,7 +172,7 @@
                         <div class="col-2" id="btnImportarSicoss" name="btnImportarSicoss">
                                 <div class="d-flex flex-column align-items-center">
                                 <div class="avatar">
-                                    <a href="/sicoss/importar" class="avatar-initial bg-label-primary rounded-3">
+                                    <a href="{{ route('sicoss.importar') }}" class="avatar-initial bg-label-primary rounded-3">
                                     <i class="ri-download-line ri-24px"></i>
                                     </div>
                                 </a>
@@ -186,7 +186,7 @@
                         <div class="col-2" id="btnImportarSicoss" name="btnImportarSicoss">
                             <div class="d-flex flex-column align-items-center">
                             <div class="avatar">
-                                <a href="/arca/importar" class="avatar-initial bg-label-success rounded-3">
+                                <a href="{{ route('arca.importar') }}" class="avatar-initial bg-label-success rounded-3">
                                 <i class="ri-download-line ri-24px"></i>
                                 </div>
                             </a>
@@ -197,7 +197,7 @@
                         <div class="col-2" id="btnImportarSicoss" name="btnImportarSicoss">
                                 <div class="d-flex flex-column align-items-center">
                                 <div class="avatar">
-                                    <a href="/basedat/importar" class="avatar-initial bg-label-warning rounded-3">
+                                    <a href="{{ route('basedat.importar') }}" class="avatar-initial bg-label-warning rounded-3">
                                     <i class="ri-download-line ri-24px"></i>
                                     </div>
                                 </a>
@@ -208,7 +208,7 @@
                             <!-- @ can('services.requisition') -->
                             <div class="col-2" id="btnRequisicionServ" name="btnRequisicionServ">
                                 <div class="d-flex flex-column align-items-center">
-                                <a href="/lsd/generar" class="avatar">
+                                <a href="{{ route('lsd.generar') }}" class="avatar">
                                     <div class="avatar-initial bg-label-primary rounded-3">
                                     <i class="ri-file-text-line ri-24px"></i>
                                     </div>
