@@ -411,7 +411,7 @@ const moverFocoACodigoDesdeSelect = () => {
                 :rutaPrevious="form.id ? route('liquidacion.conceptos.previous', form.id) : null"
                 :rutaNext="form.id ? route('liquidacion.conceptos.next', form.id) : null"
                 :rutaLast="form.id ? route('liquidacion.conceptos.last') : null"
-                :rutaSearch="`/liquidacion/conceptos/search`"
+                :rutaSearch="route('liquidacion.conceptos.search')"
                 :rutaIndex="route('liquidacion.conceptos.index')"
                 :onSubmit="submit"
                 @edit="setFocus"

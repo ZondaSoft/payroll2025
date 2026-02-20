@@ -48,9 +48,9 @@
     <!-- Vendors CSS -->
     <link rel="stylesheet" href="{{ asset('/libs/perfect-scrollbar/perfect-scrollbar.css') }}" />
     <link rel="stylesheet" href="{{ asset('/libs/typeahead-js/typeahead.css') }}" />
-    {{-- <link rel="stylesheet" href="{{ asset('/libs/datatables-bs5/datatables.bootstrap5.css') }}" />
+    <!-- {{-- <link rel="stylesheet" href="{{ asset('/libs/datatables-bs5/datatables.bootstrap5.css') }}" />
     <link rel="stylesheet" href="{{ asset('/libs/datatables-responsive-bs5/responsive.bootstrap5.css') }}" />
-    <link rel="stylesheet" href="{{ asset('/libs/datatables-checkboxes-jquery/datatables.checkboxes.css') }}" /> --}}
+    <link rel="stylesheet" href="{{ asset('/libs/datatables-checkboxes-jquery/datatables.checkboxes.css') }}" /> --}} -->
     <link rel="stylesheet" href="{{ asset('/libs/datatables-buttons-bs5/buttons.bootstrap5.css') }}" />
 
     @yield('styles')

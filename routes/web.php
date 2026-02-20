@@ -325,12 +325,25 @@ Route::middleware('auth')->group(function () {
 
     // Resource al final
     // Asegurar nombre 'liquidacion.conceptos.index' explícitamente y evitar duplicar la ruta index
-    Route::get('liquidacion/conceptos', [ConceptosLiquidacionController::class, 'index'])
+    // Hacer `id` y `direction` opcionales para que Ziggy / JS no requiera parámetros
+    Route::get('liquidacion/conceptos/{id?}/{direction?}', [ConceptosLiquidacionController::class, 'index'])
         ->name('liquidacion.conceptos.index');
+
+    // Ruta explícita para create (Ziggy a veces no incluye ciertas rutas implícitas)
+    Route::get('liquidacion/conceptos/create', [ConceptosLiquidacionController::class, 'create'])
+        ->name('liquidacion.conceptos.create');
+
+    // Ruta explícita para edit (Ziggy a veces no incluye ciertas rutas implícitas)
+    Route::get('liquidacion/conceptos/{concepto}/edit', [ConceptosLiquidacionController::class, 'edit'])
+        ->name('liquidacion.conceptos.edit');
+
+    // Ruta explícita para show (Ziggy a veces no incluye ciertas rutas implícitas)
+    Route::get('liquidacion/conceptos/{concepto}/show', [ConceptosLiquidacionController::class, 'show'])
+        ->name('liquidacion.conceptos.show');
 
     Route::resource('liquidacion/conceptos', ConceptosLiquidacionController::class)
         ->parameters(['conceptos' => 'concepto'])
-        ->except(['index']);
+        ->except(['index','create','edit','show']);
 
     
 });
