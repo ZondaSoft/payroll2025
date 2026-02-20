@@ -324,8 +324,13 @@ Route::middleware('auth')->group(function () {
         ->name('liquidacion.conceptos.next');
 
     // Resource al final
+    // Asegurar nombre 'liquidacion.conceptos.index' explícitamente y evitar duplicar la ruta index
+    Route::get('liquidacion/conceptos', [ConceptosLiquidacionController::class, 'index'])
+        ->name('liquidacion.conceptos.index');
+
     Route::resource('liquidacion/conceptos', ConceptosLiquidacionController::class)
-        ->parameters(['conceptos' => 'concepto']);
+        ->parameters(['conceptos' => 'concepto'])
+        ->except(['index']);
 
     
 });

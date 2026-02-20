@@ -374,6 +374,7 @@
     <!-- {{-- <script src="{{ asset('js/app-invoice-list.js') }}"></script> --}} -->
 
 
+    @routes
     @yield('scripts')
 
   </body>
