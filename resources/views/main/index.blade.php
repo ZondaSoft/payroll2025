@@ -108,7 +108,7 @@
                             <div class="col-2" id="btnConceptos" name="btnConceptos">
                                 <div class="d-flex flex-column align-items-center">
                                 <div class="avatar">
-                                    <a href="{{ route('liquidacion.conceptos') }}" class="avatar-initial bg-label-success rounded-3">
+                                    <a href="{{ route('liquidacion.conceptos.index') }}" class="avatar-initial bg-label-success rounded-3">
                                     <i class="ri-download-line ri-24px"></i>
                                     </div>
                                 </a>
