@@ -5,7 +5,7 @@
     const props = defineProps({
         imageUrl: {
             type: String,
-            default: '/img/welcome.jpeg', // Cambiá la ruta a la imagen que quieras
+            default: import.meta.env.BASE_URL + 'img/welcome.jpeg', // Cambiá la ruta a la imagen que quieras
         },
         imageAlt: {
             type: String,

@@ -279,8 +279,7 @@ const anularEmision = async (id) => {
                     <td>{{ emision.numero_emision }}</td>
                     <td>{{ getNombreEmpresa(emision.id_empresa) }}</td>
                     <td>
-                      {{ formatDate(emision.periodo_desde) }} a
-                      {{ formatDate(emision.periodo_hasta) }}
+                      {{ (emision.periodo) }}
                     </td>
                     <td>{{ formatDate(emision.fecha_emision) }}</td>
                     <td>

@@ -12,7 +12,7 @@ class HandleInertiaRequests extends Middleware
      *
      * @var string
      */
-    protected $rootView = 'guest';
+    protected $rootView = 'layouts/legajos';        //'guest';
 
     /**
      * Determine the current asset version.
@@ -57,6 +57,19 @@ class HandleInertiaRequests extends Middleware
             return 'layouts/legajos';
         }
 
+        // Liquidaciones
+        // dd($request);
+
+        if ($request->is('liquidacion*')) {
+            return 'layouts/legajos';
+        }
+        if ($request->is('liquidacion/conceptos*')) {
+            return 'layouts/legajos';
+        }
+        if ($request->is('liquidacion/conceptos/*')) {
+            return 'layouts/legajos';
+        }
+
         // Sicoss
         if ($request->is('sicoss*')) {
             return 'layouts/legajos';
@@ -68,6 +81,8 @@ class HandleInertiaRequests extends Middleware
         }
 
         // Layout por defecto
+
+        //return 'layouts/legajos';
         return 'guest';
     }
 }

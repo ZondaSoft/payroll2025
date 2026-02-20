@@ -1,4 +1,4 @@
-@if (auth()->user()->getRoleNames()->first() != 'Municipalidad')
+<!-- @ if (auth()->user()->getRoleNames()->first() != 'Municipalidad') -->
 <!-- Notification -->
 <li class="nav-item dropdown-notifications navbar-dropdown dropdown me-4 me-xl-1">
     <a
@@ -250,4 +250,4 @@
     </ul>
 </li>
 <!--/ Notification -->
-@endif
+<!-- @ endif -->

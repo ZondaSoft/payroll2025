@@ -4,7 +4,7 @@
         lang="en"
         dir="ltr"
         data-theme="theme-default"
-        data-assets-path="../../"
+        data-assets-path="/"
         data-template="vertical-menu-template"
         data-style="light">
         <meta charset="utf-8">
@@ -18,7 +18,7 @@
 
         <!-- Scripts -->
         @routes
-        @vite(['resources/js/app.js', "resources/js/Pages/{$page['component']}.vue"])
+        @vite('resources/js/app.js')
         @inertiaHead
     </head>
     <body class="font-sans antialiased">

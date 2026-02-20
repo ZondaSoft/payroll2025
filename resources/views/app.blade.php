@@ -11,7 +11,7 @@ $rol = '';
     class="light-style layout-navbar-fixed layout-menu-fixed layout-compact"
     dir="ltr"
     data-theme="theme-default"
-    data-assets-path="../../"
+    data-assets-path="/"
     data-template="vertical-menu-template"
     data-style="light">
 
@@ -37,15 +37,15 @@ $rol = '';
     rel="stylesheet" />
 
     <!-- Icons -->
-    <link rel="stylesheet" href="{{ asset('fonts/remixicon/remixicon.css') }}" />
+    <link rel="stylesheet" href="{{ asset('/fonts/remixicon/remixicon.css') }}" />
 
     <!-- Menu waves for no-customizer fix -->
-    <link rel="stylesheet" href="{{ asset('libs/node-waves/node-waves.css') }}" />
+    <link rel="stylesheet" href="{{ asset('/libs/node-waves/node-waves.css') }}" />
 
     <!-- Core CSS -->
-    <link rel="stylesheet" href="{{ asset('css/rtl/core.css') }}" class="template-customizer-core-css" />
-    <link rel="stylesheet" href="{{ asset('css/rtl/theme-default.css') }}" class="template-customizer-theme-css" />
-    <link rel="stylesheet" href="{{ asset('css/demo.css') }}" />
+    <link rel="stylesheet" href="{{ asset('/css/rtl/core.css') }}" class="template-customizer-core-css" />
+    <link rel="stylesheet" href="{{ asset('/css/rtl/theme-default.css') }}" class="template-customizer-theme-css" />
+    <link rel="stylesheet" href="{{ asset('/css/demo.css') }}" />
 
     <!-- Vendors CSS -->
     <link rel="stylesheet" href="{{ asset('/libs/perfect-scrollbar/perfect-scrollbar.css') }}" />
@@ -59,12 +59,12 @@ $rol = '';
     <!-- Page CSS -->
 
     <!-- Helpers -->
-    <script src="{{ asset('js/helpers.js') }}"></script>
+    <script src="{{ asset('/js/helpers.js') }}"></script>
     <!--! Template customizer & Theme config files MUST be included after core stylesheets and helpers.js in the <head> section -->
     <!--? Template customizer: To hide customizer set displayCustomizer value false in config.js.  -->
-    <script src="{{ asset('js/template-customizer1.js') }}"></script>
+    <script src="{{ asset('/js/template-customizer1.js') }}"></script>
     <!--? Config:  Mandatory theme config file contain global vars & default theme options, Set your preferred theme option in this file.  -->
-    <script src="{{ asset('js/config.js') }}"></script>
+    <script src="{{ asset('/js/config.js') }}"></script>
 
     <!-- Scripts -->
     @routes
@@ -83,7 +83,7 @@ $rol = '';
             <a href="/" class="app-brand-link">
             <span class="app-brand-logo demo">
                 <span style="color: var(--bs-primary)">
-                <img width="50" height="45" viewBox="0 0 38 20" src="{{ asset('img/logo_af.png') }}" alt="Agrotecnica Fueguina">
+                <img width="50" height="45" viewBox="0 0 38 20" src="{{ asset('/img/logo_af.png') }}" alt="Agrotecnica Fueguina">
                 </span>
             </span>
             <span class="app-brand-text demo menu-text fw-semibold ms-2">Agrotecnica</span>
@@ -467,19 +467,19 @@ $rol = '';
     <!-- endbuild -->
 
     <!-- Vendors JS -->
-    <script src="{{ asset('libs/moment/moment.js') }}"></script>
+    <script src="{{ asset('/libs/moment/moment.js') }}"></script>
     <!-- <script src="{{ asset('libs/datatables-bs5/datatables-bootstrap5.js') }}"></script> -->
 
     <!-- Main JS -->
-    <script src="{{ asset('js/main.js') }}"></script>
+    <script src="{{ asset('/js/main.js') }}"></script>
 
     <!-- Page JS -->
     <!-- <script src="{{ asset('js/app-invoice-list.js') }}"></script> -->
 
     <!-- JS. que deberia estar en el componente vue -->
-    <script src="{{ asset('js/ui-modals.js') }}"></script>
+    <script src="{{ asset('/js/ui-modals.js') }}"></script>
 
-    @vite(['resources/js/app.js', "resources/js/Pages/{$page['component']}.vue"])
+    @vite('resources/js/app.js')
 
     @yield('scripts')
 </body>

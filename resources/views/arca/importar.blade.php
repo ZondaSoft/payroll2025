@@ -129,7 +129,6 @@
                                             </select>
                                         </div>
 
-
                                         <div class="col-lg-6 mb-2 mr-4">
                                             <label class="col-form-label">CUIT</label>
                                             <div class="input-group " id="divCuit" data-provide="" keyboardNavigation="false" title="Ingrese un Nro. de CUIT">
@@ -152,6 +151,25 @@
                                             </div>
                                         </div>
 
+                                        <!-- Activo -->
+                                        <div class="col-lg-12 pt-2">
+                                            <div class="form-check form-switch mt-4">
+                                                <input
+                                                    type="hidden"
+                                                    name="generar"
+                                                    value="0"
+                                                />
+                                                <input
+                                                    type="checkbox"
+                                                    id="generar"
+                                                    name="generar"
+                                                    value="1"
+                                                    class="form-check-input"
+                                                />
+                                                <label class="form-check-label" for="generar">Generar concepto de liquidación interno si no existe ?</label>
+                                            </div>
+                                        </div>
+
                                         
                                     </div>
                                 </div>
@@ -161,7 +179,7 @@
                             <section class="pt-2" hidden>
                                 <h5 class="bd-wizard-step-title mb-2">Paso 2</h5>
                                 <!-- <h5 class="section-heading" style="margin-bottom: 5px">Elija por favor el archivo a importar</h5> -->
-                                <p>Selecciona el archivo de origen</p>
+                                <p>Selecciona el archivo de origen descargado desde la plataforma de ARCA:</p>
                                 <!-- <div class="form-group">
                                 <label for="firstName" class="sr-only">First Name</label>
                                 <input type="text" name="firstName" id="firstName" class="form-control" placeholder="First Name">
@@ -205,7 +223,7 @@
 
                                     <div class="form-group col-lg-12 row align-items-center">
                                         <div class="col-md-12">
-                                            <label for="file">Selecciona el archivo de texto descargado desde la plataforma de ARCA:</label>
+                                            <label for="file">El archivo suele llamarse Conceptos_Contribuyente...txt :</label>
                                             <input type="file"
                                                 name="file"
                                                 id="file"
@@ -973,6 +991,7 @@
             //formData.append('comenta1', document.getElementById('comenta1').value);       // ej: 16/08/2025
             formData.append('nom_arch', document.getElementById('nom_arch').value);
             formData.append('tam_arch', document.getElementById('tam_arch').value);
+            formData.append('generar', document.getElementById('generar').checked ? '1' : '0');
 
             // Mostrar loading
             loadingDiv.removeAttribute('hidden');

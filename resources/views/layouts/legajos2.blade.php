@@ -11,7 +11,7 @@
   class="light-style layout-navbar-fixed layout-menu-fixed layout-compact"
   dir="ltr"
   data-theme="theme-default"
-  data-assets-path="../../"
+  data-assets-path="/"
   data-template="vertical-menu-template"
   data-style="light">
   <head>

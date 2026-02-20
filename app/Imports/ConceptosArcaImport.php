@@ -4,6 +4,7 @@ namespace App\Imports;
 
 use App\Models\Conceptosarca;
 use App\Models\Sue086;
+use App\Models\Sue102;
 use App\Models\ImportConceptosArcaOk;
 use App\Models\ImportConceptosArcaErr;
 use Illuminate\Support\Facades\Log;
@@ -23,7 +24,8 @@ class ConceptosArcaImport
         private string $filePath,
         private int $idEmpresa,
         private string $nom_arch,
-        private int $tam_arch
+        private int $tam_arch,
+        private bool $generar
     ) {}
 
     /**
@@ -129,6 +131,28 @@ class ConceptosArcaImport
             $descripcion = substr($row[1] ?? '', 0, 80);
             $codigoContribuyente = intval($row[2]);
             $descripcionContribuyente = substr($row[3] ?? '', 0, 80);
+            
+            // 1-Haber 2-Descuento 3-Asig. 4-No Remun. 5-Ganancias 6-Devolución Ganancia 7-Redondeo 8-Aportes 9-Auxiliares
+            $tipo = 1; // Por defecto asignamos tipo HABER, esto se puede ajustar según la lógica de negocio
+
+            if ($codigoAfip >= 510000 && $codigoAfip <= 519999) {
+                $tipo = 3; // Asignaciones
+            }
+            if ($codigoAfip >= 520000 && $codigoAfip <= 570003) {
+                $tipo = 4; // No Remunerativos
+            }
+            if ($codigoAfip == 799999) {
+                $tipo = 7; // Redondeo
+            }
+            if ($codigoAfip >= 810000 && $codigoAfip <= 829999) {
+                $tipo = 2; // DescuentoS
+            }
+            if ($codigoAfip == 810008) {
+                $tipo = 5; // Ganancias
+            }
+            if ($codigoAfip >= 531000 && $codigoAfip <= 549999) {
+                $tipo = 8; // Aportes
+            }
 
             // Mapeo de índices para los campos de aportaciones/contribuciones
             $conceptosData = [
@@ -154,6 +178,37 @@ class ConceptosArcaImport
                 'aportes_diferenciales' => $this->parseDecimal($row[18] ?? null),
                 'aportes_especiales' => $this->parseDecimal($row[19] ?? null),
             ];
+
+            // Si el checkbox de generar concepto de liquidación interno está activo y no existe un concepto con ese código AFIP, lo creo automáticamente
+            $existeConcepto = Sue102::where('codigo', $codigoContribuyente)
+                    ->exists();
+            
+            if ($this->generar) {
+                if (!$existeConcepto) {
+                    Sue102::create([
+                        'codigo' => $codigoContribuyente,
+                        'detalle' => $descripcionContribuyente,
+                        'tipo' => $tipo,
+                        'concepto_arca' => $codigoAfip,
+                    ]);
+                }
+            } else {
+                // Si no se permite generar automáticamente, verifico que exista el concepto antes de continuar
+                if (!$existeConcepto) {
+                    
+                    $this->count++;
+                    $this->rechazados++;
+
+                    ImportConceptosArcaErr::create([
+                        'registro' => $this->count,
+                        'id_empresa'     => $this->idEmpresa,
+                        'nombre_archivo' => $this->nom_arch,
+                        'tamanio_archivo'=> $this->tam_arch,
+                        'detalle' => "El concepto con Código {$codigoContribuyente} no existe y la opción de generación automática está desactivada",
+                    ]);
+                    return;
+                }
+            }
 
             // Guardar en la base de datos
             Conceptosarca::create($conceptosData);

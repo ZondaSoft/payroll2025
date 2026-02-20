@@ -15,7 +15,7 @@
             </div>
           </div>
           <div class="flex-grow-1">
-            <span class="fw-medium d-block small">{{ $user->name }}</span>
+            <span class="fw-medium d-block small">{{ optional(auth()->user())->name ?? 'Usuario' }}</span>
             <small class="text-muted">{{ $rol }}</small>
           </div>
         </div>

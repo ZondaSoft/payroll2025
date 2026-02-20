@@ -11,7 +11,7 @@
   class="light-style layout-navbar-fixed layout-menu-fixed layout-compact"
   dir="ltr"
   data-theme="theme-default"
-  data-assets-path="../../"
+  data-assets-path="/"
   data-template="vertical-menu-template"
   data-style="light">
   <head>
@@ -35,10 +35,10 @@
       rel="stylesheet" />
 
     <!-- Icons -->
-    <link rel="stylesheet" href="{{ asset('fonts/remixicon/remixicon.css') }}" />
+    <link rel="stylesheet" href="{{ asset('/fonts/remixicon/remixicon.css') }}" />
 
     <!-- Menu waves for no-customizer fix -->
-    <link rel="stylesheet" href="{{ asset('libs/node-waves/node-waves.css') }}" />
+    <link rel="stylesheet" href="{{ asset('/libs/node-waves/node-waves.css') }}" />
 
     <!-- Core CSS -->
     <link rel="stylesheet" href="{{ asset('/css/rtl/core.css') }}" class="template-customizer-core-css" />
@@ -57,12 +57,12 @@
     <!-- Page CSS -->
 
     <!-- Helpers -->
-    <script src="{{ asset('js/helpers.js') }}"></script>
+    <script src="{{ asset('/js/helpers.js') }}"></script>
     <!--! Template customizer & Theme config files MUST be included after core stylesheets and helpers.js in the <head> section -->
     <!--? Template customizer: To hide customizer set displayCustomizer value false in config.js.  -->
-    <script src="{{ asset('js/template-customizer.js') }}"></script>
+    <script src="{{ asset('/js/template-customizer.js') }}"></script>
     <!--? Config:  Mandatory theme config file contain global vars & default theme options, Set your preferred theme option in this file.  -->
-    <script src="{{ asset('js/config.js') }}"></script>
+    <script src="{{ asset('/js/config.js') }}"></script>
 
     @routes
 
@@ -125,7 +125,7 @@
                     </defs>
                   </svg> -->
                   <!-- <svg width="268" height="150" viewBox="0 0 38 20" fill="none" xmlns="http://www.w3.org/2000/svg"> -->
-                  <img width="50" height="45" viewBox="0 0 38 20" src="{{ asset('img/logo_af.png') }}" alt="Agrotecnica Fueguina">
+                  <img width="50" height="45" viewBox="0 0 38 20" src="{{ asset('/img/logo_af.png') }}" alt="Agrotecnica Fueguina">
                 </span>
               </span>
               <span class="app-brand-text demo menu-text fw-semibold ms-2">Agrotecnica</span>
@@ -441,11 +441,11 @@
     <!-- endbuild -->
 
     <!-- Vendors JS -->
-    <script src="{{ asset('libs/moment/moment.js') }}"></script>
-    <script src="{{ asset('libs/datatables-bs5/datatables-bootstrap5.js') }}"></script>
+    <script src="{{ asset('/libs/moment/moment.js') }}"></script>
+    <script src="{{ asset('/libs/datatables-bs5/datatables-bootstrap5.js') }}"></script>
 
     <!-- Main JS -->
-    <script src="{{ asset('js/main.js') }}"></script>
+    <script src="{{ asset('/js/main.js') }}"></script>
 
     @vite(['resources/js/app.js', "resources/js/Pages/{$page['component']}.vue"])
 

@@ -23,13 +23,14 @@ class DatabaseSeeder extends Seeder
         // ]);
 
         $this->call([
-            Sicoss01Seeder::class,
-            Sicoss05Seeder::class,
-            Sicoss08Seeder::class,
-            Sicoss12Seeder::class,
-            SicossObrasSeeder::class,
-            SicossSinieSeeder::class,
-            SicossZonasSeeder::class,
+            // Sicoss01Seeder::class,
+            // Sicoss05Seeder::class,
+            // Sicoss08Seeder::class,
+            // Sicoss12Seeder::class,
+            // SicossObrasSeeder::class,
+            // SicossSinieSeeder::class,
+            // SicossZonasSeeder::class,
+            Sue103Seeder::class,
         ]);
     }
 }

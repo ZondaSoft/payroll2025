@@ -13,8 +13,11 @@ class LsdEmision extends Model
 
     protected $fillable = [
         'id_empresa',
+        'periodo_id',
+        'cuit_empresa',
         'numero_emision',
         'fecha_emision',
+        'periodo',
         'periodo_desde',
         'periodo_hasta',
         'cantidad_empleados',

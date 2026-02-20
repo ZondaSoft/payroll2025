@@ -104,35 +104,97 @@
 
                             <!-- <div class="col-1 arrow-line" style="margin-top: 20px;">
                             </div> -->
-                        <!-- @ endcan -->
-                        <!-- @ can('services.balanza') -->
-                            <div class="col-2" id="btnImportarSicoss" name="btnImportarSicoss">
+
+                            <div class="col-2" id="btnConceptos" name="btnConceptos">
+                                <div class="d-flex flex-column align-items-center">
+                                <div class="avatar">
+                                    <a href="/liquidacion/conceptos" class="avatar-initial bg-label-success rounded-3">
+                                    <i class="ri-download-line ri-24px"></i>
+                                    </div>
+                                </a>
+                                <p class="mt-3 mb-1 text-center">Conceptos de liquidación</p>
+                                </div>
+                            </div>
+
+                            <!-- @ endcan -->
+                            <!-- @ can('services.balanza') -->
+                            <div class="col-1 arrow-line" style="margin-top: 20px;" hidden>
+                            </div>
+                            <!-- @ endcan -->
+                            
+                            <!-- @ endcan -->
+
+                            <!-- @ can('services.ordenes') -->
+                                <!-- <div class="col-2" id="btnRequisicionServ" name="btnRequisicionServ">
+                                    <div class="d-flex flex-column align-items-center">
+                                    <a href="/servicios/orden-serv1" class="avatar">
+                                        <div class="avatar-initial bg-label-primary rounded-3">
+                                        <div class="ri-money-dollar-circle-line ri-24px"></div>
+                                        </div>
+                                    </a>
+                                    <p class="mt-3 mb-1 text-center">Ordenes de servicio</p>
+                                    </div>
+                                </div> -->
+                            <!-- @ endcan -->
+                    </div>
+
+                </div>
+
+            </div>
+
+            
+
+        </div>
+      </div>
+    </div>
+    <!-- @ endif -->
+    <!--/ SERVICIOS -->
+
+    <div class="col-12 col-xxl-8">
+      <div class="card h-100">
+        <div class="row row-bordered g-0 h-100">
+            <div class="col-md-12 col-12">
+                <div class="card-header" style="padding-bottom: 0px;padding-top: 10px;">
+                    <div class="d-flex justify-content-between">
+                        <h5 class="mb-1">Libro de sueldo digital</h5>
+                        <div class="dropdown">
+                            <button class="btn btn-text-secondary rounded-pill text-muted border-0 p-1 waves-effect waves-light" type="button" id="totalTransaction" data-bs-toggle="dropdown" aria-haspopup="true" aria-expanded="false">
+                                <i class="ri-more-2-line ri-20px"></i>
+                            </button>
+                            
+                        </div>
+                    </div>
+
+                </div>
+
+                <div class="card-body pt-6">
+                    <div class="row">
+                        <div class="col-2" id="btnImportarSicoss" name="btnImportarSicoss">
                                 <div class="d-flex flex-column align-items-center">
                                 <div class="avatar">
                                     <a href="/sicoss/importar" class="avatar-initial bg-label-primary rounded-3">
                                     <i class="ri-download-line ri-24px"></i>
                                     </div>
                                 </a>
-                                <p class="mt-3 mb-1 text-center">Importación Sicoss</p>
+                                <p class="mt-3 mb-1 text-center">Importación Nomina desde Sicoss</p>
                                 </div>
                             </div>
 
                             <div class="col-1 arrow-line" style="margin-top: 20px;" hidden>
-                            </div>
-                        <!-- @ endcan -->
-
-                            <div class="col-2" id="btnImportarSicoss" name="btnImportarSicoss">
-                                <div class="d-flex flex-column align-items-center">
-                                <div class="avatar">
-                                    <a href="/arca/importar" class="avatar-initial bg-label-success rounded-3">
-                                    <i class="ri-download-line ri-24px"></i>
-                                    </div>
-                                </a>
-                                <p class="mt-3 mb-1 text-center">Importar conceptos desde ARCA</p>
+                        </div>
+                        
+                        <div class="col-2" id="btnImportarSicoss" name="btnImportarSicoss">
+                            <div class="d-flex flex-column align-items-center">
+                            <div class="avatar">
+                                <a href="/arca/importar" class="avatar-initial bg-label-success rounded-3">
+                                <i class="ri-download-line ri-24px"></i>
                                 </div>
+                            </a>
+                            <p class="mt-3 mb-1 text-center">Importar conceptos desde ARCA</p>
                             </div>
+                        </div>
 
-                            <div class="col-2" id="btnImportarSicoss" name="btnImportarSicoss">
+                        <div class="col-2" id="btnImportarSicoss" name="btnImportarSicoss">
                                 <div class="d-flex flex-column align-items-center">
                                 <div class="avatar">
                                     <a href="/basedat/importar" class="avatar-initial bg-label-warning rounded-3">
@@ -156,34 +218,14 @@
                             </div>
 
                             <div class="col-1 arrow-line" style="margin-top: 20px;" hidden>
-                            </div>
-                            <!-- @ endcan -->
-
-                            <!-- @ can('services.ordenes') -->
-                                <!-- <div class="col-2" id="btnRequisicionServ" name="btnRequisicionServ">
-                                    <div class="d-flex flex-column align-items-center">
-                                    <a href="/servicios/orden-serv1" class="avatar">
-                                        <div class="avatar-initial bg-label-primary rounded-3">
-                                        <div class="ri-money-dollar-circle-line ri-24px"></div>
-                                        </div>
-                                    </a>
-                                    <p class="mt-3 mb-1 text-center">Ordenes de servicio</p>
-                                    </div>
-                                </div> -->
-                            <!-- @ endcan -->
+                        </div>
                     </div>
-
                 </div>
-
             </div>
-
-
-
         </div>
       </div>
     </div>
-    <!-- @ endif -->
-    <!--/ SERVICIOS -->
+
   </div>
 </div>
 

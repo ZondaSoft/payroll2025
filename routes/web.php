@@ -15,7 +15,9 @@ use App\Http\Controllers\SicossSiniestroController;
 use App\Http\Controllers\SicossImportarController;
 use App\Http\Controllers\ArcaImportarController;
 use App\Http\Controllers\SicossLocalidadesController;
+use App\Http\Controllers\LiquidacionImportarController;
 use App\Http\Controllers\LsdController;
+use App\Http\Controllers\ConceptosLiquidacionController;
 use Inertia\Inertia;
 
 // Route::get('/', function () {
@@ -263,10 +265,10 @@ Route::middleware('auth')->group(function () {
     //--------------------------------------------
     // Importacion de liquidaciones (BASEDAT)
     //---------------------------------------------
-    Route::get('basedat/importar', [SicossImportarController::class, 'index'])
+    Route::get('basedat/importar', [LiquidacionImportarController::class, 'index'])
         ->name('basedat.importar');
 
-    Route::post('basedat/importar2', [SicossImportarController::class, 'importar'])
+    Route::post('basedat/importar2', [LiquidacionImportarController::class, 'importar'])
         ->name('basedat.importar2');
 
     Route::get('/basedat/import/status', function () {
@@ -277,13 +279,13 @@ Route::middleware('auth')->group(function () {
     });
 
     // Importaciones
-    Route::get('/basedat/importar/exportar-ok', [SicossImportarController::class, 'exportarOk'])->name('basedat.importar.exportarOk');
-    Route::get('/basedat/importar/exportar-err', [SicossImportarController::class, 'exportarErr'])->name('basedat.importar.exportarErr');
+    Route::get('/basedat/importar/exportar-ok', [LiquidacionImportarController::class, 'exportarOk'])->name('basedat.importar.exportarOk');
+    Route::get('/basedat/importar/exportar-err', [LiquidacionImportarController::class, 'exportarErr'])->name('basedat.importar.exportarErr');
     
-    Route::get('/basedat/importar/resumen', [SicossImportarController::class, 'resumenLiq'])->name('basedat.importar.resumen');
-    Route::get('/basedat/importar/resumen/export-xlsx', [SicossImportarController::class, 'resumenLiqExportXlsx'])->name('basedat.importar.resumen.export.xlsx');
+    Route::get('/basedat/importar/resumen', [LiquidacionImportarController::class, 'resumenLiq'])->name('basedat.importar.resumen');
+    Route::get('/basedat/importar/resumen/export-xlsx', [LiquidacionImportarController::class, 'resumenLiqExportXlsx'])->name('basedat.importar.resumen.export.xlsx');
 
-    Route::get('/basedat/import-resultados', [SicossImportarController::class, 'resultadosImport'])->name('basedat.import.resultados');
+    Route::get('/basedat/import-resultados', [LiquidacionImportarController::class, 'resultadosImport'])->name('basedat.import.resultados');
 
     //--------------------------------------------
     // Libro de Sueldo Digital (LSD)
@@ -296,6 +298,35 @@ Route::middleware('auth')->group(function () {
         Route::get('/listar', [LsdController::class, 'listar'])->name('listar');
         Route::delete('/emision/{id}', [LsdController::class, 'eliminar'])->name('emision.eliminar');
     });
+
+    //--------------------------------------------
+    // Liquidación: Conceptos
+    //---------------------------------------------
+    Route::get('liquidacion/conceptos/proximoCodigo', [ConceptosLiquidacionController::class, 'obtenerProximoCodigo'])
+        ->name('liquidacion.conceptos.proximoCodigo');
+
+    Route::get('liquidacion/conceptos/buscarConceptosArca', [ConceptosLiquidacionController::class, 'buscarConceptosArca'])
+        ->name('liquidacion.conceptos.buscarConceptosArca');
+
+    Route::get('liquidacion/conceptos/search', [ConceptosLiquidacionController::class, 'search'])
+        ->name('liquidacion.conceptos.search');
+
+    Route::get('liquidacion/conceptos/first', [ConceptosLiquidacionController::class, 'first'])
+        ->name('liquidacion.conceptos.first');
+
+    Route::get('liquidacion/conceptos/last', [ConceptosLiquidacionController::class, 'last'])
+        ->name('liquidacion.conceptos.last');
+
+    Route::get('liquidacion/conceptos/{concepto}/previous', [ConceptosLiquidacionController::class, 'previous'])
+        ->name('liquidacion.conceptos.previous');
+
+    Route::get('liquidacion/conceptos/{concepto}/next', [ConceptosLiquidacionController::class, 'next'])
+        ->name('liquidacion.conceptos.next');
+
+    // Resource al final
+    Route::resource('liquidacion/conceptos', ConceptosLiquidacionController::class)
+        ->parameters(['conceptos' => 'concepto'])
+        ->names('liquidacion.conceptos');
 
     
 });

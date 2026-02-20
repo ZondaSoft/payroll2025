@@ -2,32 +2,11 @@
 
 namespace App\Http\Controllers;
 
-use App\Models\Sicoss01;    // Actividades sicoss
-use App\Models\Sicoss05;    // Condiciones sicoss
-use App\Models\Sicoss08;    // Modalidades sicoss
-use App\Models\Sicoss12;    // Situaciones sicoss
-use App\Models\SicossObras;
 use App\Models\Sue001;      // Empleados activos
 use App\Models\Sue086;      // Empresas
-use App\Models\ImportConceptosArcaOk;
-use App\Models\ImportConceptosArcaErr;
-use App\Exports\ImportConceptosOkExport;
-use App\Exports\ImportConceptosErrExport;
-use DateTime;
-use Illuminate\Support\Facades\DB;
-use Barryvdh\DomPDF\Facade\Pdf;
-use App\Exports\ResumenLiquidacionExport;
-use PhpOffice\PhpSpreadsheet\IOFactory;
-use Maatwebsite\Excel\Facades\Excel;
-use Illuminate\Support\Facades\Storage;
-use App\Imports\NominasImport;
-use App\Imports\ConceptosArcaImport;
-use Illuminate\Support\Str;
 use Illuminate\Http\Request;
-use Inertia\Inertia;
-use App\Models\Datoempr;
 
-class ArcaImportarController extends Controller
+class LiquidacionImportarController extends Controller
 {
     public function index()
     {
@@ -41,6 +20,7 @@ class ArcaImportarController extends Controller
         $id = null;
         $direction = null;
         $periodo2 = "2026/01";
+        $tipoliq = 1;
 
         // Obtener el usuario actual autenticado
         $user = auth()->user();
@@ -109,41 +89,27 @@ class ArcaImportarController extends Controller
 
 
         // Tablas complementarias
-        $actividades = Sicoss01::orderBy('codigo')->get();
-        $condiciones = Sicoss05::orderBy('codigo')->get();
-        $contrataciones = Sicoss08::orderBy('codigo')->get();
-        $situaciones = Sicoss12::orderBy('codigo')->get();
-        $obras2 = SicossObras::orderBy('codigo')->get();
+        //$actividades = Sicoss01::orderBy('codigo')->get();
+        //$condiciones = Sicoss05::orderBy('codigo')->get();
+        //$contrataciones = Sicoss08::orderBy('codigo')->get();
+        //$situaciones = Sicoss12::orderBy('codigo')->get();
+        //$obras2 = SicossObras::orderBy('codigo')->get();
         $empresas = Sue086::orderBy('codigo')->get();
-        
-        // Obtener CUIT de la primera empresa por defecto
-        $cuit = $empresas->first()?->cuit ?? '';
         //$zonas = SicossZona::orderBy('codigo')->get();
         //$sinie = SicossSinie::orderBy('codigo')->get();
 
-        return view('arca.importar')->with(compact(
-            'legajo', 'active', 'agregar', 'edicion', 'actividades', 'condiciones', 'contrataciones', 'periodo2', 'user', 'rol', 'empresas', 'cuit'
+        return view('liquidacion.importar')->with(compact(
+            'legajo', 'active', 'agregar', 'edicion','periodo2', 'user', 'rol', 'empresas', 'tipoliq'
         ));
-    }
-
-    public function obtenerCuit($id)
-    {
-        $empresa = Sue086::find($id);
-
-        if (!$empresa) {
-            return response()->json(['error' => 'Empresa no encontrada'], 404);
-        }
-
-        return response()->json(['cuit' => $empresa->cuit]);
     }
 
     public function importar(Request $request)
     {
         $request->validate([
-            'file' => 'required|mimes:txt,csv|max:2048',
+            'file' => 'required|mimes:xls,xlsx|max:2048',
             ], [
             'file.required' => 'Por favor, selecciona un archivo para subir.',
-            'file.mimes' => 'El archivo debe ser un archivo de texto (.txt) o CSV (.csv).',
+            'file.mimes' => 'El archivo debe ser un documento Excel con extensión .xls o .xlsx.',
             'file.max' => 'El archivo no debe ser mayor a 2 MB.', // 1024 KB = 1 MB
         ]);
 
@@ -158,11 +124,20 @@ class ArcaImportarController extends Controller
 
         session()->flash('errorNro', '0');
 
+        // Normalizaciones
+        $periodoIn = preg_replace('/\D/', '', $request->input('periodo2')); // quita '/'
+        // ahora $periodo = YYYYMM
+        if (strlen($periodoIn) === 6) {
+            $periodo = $periodoIn; // p.ej 2025/06
+        } else {
+            return response()->json(['success'=>false,'$periodoIn'=>$periodoIn,'msg'=>'Periodo inválido'], 422);
+        }
+
         $fechaLiq = now();
 
         //$tipoliq = (int) $request->input('tipoliq');
         $idEmpresa = (int) $request->input('empresa');
-        $generar = $request->input('generar') === '1'; // true o false
+
         $comenta1 = $request->input('comenta1');
         $nom_arch = $request->input('nom_arch');
         $tam_arch = $request->input('tam_arch');
@@ -172,8 +147,8 @@ class ArcaImportarController extends Controller
         }
 
         // ⚡️ Limpio los logs antes de correr el import:
-        ImportConceptosArcaOk::truncate();
-        ImportConceptosArcaErr::truncate();
+        ImportLiquidacionOk::truncate();
+        ImportLiquidacionErr::truncate();
 
         // Limites de tiempo desactivoados
         set_time_limit(0); // sin límite (o pon 300 para 5 min)
@@ -181,15 +156,27 @@ class ArcaImportarController extends Controller
         ini_set('memory_limit', '512M'); // por si ayuda
         DB::disableQueryLog(); // reduce consumo de memoria
 
-        // Almacenar el archivo
-        $file = $request->file('file')->store('imports');
-        $fullPath = Storage::path($file);
+        // Proceso el importador
+        //$file = $request->file('file')->store('imports');
+        //$fullPath = storage_path('app/' . $file);
+        $file = $request->file('file')->store('imports'); // usa el disk default (private en tu caso)
+        $fullPath = Storage::path($file);                 // ✅ te da el path real correcto
 
-        // Validar existencia y lectura del archivo
+        // Diagnostico
+        logger()->info('IMPORT DEBUG', [
+            'stored' => $file ?? null,
+            'fullPath' => $fullPath,
+            'exists_file_exists' => file_exists($fullPath),
+            'exists_storage' => \Illuminate\Support\Facades\Storage::disk('local')->exists($file ?? ''),
+            'filesize' => file_exists($fullPath) ? filesize($fullPath) : null,
+            'is_readable' => is_readable($fullPath),
+            'mime' => file_exists($fullPath) ? mime_content_type($fullPath) : null,
+        ]);
+
         if (!file_exists($fullPath)) {
             return response()->json([
                 'success' => false,
-                'msg' => 'El archivo no existe en el path calculado',
+                'msg' => 'NO EXISTE el archivo en el path calculado',
                 'fullPath' => $fullPath,
             ], 422);
         }
@@ -197,40 +184,64 @@ class ArcaImportarController extends Controller
         if (!is_readable($fullPath)) {
             return response()->json([
                 'success' => false,
-                'msg' => 'El archivo existe pero no es legible (permisos)',
+                'msg' => 'El archivo existe pero NO es legible (permisos)',
                 'fullPath' => $fullPath,
             ], 422);
         }
 
-        // ⚡️ Limpio los logs antes de correr el import:
-        ImportConceptosArcaOk::truncate();
-        ImportConceptosArcaErr::truncate();
-
+        // Detectar hoja activa
+        //$spreadsheet = IOFactory::load($fullPath);
+        //$activeTitle = $spreadsheet->getActiveSheet()->getTitle();
         try {
-            // Usar ConceptosArcaImport para procesar archivos de texto
-            $import = new ConceptosArcaImport(
-                $fullPath,
-                $idEmpresa,
-                $nom_arch,
-                $tam_arch,
-                $generar
-            );
-
-            // Ejecutar la importación
-            $import->execute();
-
-            // Contadores desde el import
-            $count = $import->getRowCount();
-            $rechazados = $import->getRejectedCount();
-            $total = $import->getTotalCount();
-
+            $reader = IOFactory::createReaderForFile($fullPath);
+            $reader->setReadDataOnly(true); // más liviano
+            $spreadsheet = $reader->load($fullPath);
+            $activeTitle = $spreadsheet->getActiveSheet()->getTitle();
         } catch (\Throwable $e) {
             return response()->json([
                 'success' => false,
-                'msg' => 'Error procesando archivo: ' . $e->getMessage(),
+                'msg' => 'No se pudo abrir el Excel (PhpSpreadsheet)',
+                'error' => $e->getMessage(),
                 'fullPath' => $fullPath,
             ], 422);
         }
+
+        // Tomar la hoja activa solo para el título (sin recalcular fórmulas)
+        //$reader = IOFactory::createReaderForFile($fullPath);
+        //$reader->setReadDataOnly(true); // lee valores, no estilos
+        //$spreadsheet = $reader->load($fullPath);
+        //$activeTitle = $spreadsheet->getActiveSheet()->getTitle();
+
+        $import = new NominasImport(
+            $activeTitle,
+            periodo: $periodo,         // YYYYMM
+            idEmpresa: $idEmpresa,
+            nom_arch: $nom_arch,
+            tam_arch: $tam_arch
+        );
+
+        //ImportarLiquidacionJob::dispatch($file);
+        //Excel::import($import, $fullPath);
+        //Excel::import($import, $fullPath, null, \Maatwebsite\Excel\Excel::XLSX, [
+        //    'pre_calculate_formulas' => false
+        //]);
+        $ext = strtolower($request->file('file')->getClientOriginalExtension());
+
+        $excelType = match ($ext) {
+            'xls'  => \Maatwebsite\Excel\Excel::XLS,
+            'xlsx' => \Maatwebsite\Excel\Excel::XLSX,
+            'xlsm' => \Maatwebsite\Excel\Excel::XLSX, // suele abrir igual
+            default => \Maatwebsite\Excel\Excel::XLSX,
+        };
+
+        Excel::import($import, $fullPath, null, $excelType, [
+            'pre_calculate_formulas' => false
+        ]);
+
+        // Contadores desde el import, sin depender de la BD
+        $count = $import->getRowCount();
+        $rechazados = $import->getRejectedCount();
+        $total = $count + $rechazados;
 
         // 👉 Si la petición viene por AJAX (fetch), respondemos en JSON
         if ($request->ajax()) {
@@ -254,8 +265,8 @@ class ArcaImportarController extends Controller
 
     public function resultadosImport()
     {
-        $count = ImportConceptosArcaOk::count();
-        $rechazados = ImportConceptosArcaErr::count();
+        $count = ImportLiquidacionOk::count();
+        $rechazados = ImportLiquidacionErr::count();
         $total = $count + $rechazados;
 
         return response()->json([
@@ -267,10 +278,10 @@ class ArcaImportarController extends Controller
     }
 
     public function exportarOk() {
-        return Excel::download(new ImportConceptosOkExport, 'importacion_liquidacion.xlsx');
+        return Excel::download(new ImportSicossOkExport, 'importacion_liquidacion.xlsx');
     }
 
     public function exportarErr() {
-        return Excel::download(new ImportConceptosErrExport, 'importacion_rechazados.xlsx');
+        return Excel::download(new ImportSicossErrExport, 'importacion_rechazados.xlsx');
     }
 }
