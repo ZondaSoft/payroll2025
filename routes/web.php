@@ -325,8 +325,7 @@ Route::middleware('auth')->group(function () {
 
     // Resource al final
     Route::resource('liquidacion/conceptos', ConceptosLiquidacionController::class)
-        ->parameters(['conceptos' => 'concepto'])
-        ->name('liquidacion.conceptos');
+        ->parameters(['conceptos' => 'concepto']);
 
     
 });
