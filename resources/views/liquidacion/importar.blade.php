@@ -608,7 +608,7 @@
                 return;
             }
 
-            fetch(`/arca/empresa/${empresaId}/cuit`)
+            fetch(`{{ route('arca.empresa.cuit', '') }}/${empresaId}`)
                 .then(response => {
                     if (!response.ok) {
                         throw new Error('No se pudo obtener el CUIT');
