@@ -42,7 +42,7 @@
     <link rel="stylesheet" href="{{ $assetBase }}/libs/node-waves/node-waves.css" />
 
     <!-- Core CSS -->
-    <link rel="stylesheet" href="{{ $assetBase }}/css/rtl/core2.css" class="template-customizer-core-css" />
+    <link rel="stylesheet" href="{{ asset('/css/rtl/core.css') }}" class="template-customizer-core-css" />
     <link rel="stylesheet" href="{{ $assetBase }}/css/rtl/theme-default.css" class="template-customizer-theme-css" />
     <link rel="stylesheet" href="{{ $assetBase }}/css/demo.css" />
 

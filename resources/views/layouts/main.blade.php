@@ -324,11 +324,11 @@
                     </script><span class="text-danger"></i></span> by
                     <a href="https://zondasoftware.com.ar" target="_blank" class="footer-link">Zonda Software</a>
                   </div>
-                  {{-- <div class="d-none d-lg-inline-block">
+                  <!-- {{-- <div class="d-none d-lg-inline-block">
                     <a href="https://pixinvent.ticksy.com/" target="_blank" class="footer-link d-none d-sm-inline-block"
                       >Soporte</a
                     >
-                  </div> --}}
+                  </div> --}} -->
                 </div>
               </div>
             </footer>
