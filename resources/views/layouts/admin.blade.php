@@ -76,7 +76,7 @@
 
         <aside id="layout-menu" class="layout-menu menu-vertical menu bg-menu-theme">
           <div class="app-brand demo">
-            <a href="/" class="app-brand-link">
+            <a href="{{ url('/') }}" class="app-brand-link">
               <span class="app-brand-logo demo">
                 <span style="color: var(--bs-primary)">
                   <img width="50" height="45" viewBox="0 0 38 20" src="{{ asset('img/logo_af.png') }}" alt="Agrotecnica Fueguina">

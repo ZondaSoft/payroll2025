@@ -80,7 +80,7 @@
 
         <aside id="layout-menu" class="layout-menu menu-vertical menu bg-menu-theme">
           <div class="app-brand demo">
-            <a href="/" class="app-brand-link">
+            <a href="{{ url('/') }}" class="app-brand-link">
               <span class="app-brand-logo demo">
                 <span style="color: var(--bs-primary)">
                   <!-- <svg width="268" height="150" viewBox="0 0 38 20" fill="none" xmlns="http://www.w3.org/2000/svg">
