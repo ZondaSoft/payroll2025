@@ -4,7 +4,7 @@
         lang="en"
         dir="ltr"
         data-theme="theme-default"
-        data-assets-path="/"
+        data-assets-path="{{ env('ASSET_URL', '/') }}"
         data-template="vertical-menu-template"
         data-style="light">
         <meta charset="utf-8">
