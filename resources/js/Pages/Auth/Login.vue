@@ -99,3 +99,19 @@ const submit = () => {
         </form>
     </GuestLayout>
 </template>
+
+<style scoped>
+    /* 🟦 Lado izquierdo */
+    .left-side {
+        display: -webkit-box;
+        display: flex;
+        -webkit-box-orient: vertical;
+        -webkit-box-direction: normal;
+                flex-direction: column;
+        background-color: #fff;
+        justify-content: center;
+        align-items: flex-start;
+        padding: 40px 0 40px 85px;
+        height: 100vh;
+    }
+</style>

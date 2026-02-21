@@ -249,7 +249,7 @@ const buscarConceptosArca = async (search) => {
     loadingConceptos.value = true;
     try {
         const searchTerm = search && search.length > 0 ? search : '';
-        const response = await fetch(`/liquidacion/conceptos/buscarConceptosArca?search=${encodeURIComponent(searchTerm)}`, {
+        const response = await fetch(route('liquidacion.conceptos.buscarConceptosArca') + '?search=' + encodeURIComponent(searchTerm), {
             method: 'GET',
             headers: {
                 'Content-Type': 'application/json',
