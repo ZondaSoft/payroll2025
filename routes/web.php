@@ -293,6 +293,7 @@ Route::middleware('auth')->group(function () {
     Route::prefix('lsd')->name('lsd.')->group(function () {
         Route::get('/generar', [LsdController::class, 'generar'])->name('generar');
         Route::post('/generar-emision', [LsdController::class, 'generarEmision'])->name('generar.emision');
+        Route::get('/emision/{id}/download', [LsdController::class, 'download'])->name('emision.download');
         Route::get('/emision/{id}', [LsdController::class, 'obtenerEmision'])->name('emision');
         Route::put('/emision/{id}/estado', [LsdController::class, 'actualizarEstado'])->name('emision.estado');
         Route::get('/listar', [LsdController::class, 'listar'])->name('listar');

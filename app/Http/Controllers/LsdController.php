@@ -76,8 +76,8 @@ class LsdController extends Controller
                 'numero_emision' => $numeroEmision,
                 'fecha_emision' => now()->toDateString(),
                 'periodo' => $periodoStr,
-                'cantidad_empleados' => 0,
-                'monto_total' => 0,
+                'cantidad_empleados' => $fileData['cantidad_empleados'] ?? 0,
+                'monto_total'        => $fileData['monto_total'] ?? 0,
                 'estado' => 'borrador',
                 'usuario_id' => auth()->id(),
                 'fecha_generacion' => now(),
@@ -86,11 +86,15 @@ class LsdController extends Controller
                 'fecha_pago' => $request->fecha_pago,
             ]);
 
-            // Después de crear la emisión, devolver el archivo para descarga
-            $fullPath = $fileData['path'];
+            // Devolver JSON con éxito y URL de descarga para que el frontend la procese
             $filename = $fileData['filename'];
 
-            return response()->download($fullPath, $filename);
+            return response()->json([
+                'success' => true,
+                'message' => 'Emisión generada exitosamente',
+                'download_url' => route('lsd.emision.download', $emision->id),
+                'emision_id' => $emision->id,
+            ]);
         } catch (\Throwable $e) {
             return response()->json([
                 'success' => false,
@@ -474,13 +478,52 @@ class LsdController extends Controller
             ];
         }
 
-        return ['status' => 200, 'path' => $fullPath, 'filename' => $filename];
+        return [
+            'status'             => 200,
+            'path'               => $fullPath,
+            'filename'           => $filename,
+            'cantidad_empleados' => $cantidadEmpleados,
+            'monto_total'        => $montoTotal,
+        ];
     }
 
 
     /**
      * Obtener detalles de una emisión
      */
+    /**
+     * Descargar el archivo TXT de una emisión ya generada
+     */
+    public function download($id)
+    {
+        $emision = LsdEmision::find($id);
+
+        if (!$emision) {
+            abort(404, 'Emisión no encontrada');
+        }
+
+        // Buscar el último archivo generado para esta emisión
+        $dir = storage_path('app/lsd');
+        $pattern = $dir . '/' . ($emision->cuit_empresa ?? '*') . '_' . ($emision->periodo ?? '*') . '_*.txt';
+        $files = glob($pattern);
+
+        if (empty($files)) {
+            // Intentar buscar por emision id con patrón más amplio
+            $files = glob($dir . '/*.txt');
+        }
+
+        if (empty($files)) {
+            abort(404, 'Archivo de emisión no encontrado');
+        }
+
+        // Tomar el más reciente
+        usort($files, fn($a, $b) => filemtime($b) - filemtime($a));
+        $filepath = $files[0];
+        $filename = basename($filepath);
+
+        return response()->download($filepath, $filename);
+    }
+
     public function obtenerEmision($id)
     {
         $emision = LsdEmision::with(['empresa', 'usuario'])->find($id);

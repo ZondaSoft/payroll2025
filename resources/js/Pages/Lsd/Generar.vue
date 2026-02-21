@@ -1,6 +1,7 @@
 <script setup>
 import { ref, reactive } from 'vue'
 import axios from 'axios'
+import { router } from '@inertiajs/vue3'
 
 const props = defineProps({
   empresas: Array,
@@ -58,9 +59,13 @@ const generarEmision = async () => {
     const response = await axios.post(route('lsd.generar.emision'), formulario)
     
     if (response.data.success) {
+      // Iniciar descarga del archivo en segundo plano
+      if (response.data.download_url) {
+        window.open(response.data.download_url, '_blank')
+      }
       alert('Emisión generada exitosamente')
-      // Recargar la página
-      window.location.reload()
+      // Refrescar solo la tabla de emisiones sin recargar la página completa
+      router.reload({ only: ['emisiones'] })
     }
   } catch (error) {
     alert('Error: ' + (error.response?.data?.message || error.message))
@@ -236,6 +241,7 @@ const anularEmision = async (id) => {
 
                 <div class="col-12">
                   <button
+                    id="btnGenerar"
                     type="submit"
                     class="btn btn-primary"
                     :disabled="cargando"
