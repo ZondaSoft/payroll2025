@@ -88,7 +88,7 @@
         background-color: #fff;
         justify-content: center;
         align-items: flex-start;
-        padding: 40px 0 40px 85px;
+        padding: 40px 0 40px 85px !important;
         height: 100vh;
     }
 
