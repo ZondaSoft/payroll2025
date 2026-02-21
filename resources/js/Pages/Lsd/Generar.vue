@@ -55,7 +55,7 @@ const generarEmision = async () => {
 
   cargando.value = true
   try {
-    const response = await axios.post('/lsd/generar-emision', formulario)
+    const response = await axios.post(route('lsd.generar.emision'), formulario)
     
     if (response.data.success) {
       alert('Emisión generada exitosamente')
@@ -108,7 +108,7 @@ const cerrarModal = () => {
 
 const descargarEmision = async (id) => {
   try {
-    const response = await axios.get(`/lsd/descargar/${id}`, {
+    const response = await axios.get(route('lsd.emision', id), {
       responseType: 'blob',
     })
     const url = window.URL.createObjectURL(new Blob([response.data]))
@@ -128,7 +128,7 @@ const anularEmision = async (id) => {
     return
   }
   try {
-    const response = await axios.post(`/lsd/anular/${id}`)
+    const response = await axios.post(route('lsd.emision.estado', id))
     if (response.data.success) {
       alert('Emisión anulada exitosamente')
       window.location.reload()

@@ -58,7 +58,7 @@
     /* El logo queda SIEMPRE a 90px del borde superior */
     .logo-container {
         /* position: absolute; */
-        padding-top: 60px;
+        padding-top: 40px;
         left: 100px; /* mismo alineado que tus inputs */
     }
 
