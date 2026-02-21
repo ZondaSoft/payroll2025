@@ -19,9 +19,6 @@ if (window.templateName === null) {
   window.templateName = 'vertical-menu-template';
 }
 
-alert('assetsPath: ' + window.assetsPath);
-alert('templateName: ' + window.templateName);
-
 /**
  * TemplateCustomizer settings
  * -------------------------------------------------------------------------------------
