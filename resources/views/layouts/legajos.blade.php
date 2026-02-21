@@ -26,7 +26,7 @@
     <meta name="description" content="" />
 
     <!-- Favicon -->
-    <link rel="icon" type="image/x-icon" href="{{ $assetBase }}/assets/img/favicon/favicon.ico" />
+    <link rel="icon" type="image/x-icon" href="{{ asset('/assets/img/favicon/favicon.ico') }}" />
 
     <!-- Fonts -->
     <link rel="preconnect" href="https://fonts.googleapis.com" />
@@ -36,34 +36,34 @@
       rel="stylesheet" />
 
     <!-- Icons -->
-    <link rel="stylesheet" href="{{ $assetBase }}/fonts/remixicon/remixicon.css" />
+    <link rel="stylesheet" href="{{ asset('/fonts/remixicon/remixicon.css') }}" />
 
     <!-- Menu waves for no-customizer fix -->
-    <link rel="stylesheet" href="{{ $assetBase }}/libs/node-waves/node-waves.css" />
+    <link rel="stylesheet" href="{{ asset('/libs/node-waves/node-waves.css') }}" />
 
     <!-- Core CSS -->
     <link rel="stylesheet" href="{{ asset('/css/rtl/core.css') }}" class="template-customizer-core-css" />
-    <link rel="stylesheet" href="{{ $assetBase }}/css/rtl/theme-default.css" class="template-customizer-theme-css" />
-    <link rel="stylesheet" href="{{ $assetBase }}/css/demo.css" />
+    <link rel="stylesheet" href="{{ asset('/css/rtl/theme-default.css') }}" class="template-customizer-theme-css" />
+    <link rel="stylesheet" href="{{ asset('/css/demo.css') }}" />
 
     <!-- Vendors CSS -->
-    <link rel="stylesheet" href="{{ $assetBase }}/libs/perfect-scrollbar/perfect-scrollbar.css" />
-    <link rel="stylesheet" href="{{ $assetBase }}/libs/typeahead-js/typeahead.css" />
-    <link rel="stylesheet" href="{{ $assetBase }}/libs/datatables-bs5/datatables.bootstrap5.css" />
-    <link rel="stylesheet" href="{{ $assetBase }}/libs/datatables-responsive-bs5/responsive.bootstrap5.css" />
-    <link rel="stylesheet" href="{{ $assetBase }}/libs/datatables-checkboxes-jquery/datatables.checkboxes.css" />
-    <link rel="stylesheet" href="{{ $assetBase }}/libs/datatables-buttons-bs5/buttons.bootstrap5.css" />
+    <link rel="stylesheet" href="{{ asset('/libs/perfect-scrollbar/perfect-scrollbar.css') }}" />
+    <link rel="stylesheet" href="{{ asset('/libs/typeahead-js/typeahead.css') }}" />
+    <link rel="stylesheet" href="{{ asset('/libs/datatables-bs5/datatables.bootstrap5.css') }}" />
+    <link rel="stylesheet" href="{{ asset('/libs/datatables-responsive-bs5/responsive.bootstrap5.css') }}" />
+    <link rel="stylesheet" href="{{ asset('/libs/datatables-checkboxes-jquery/datatables.checkboxes.css') }}" />
+    <link rel="stylesheet" href="{{ asset('/libs/datatables-buttons-bs5/buttons.bootstrap5.css') }}" />
 
     @yield('styles')
     <!-- Page CSS -->
 
     <!-- Helpers -->
-    <script src="{{ $assetBase }}/js/helpers.js"></script>
+    <script src="{{ asset('/js/helpers.js') }}"></script>
     <!--! Template customizer & Theme config files MUST be included after core stylesheets and helpers.js in the <head> section -->
     <!--? Template customizer: To hide customizer set displayCustomizer value false in config.js.  -->
-    <script src="{{ $assetBase }}/js/template-customizer.js"></script>
+    <script src="{{ asset('/js/template-customizer.js') }}"></script>
     <!--? Config:  Mandatory theme config file contain global vars & default theme options, Set your preferred theme option in this file.  -->
-    <script src="{{ $assetBase }}/js/config.js"></script>
+    <script src="{{ asset('/js/config.js') }}"></script>
 
     @routes
     @vite('resources/js/app.js')
@@ -126,7 +126,7 @@
                     </defs>
                   </svg> -->
                   <!-- <svg width="268" height="150" viewBox="0 0 38 20" fill="none" xmlns="http://www.w3.org/2000/svg"> -->
-                  <img width="50" height="45" viewBox="0 0 38 20" src="{{ $assetBase }}/img/logo_af.png" alt="Agrotecnica Fueguina">
+                  <img width="50" height="45" viewBox="0 0 38 20" src="{{ asset('/img/logo_af.png') }}" alt="Agrotecnica Fueguina">
                 </span>
               </span>
               <span class="app-brand-text demo menu-text fw-semibold ms-2">Agrotecnica</span>
@@ -429,25 +429,24 @@
 
     <!-- Core JS -->
     <!-- build:js assets/vendor/js/core.js -->
-    <script src="{{ $assetBase }}/libs/jquery/jquery.js"></script>
-    <script src="{{ $assetBase }}/libs/popper/popper.js"></script>
-    <script src="{{ $assetBase }}/js/bootstrap.js"></script>
-    <script src="{{ $assetBase }}/libs/node-waves/node-waves.js"></script>
-    <script src="{{ $assetBase }}/libs/perfect-scrollbar/perfect-scrollbar.js"></script>
-    <script src="{{ $assetBase }}/libs/hammer/hammer.js"></script>
-    <script src="{{ $assetBase }}/libs/i18n/i18n.js"></script>
-    <script src="{{ $assetBase }}/libs/typeahead-js/typeahead.js"></script>
-    <script src="{{ $assetBase }}/js/menu.js"></script>
+    <script src="{{ asset('/libs/jquery/jquery.js') }}"></script>
+    <script src="{{ asset('/libs/popper/popper.js') }}"></script>
+    <script src="{{ asset('/js/bootstrap.js') }}"></script>
+    <script src="{{ asset('/libs/node-waves/node-waves.js') }}"></script>
+    <script src="{{ asset('/libs/perfect-scrollbar/perfect-scrollbar.js') }}"></script>
+    <script src="{{ asset('/libs/hammer/hammer.js') }}"></script>
+    <script src="{{ asset('/libs/i18n/i18n.js') }}"></script>
+    <script src="{{ asset('/libs/typeahead-js/typeahead.js') }}"></script>
+    <script src="{{ asset('/js/menu.js') }}"></script>
 
     <!-- endbuild -->
 
     <!-- Vendors JS -->
-    <script src="{{ $assetBase }}/libs/moment/moment.js"></script>
-    <script src="{{ $assetBase }}/libs/datatables-bs5/datatables-bootstrap5.js"></script>
+    <script src="{{ asset('/libs/moment/moment.js') }}"></script>
+    <script src="{{ asset('/libs/datatables-bs5/datatables-bootstrap5.js') }}"></script>
 
     <!-- Main JS -->
-    <script src="{{ $assetBase }}/js/main.js"></script>
-
+    <script src="{{ asset('/js/main.js') }}"></script>
     @vite(['resources/js/app.js', "resources/js/Pages/{$page['component']}.vue"])
 
     @yield('scripts')
