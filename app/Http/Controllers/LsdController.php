@@ -141,7 +141,8 @@ class LsdController extends Controller
         $datos = $query->select('sue090s.*', 'sue001s.cuil as cuil', 
             'sue001s.codigo as legajo_codigo',
             'sue001s.sicoss_conyuge as conyugue',
-            'sue001s.sicoss_hijos as hijos')->get();
+            'sue001s.sicoss_hijos as hijos',
+            'sue001s.sicoss_adherentes as adherentes')->get();
 
         // Debug: registrar información no intrusiva sobre $datos
         try {
@@ -231,10 +232,23 @@ class LsdController extends Controller
                 $legajoValue = str_pad($registro->legajo_codigo ?? $registro->legajo ?? '', 10, ' ', STR_PAD_LEFT);
                 $cuilValue = $registro->cuil ?? '';
                 $concepto = str_pad($registro->concepto ?? '', 10, ' ', STR_PAD_LEFT);
-                $cantidad = str_pad($registro->cantidad ?? 0, 6, '$', STR_PAD_LEFT);    
-                $unidades = str_pad($registro->unidades ?? '', 10, ' ', STR_PAD_LEFT);      // $=moneda; %=porcentuales;   A=año; Q=quincena; M=mes;   D=días; H=horas.  Valor optativo, puede informarse en blanco.
-                $importe = str_pad(number_format($registro->importe ?? 0, 2, '', ''), 15, '0', STR_PAD_LEFT); // Sin decimales, sin separadores de miles, con ceros a la izquierda. Ejemplo: $1234.56 se informaría como 0000000000123456
-                $debitoCredito = 'D'; // D=Débito (descuento); C=Crédito (remunerativo)
+                //$cantidad = str_pad(number_format($registro->cantidad ?? 0, 2, '.', ''), 6, ' ', STR_PAD_LEFT);    
+                $cantidad = str_pad((string)(int)round(($registro->cantidad ?? 0) * 100), 5, '0', STR_PAD_LEFT); // 15 dígitos, sin punto decimal, los 2 últimos son decimales. Ej: $1234.56 → 000000000123456
+                $unidades = substr(str_pad($registro->unidades ?? ' ', 1, ' ', STR_PAD_LEFT), 0, 1);      // $=moneda; %=porcentuales;   A=año; Q=quincena; M=mes;   D=días; H=horas.  Valor optativo, puede informarse en blanco.
+                $importe = str_pad((string)(int)round(($registro->importe ?? 0) * 100), 15, '0', STR_PAD_LEFT); // 15 dígitos, sin punto decimal, los 2 últimos son decimales. Ej: $1234.56 → 000000000123456
+
+                $debitoCredito = 'D';   // D=Débito (descuento); C=Crédito (remunerativo)
+                if ($registro->tiporem == 'sue')
+                    $debitoCredito = 'C';
+                else if ($registro->tiporem == 'nre')
+                    $debitoCredito = 'C';
+                else if ($registro->tiporem == 'adi')
+                    $debitoCredito = 'C';
+                else if ($registro->tiporem == 'hse')
+                    $debitoCredito = 'C';
+                else if ($registro->tiporem == 'sac')
+                    $debitoCredito = 'C';
+
                 $periodoAjuste = '        ';
                 
                 $line03 = '03'
@@ -255,7 +269,7 @@ class LsdController extends Controller
         foreach ($datos as $registro) {
                 $legajoValue = str_pad($registro->legajo_codigo ?? $registro->legajo ?? '', 10, ' ', STR_PAD_LEFT);
                 $cuilValue = $registro->cuil ?? '';
-                $conyugue = str_pad($registro->conyugue ?? '', 1, ' ', STR_PAD_LEFT); // 0 = NO  1= SI
+                $conyugue = str_pad($registro->conyugue ?? '', 1, '0', STR_PAD_LEFT); // 0 = NO  1= SI
                 $hijos = str_pad($registro->hijos ?? 0, 2, '0', STR_PAD_LEFT); // Cantidad de hijos menores de 18 años o incapacitados para el trabajo
                 $cct = str_pad($registro->cct ?? '0', 1, '0', STR_PAD_LEFT); // Convenio Colectivo de Trabajo. Valor optativo, puede informarse en blanco.  
                 $scvo = str_pad($registro->scvo ?? '0', 1, '0', STR_PAD_LEFT); // Sí/No de trabajador con S/CV. Valor optativo, puede informarse en blanco.

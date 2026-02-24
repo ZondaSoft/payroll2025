@@ -111,21 +111,8 @@ const cerrarModal = () => {
   emisionSeleccionada.value = null
 }
 
-const descargarEmision = async (id) => {
-  try {
-    const response = await axios.get(route('lsd.emision', id), {
-      responseType: 'blob',
-    })
-    const url = window.URL.createObjectURL(new Blob([response.data]))
-    const link = document.createElement('a')
-    link.href = url
-    link.setAttribute('download', `emision_${id}.pdf`)
-    document.body.appendChild(link)
-    link.click()
-    link.parentNode.removeChild(link)
-  } catch (error) {
-    alert('Error al descargar: ' + (error.response?.data?.message || error.message))
-  }
+const descargarEmision = (id) => {
+  window.location.href = route('lsd.emision.download', id)
 }
 
 const anularEmision = async (id) => {

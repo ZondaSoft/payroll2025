@@ -325,6 +325,17 @@ watch(() => props.agregar, () => {
                                             <button
                                                 class="nav-link"
                                                 data-bs-toggle="tab"
+                                                data-bs-target="#form-tabs-cargas-familia"
+                                                role="tab"
+                                                aria-selected="false">
+                                                <span class="ri-folder-user-line ri-20px d-sm-none"></span
+                                                ><span class="d-none d-sm-block">Familiares</span>
+                                            </button>
+                                        </li>
+                                        <li class="nav-item">
+                                            <button
+                                                class="nav-link"
+                                                data-bs-toggle="tab"
                                                 data-bs-target="#form-tabs-sicoss"
                                                 role="tab"
                                                 aria-selected="false">
@@ -765,16 +776,31 @@ watch(() => props.agregar, () => {
                                             </div>
 
 
-                                            <div class="col-md-6">
+                                            <div class="col-md-12">
                                                 <div class="form-floating form-floating-outline">
-                                                    <br>
+                                                    <hr>
+                                                </div>
+                                            </div>
+
+                                            <!-- Activo -->
+                                            <div class="col-md-3">
+                                                <div class="form-check form-switch mt-4">
+                                                    <input
+                                                        type="checkbox"
+                                                        id="activo"
+                                                        name="activo"
+                                                        class="form-check-input"
+                                                        v-model="form.activo"
+                                                        v-bind:disabled="!modoEdicion"
+                                                    />
+                                                    <label class="form-check-label" for="activo">Cónyuge</label>
                                                 </div>
                                             </div>
                                         </div>
 
                                     </div>
 
-                                    <div class="tab-pane fade active show" id="form-tabs-categorias" role="tabpanel">
+                                    <div class="tab-pane fade show" id="form-tabs-categorias" role="tabpanel">
 
                                         <!-- MENSAJES DE ERRORES -->
                                         <!-- @ if ($errors->any())
@@ -1147,7 +1173,73 @@ watch(() => props.agregar, () => {
 
                                     </div>
 
-                                    <div class="tab-pane fade active show" id="form-tabs-sicoss" role="tabpanel">
+                                    <div class="tab-pane fade show" id="form-tabs-cargas-familia" role="tabpanel">
+
+                                        <!-- MENSAJES DE ERRORES -->
+                                        <!-- @ if ($errors->any())
+                                            <div class="alert alert-danger">
+                                                <ul>
+                                                    @ foreach ($errors->all() as $error)
+                                                        <li>{{ $error }}</li>
+                                                    @ endforeach
+                                                </ul>
+                                            </div>
+                                        @ endif -->
+
+                                        <div class="row g-6">
+                                            <!-- Conyuge -->
+                                            <div class="col-md-3">
+                                                <div class="form-check form-switch mt-4">
+                                                    <input
+                                                        type="checkbox"
+                                                        id="sicoss_conyuge"
+                                                        name="sicoss_conyuge"
+                                                        class="form-check-input"
+                                                        v-model="form.sicoss_conyuge"
+                                                        v-bind:disabled="!edicion"
+                                                    />
+                                                    <label class="form-check-label" for="sicoss_conyuge">Cónyuge</label>
+                                                </div>
+                                            </div>
+
+                                            <div class="row"></div>
+
+                                            <!-- Hijos -->
+                                            <div class="col-md-3">
+                                                <div class="form-check form-switch mt-4">
+                                                    <input
+                                                        type="checkbox"
+                                                        id="sicoss_hijos"
+                                                        name="sicoss_hijos"
+                                                        class="form-check-input"
+                                                        v-model="form.sicoss_hijos"
+                                                        v-bind:disabled="!edicion"
+                                                    />
+                                                    <label class="form-check-label" for="sicoss_hijos">Hijos</label>
+                                                </div>
+                                            </div>
+
+                                            <div class="row"></div>
+                                            
+                                            <!-- Adherentes -->
+                                            <div class="col-md-3">
+                                                <div class="form-check form-switch mt-4">
+                                                    <input
+                                                        type="checkbox"
+                                                        id="sicoss_adherentes"
+                                                        name="sicoss_adherentes"
+                                                        class="form-check-input"
+                                                        v-model="form.sicoss_adherentes"
+                                                        v-bind:disabled="!edicion"
+                                                    />
+                                                    <label class="form-check-label" for="sicoss_adherentes">Adherentes</label>
+                                                </div>
+                                            </div>
+                                        </div>
+
+                                    </div>
+
+                                    <div class="tab-pane fade show" id="form-tabs-sicoss" role="tabpanel">
 
                                         <!-- MENSAJES DE ERRORES -->
                                         <!-- @ if ($errors->any())
