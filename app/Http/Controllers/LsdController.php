@@ -60,7 +60,7 @@ class LsdController extends Controller
                 ->max('numero_emision') ?? 0;
             $numeroEmision = $ultimaEmision + 1;
             
-            $fileData = $this->generarTxt($empresa, $periodo, $tipoLiquidacion);
+            $fileData = $this->generarTxt($empresa, $periodo, $tipoLiquidacion, $numeroEmision);
 
             // Si generarTxt devolvió un error (por ejemplo 404), retornarlo y no crear la emisión
             if (!is_array($fileData) || ($fileData['status'] ?? 200) !== 200) {
@@ -103,7 +103,7 @@ class LsdController extends Controller
         }
     }
 
-    public function generarTxt($empresa, $periodo, $tipoLiquidacion)
+    public function generarTxt($empresa, $periodo, $tipoLiquidacion, $numero_emision)
     {
         $empresaId = $empresa->id;
         $empresaName = $empresa->detalle ?? '';
@@ -142,7 +142,8 @@ class LsdController extends Controller
             'sue001s.codigo as legajo_codigo',
             'sue001s.sicoss_conyuge as conyugue',
             'sue001s.sicoss_hijos as hijos',
-            'sue001s.sicoss_adherentes as adherentes')->get();
+            'sue001s.sicoss_adherentes as adherentes',
+            'sue001s.obra_sijp as obra_sijp')->get();
 
         // Debug: registrar información no intrusiva sobre $datos
         try {
@@ -249,7 +250,7 @@ class LsdController extends Controller
                 else if ($registro->tiporem == 'sac')
                     $debitoCredito = 'C';
 
-                $periodoAjuste = '        ';
+                $periodoAjuste = '      ';
                 
                 $line03 = '03'
                     . $cuilValue
@@ -276,13 +277,14 @@ class LsdController extends Controller
                 $reduccion = str_pad($registro->reduccion ?? '0', 1, '0', STR_PAD_LEFT); // Sí/No de reducción de jornada por cuidado de hijes menores de 12 años. Valor optativo, puede informarse en blanco.
                 $tipoempresa = "1"; // str_pad($registro->tipoempresa ?? '0', 1, '0', STR_PAD_LEFT); // Tipo de empresa: 0 - Administración Pública  1-Decreto 814/01, Art2 Inc.B 2-Servicios Eventuales, Art2 Inc.B 4-Decreto 814/01, Art2 Inc.A 5-Servicios Eventuales, Art2 Inc.A 7-Enseñanza Privada 8-Decreto 1212/03 - AFA Clubes
                 $tipoOperacion = "0";
-                $situacion = str_pad($registro->codigoSituacion ?? '0', 1, '0', STR_PAD_LEFT); // Código de situación del trabajador: 0-Activo; 1-Baja; 2-Vacaciones; 3-Licencia por enfermedad; 4-Licencia por maternidad/paternidad; 5-Reducción de jornada por cuidado de hijes menores de 12 años; 6-Suspensión por falta o reducción de tareas; 7-Suspensión por fuerza mayor; 8-Embarazo; 9-Otra licencia
-                $condicion = str_pad($registro->codigoCondicion ?? '0', 1, '0', STR_PAD_LEFT); // Código de condición del trabajador: 0-Empleado mensualizado; 1-Empleado jornalizado; 2-Empleado eventual; 3-Empleado doméstico; 4-Contratista; 5-Monotributista; 6-Honorarios; 7-Servicio de locación; 8-Servicio de comisión; 9-Otra condición
-                $actividad = str_pad($registro->actividad ?? '49', 3, ' ', STR_PAD_LEFT); // Código de actividad. Valor optativo, puede informarse en blanco.
-                $modalidadContrato = str_pad($registro->modalidadContrato ?? '8', 3, '0', STR_PAD_LEFT); // Modalidad de contrato: 0-Contrato a plazo fijo; 1-Contrato por tiempo indeterminado; 2-Contrato de temporada; 3-Contrato eventual; 4-Contrato de aprendizaje; 5-Contrato de pasantía; 6-Contrato de trabajo a domicilio; 7-Contrato de teletrabajo; 8-Otra modalidad
-                $siniestro = str_pad($registro->siniestro ?? '0', 2, '0', STR_PAD_LEFT); // Sí/No de trabajador siniestrado. Valor optativo, puede informarse en blanco.
-                $localidad = str_pad($registro->localidad ?? '', 2, ' ', STR_PAD_LEFT); // Localidad del trabajador. Valor optativo, puede informarse en blanco.
-                $situacionRevista1 = str_pad($registro->situacionRevista ?? '0', 2, '0', STR_PAD_LEFT); // Situación de revista: 0-Propio; 1-Eventual; 2-Contratista; 3-Monotributista; 4-Honorarios; 5-Servicio de locación; 6-Servicio de comisión; 7-Otra condición
+                $situacion = str_pad($registro->codigoSituacion ?? '0', 2, '0', STR_PAD_LEFT); // Código de situación del trabajador: 0-Activo; 1-Baja; 2-Vacaciones; 3-Licencia por enfermedad; 4-Licencia por maternidad/paternidad; 5-Reducción de jornada por cuidado de hijes menores de 12 años; 6-Suspensión por falta o reducción de tareas; 7-Suspensión por fuerza mayor; 8-Embarazo; 9-Otra licencia
+                $condicion = str_pad($registro->codigoCondicion ?? '0', 2, ' ', STR_PAD_RIGHT); // Código de condición del trabajador: 0-Empleado mensualizado; 1-Empleado jornalizado; 2-Empleado eventual; 3-Empleado doméstico; 4-Contratista; 5-Monotributista; 6-Honorarios; 7-Servicio de locación; 8-Servicio de comisión; 9-Otra condición
+                $actividad = str_pad($registro->actividad ?? '49', 3, '0', STR_PAD_LEFT); // Código de actividad. Valor optativo, puede informarse en blanco.
+                $modalidadContrato = str_pad($registro->modalidadContrato ?? '8', 3, ' ', STR_PAD_RIGHT); // Modalidad de contrato: 0-Contrato a plazo fijo; 1-Contrato por tiempo indeterminado; 2-Contrato de temporada; 3-Contrato eventual; 4-Contrato de aprendizaje; 5-Contrato de pasantía; 6-Contrato de trabajo a domicilio; 7-Contrato de teletrabajo; 8-Otra modalidad
+                $siniestro = str_pad($registro->siniestro ?? '0', 2, ' ', STR_PAD_RIGHT); // Sí/No de trabajador siniestrado. Valor optativo, puede informarse en blanco.
+                $localidad = str_pad($registro->localidad ?? '61', 2, ' ', STR_PAD_LEFT); // Localidad del trabajador. Valor optativo, puede informarse en blanco.
+                $situacionRevista1 = str_pad($registro->situacionRevista ?? '1', 2, ' ', STR_PAD_RIGHT); // Situación de revista: 0-Propio; 1-Eventual; 2-Contratista; 3-Monotributista; 4-Honorarios; 5-Servicio de locación; 6-Servicio de comisión; 7-Otra condición
+
                 $diaSituacionRevista1 = " 1"; // Día del mes en que se produce el cambio de situación de revista. Solo se informa si el campo "Situación de revista" es distinto de 0 (Propio). En caso de corresponder, informar con ceros a la izquierda (Ejemplo: 01, 15, 30, etc.). Valor optativo, puede informarse en blanco.
                 $situacionRevista2 = str_pad($registro->situacionRevista ?? '0', 2, '0', STR_PAD_LEFT); // Situación de revista: 0-Propio; 1-Eventual; 2-Contratista; 3-Monotributista; 4-Honorarios; 5-Servicio de locación; 6-Servicio de comisión; 7-Otra condición
                 $diaSituacionRevista2 = " 1"; // Día del mes en que se produce el cambio de situación de revista. Solo se informa si el campo "Situación de revista" es distinto de 0 (Propio). En caso de corresponder, informar con ceros a la izquierda (Ejemplo: 01, 15, 30, etc.). Valor optativo, puede informarse en blanco.
@@ -292,7 +294,7 @@ class LsdController extends Controller
                 $cantidadHoras = str_pad($registro->cantidadHoras ?? '0', 3, '0', STR_PAD_LEFT); // Si se informa un valor, el campo Cantidad días trabajados debe ser 0. Formato: 3 dígitos enteros.
                 $porcAporteAdicionalSS = str_pad($registro->porcAporteAdicionalSS ?? '0', 5, '0', STR_PAD_LEFT); // Se consignarán los puntos porcentuales que superen los establecidos en la Ley N° 24241, artículo 11 o Decreto N° 1387/01, artículo 15. El programa adicionará el porcentaje adicional que se consigne en el campo al aporte obligatorio vigente a cada periodo y procederá al cálculo sobre la Base Imponible de aportes SIPA. 
                 $contribucionTareDif = str_pad($registro->contribucionTareDif ?? '0', 5, '0', STR_PAD_LEFT); // Refleja el cálculo de los aportes diferenciales sobre la Base Imponible de Regímenes Diferenciales (por ejemplo: 2% aporte diferencial de los docentes) 
-                $codObraSocial = str_pad($registro->codigoObraSocial ?? '', 6, ' ', STR_PAD_LEFT); // Código de obra social. Valor optativo, puede informarse en blanco.
+                $codObraSocial = str_pad($registro->obra_sijp ?? '', 6, ' ', STR_PAD_LEFT); // Código de obra social. Valor optativo, puede informarse en blanco.
                 $adherentes = "0";  // Se registra el número de aquellos que no integran el grupo familiar. Ese dato es tenido en cuenta para el incremento del porcentaje a considerar para el cálculo de aportes de Obra Social.
                 $aporteAdicionalOS = str_pad($registro->aporteAdicionalOS ?? '0', 15, '0', STR_PAD_LEFT); // Se consignarán los aportes del trabajador, emergentes de la diferencia entre la remuneración efectivamente percibida por este y el mínimo fijado por ANSES, a los efectos de acceder a una cobertura médico asistencial (Dec. 492/95, art. 8) Formato: 13 dígitos enteros y 2 decimales
                 $contribAdicionalOS = str_pad($registro->aporteAdicionalOS ?? '0', 15, '0', STR_PAD_LEFT); // Se consignarán las contribuciones del empleador, emergentes de la diferencia entre la remuneración efectivamente percibida por el trabajador y el mínimo fijado por ANSES, a los efectos de permitirle a este acceder a una cobertura médico asistencial (Dec. 492/95, art. 8) Formato: 13 dígitos enteros y 2 decimales. 
@@ -360,7 +362,8 @@ class LsdController extends Controller
                     . $baseImponible9
                     . $baseCalculoDiferencialAportesSS
                     . $baseCalculoDiferencialContribSS
-                    . $baseImponible10;
+                    . $baseImponible10
+                    . $importeDetraer;
 
                 $contenido .= $line04 . "\n";
         }
@@ -379,9 +382,9 @@ class LsdController extends Controller
                 $reduccion = str_pad($registro->reduccion ?? '0', 1, '0', STR_PAD_LEFT); // Sí/No de reducción de jornada por cuidado de hijes menores de 12 años. Valor optativo, puede informarse en blanco.
                 $tipoempresa = "1"; // str_pad($registro->tipoempresa ?? '0', 1, '0', STR_PAD_LEFT); // Tipo de empresa: 0 - Administración Pública  1-Decreto 814/01, Art2 Inc.B 2-Servicios Eventuales, Art2 Inc.B 4-Decreto 814/01, Art2 Inc.A 5-Servicios Eventuales, Art2 Inc.A 7-Enseñanza Privada 8-Decreto 1212/03 - AFA Clubes
                 $tipoOperacion = "0";
-                $situacion = str_pad($registro->codigoSituacion ?? '0', 1, '0', STR_PAD_LEFT); // Código de situación del trabajador: 0-Activo; 1-Baja; 2-Vacaciones; 3-Licencia por enfermedad; 4-Licencia por maternidad/paternidad; 5-Reducción de jornada por cuidado de hijes menores de 12 años; 6-Suspensión por falta o reducción de tareas; 7-Suspensión por fuerza mayor; 8-Embarazo; 9-Otra licencia
-                $condicion = str_pad($registro->codigoCondicion ?? '0', 1, '0', STR_PAD_LEFT); // Código de condición del trabajador: 0-Empleado mensualizado; 1-Empleado jornalizado; 2-Empleado eventual; 3-Empleado doméstico; 4-Contratista; 5-Monotributista; 6-Honorarios; 7-Servicio de locación; 8-Servicio de comisión; 9-Otra condición
-                $actividad = str_pad($registro->actividad ?? '49', 3, ' ', STR_PAD_LEFT); // Código de actividad. Valor optativo, puede informarse en blanco.
+                $situacion = str_pad($registro->codigoSituacion ?? '0', 2, '0', STR_PAD_LEFT); // Código de situación del trabajador: 0-Activo; 1-Baja; 2-Vacaciones; 3-Licencia por enfermedad; 4-Licencia por maternidad/paternidad; 5-Reducción de jornada por cuidado de hijes menores de 12 años; 6-Suspensión por falta o reducción de tareas; 7-Suspensión por fuerza mayor; 8-Embarazo; 9-Otra licencia
+                $condicion = str_pad($registro->codigoCondicion ?? '0', 2, '0', STR_PAD_LEFT); // Código de condición del trabajador: 0-Empleado mensualizado; 1-Empleado jornalizado; 2-Empleado eventual; 3-Empleado doméstico; 4-Contratista; 5-Monotributista; 6-Honorarios; 7-Servicio de locación; 8-Servicio de comisión; 9-Otra condición
+                $actividad = str_pad($registro->actividad ?? '49', 3, '0', STR_PAD_LEFT); // Código de actividad. Valor optativo, puede informarse en blanco.
                 $modalidadContrato = str_pad($registro->modalidadContrato ?? '8', 3, '0', STR_PAD_LEFT); // Modalidad de contrato: 0-Contrato a plazo fijo; 1-Contrato por tiempo indeterminado; 2-Contrato de temporada; 3-Contrato eventual; 4-Contrato de aprendizaje; 5-Contrato de pasantía; 6-Contrato de trabajo a domicilio; 7-Contrato de teletrabajo; 8-Otra modalidad
                 $siniestro = str_pad($registro->siniestro ?? '0', 2, '0', STR_PAD_LEFT); // Sí/No de trabajador siniestrado. Valor optativo, puede informarse en blanco.
                 $localidad = str_pad($registro->localidad ?? '', 2, ' ', STR_PAD_LEFT); // Localidad del trabajador. Valor optativo, puede informarse en blanco.
@@ -479,11 +482,11 @@ class LsdController extends Controller
             mkdir($dir, 0755, true);
         }
 
-        $filename = "LSD_{$empresaName}_{$empresaId}_periodo_{$periodoId}_" . date('Ymd_His') . ".txt";
+        $filename = "LSD_{$empresaName}_liq_{$numero_emision}_periodo_{$periodoId}_" . date('Ymd_His') . ".txt";
         $fullPath = $dir . DIRECTORY_SEPARATOR . $filename;
 
         try {
-            file_put_contents($fullPath, $contenido);
+            file_put_contents($fullPath, rtrim($contenido, "\r\n"));
         } catch (\Throwable $e) {
             return [
                 'status' => 500,

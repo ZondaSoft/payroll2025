@@ -121,8 +121,17 @@
                             <div class="col-1 arrow-line" style="margin-top: 20px;" hidden>
                             </div>
                             <!-- @ endcan -->
-                            
-                            <!-- @ endcan -->
+
+                            <div class="col-2" id="btnConceptos" name="btnConceptos">
+                                <div class="d-flex flex-column align-items-center">
+                                <div class="avatar">
+                                    <a href="{{ route('liquidacion.individual.index') }}" class="avatar-initial bg-label-success rounded-3">
+                                    <i class="ri-money-dollar-circle-line ri-24px"></i>
+                                    </div>
+                                </a>
+                                <p class="mt-3 mb-1 text-center">Liquidación individual</p>
+                                </div>
+                            </div>
 
                             <!-- @ can('services.ordenes') -->
                                 <!-- <div class="col-2" id="btnRequisicionServ" name="btnRequisicionServ">

@@ -18,6 +18,7 @@ use App\Http\Controllers\SicossLocalidadesController;
 use App\Http\Controllers\LiquidacionImportarController;
 use App\Http\Controllers\LsdController;
 use App\Http\Controllers\ConceptosLiquidacionController;
+use App\Http\Controllers\LiquidacionIndividualController;
 use Inertia\Inertia;
 
 // Route::get('/', function () {
@@ -349,6 +350,12 @@ Route::middleware('auth')->group(function () {
     Route::resource('liquidacion/conceptos', ConceptosLiquidacionController::class)
         ->parameters(['conceptos' => 'concepto'])
         ->except(['index','create','edit','show']);
+
+    //--------------------------------------------
+    // Liquidación Individual
+    //---------------------------------------------
+    Route::get('liquidacion/individual', [LiquidacionIndividualController::class, 'index'])
+        ->name('liquidacion.individual.index');
 
     
 });
