@@ -72,15 +72,15 @@ const form = useForm({
 });
 
 const TIPOS = {
-    1: 'HABER',
-    2: 'DESCUENTO',
-    3: 'ASIGNACIONES',
-    4: 'NO_REMUNERATIVO',
-    5: 'GANANCIAS',
-    6: 'DEVOLUCIÓN DE GANANCIA',
-    7: 'REDONDEO',
-    8: 'APORTES',
-    9: 'AUXILIARES',
+    H: 'HABER',
+    D: 'DESCUENTO',
+    AS: 'ASIGNACIONES',
+    NR: 'NO_REMUNERATIVO',
+    GC: 'GANANCIAS',
+    DG: 'DEVOLUCIÓN DE GANANCIA',
+    R: 'REDONDEO',
+    AP: 'APORTES',
+    AU: 'AUXILIARES',
 };
 
 const submit = () => {
@@ -475,7 +475,7 @@ const moverFocoACodigoDesdeSelect = () => {
                                                 @keydown.enter="moverFocoACodigoDesdeSelect"
                                                 required>
                                                 <option value="" disabled>Seleccionar tipo</option>
-                                                <option v-for="(label, key) in TIPOS" :key="key" :value="parseInt(key)">
+                                                <option v-for="(label, key) in TIPOS" :key="key" :value="(key)">
                                                     {{ label }}
                                                 </option>
                                             </select>

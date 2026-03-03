@@ -15,7 +15,7 @@ class LiquidacionIndividualController extends Controller
     public function index(Request $request)
     {
         $empresa  = Datoempr::first();
-        $legajos  = Sue001::orderBy('detalle')->get(['id', 'codigo', 'detalle', 'nombres', 'cuil']);
+        $legajos  = Sue001::orderBy('codigo')->get(['id', 'codigo', 'detalle', 'nombres', 'cuil']);
         $periodos = Sue100::orderBy('periodo', 'desc')->get(['id', 'periodo']);
 
         $empleado  = null;

@@ -3,7 +3,7 @@
 namespace App\Http\Controllers;
 
 use App\Models\Sue102;
-use App\Models\Sue103;
+use App\Models\Sue089;
 use Illuminate\Http\Request;
 use Inertia\Inertia;
 use App\Models\Datoempr;
@@ -318,14 +318,14 @@ class ConceptosLiquidacionController extends Controller
     {
         $tipo = $request->input('tipo');
 
-        if (!$tipo || $tipo < 1 || $tipo > 9) {
+        if (!$tipo || !in_array($tipo, ['H', 'D', 'AS', 'NR', 'GC', 'DG', 'R', 'AP', 'AU'])) {
             return response()->json([
                 'error' => 'Tipo inválido'
             ], 400);
         }
 
-        // Obtener el rango de Sue103
-        $rango = \App\Models\Sue103::where('tipo', $tipo)->first();
+        // Obtener el rango de Sue089
+        $rango = Sue089::where('tiporem', $tipo)->first();
 
         if (!$rango) {
             return response()->json([

@@ -127,17 +127,12 @@ class LsdController extends Controller
         $nroLiquidacion = '00001'; // Número de liquidación dentro del período (1, 2, 3, etc.). Para este ejemplo, siempre se pone 1. En una implementación real, podrías querer contar cuántas liquidaciones ya existen para ese período y empresa y asignar el siguiente número.
         
         // Buscar todos los registros de sue090s
-        // $total_haberes    = $items->where('tiporem_calc','H')->sum('importe');
-        // $total_descuentos = $items->where('tiporem_calc','D')->sum('importe');
-        // $total_adicionales= $items->where('tiporem_calc','NR')->sum('importe');
-
         $codEmpresa = $empresa->codigo ?? $empresa->id ?? null;
         
         // Buscar registros de sue090s solo para legajos cuyo grupo_emp en sue001s coincide con $codEmpresa
         $query = DB::table('sue090s')
             ->join('sue001s', 'sue090s.legajo', '=', 'sue001s.codigo')
-            ->where('sue090s.periodo', $periodoStr)
-            ->where('sue090s.legajo', 127);
+            ->where('sue090s.periodo', $periodoStr);
 
         if ($codEmpresa !== null && $codEmpresa !== '') {
             $query->where('sue001s.grupo_emp', $codEmpresa);
@@ -307,9 +302,7 @@ class LsdController extends Controller
                 $baseCalculoDiferencialOS = str_pad($registro->baseCalculoDiferencialOs ?? '0', 15, '0', STR_PAD_LEFT); // Para informar diferenciales que sumen a la base imponible 8 (contribuciones de obra social y FSR) en los casos de trabajadores a tiempo parcial que contribuyen como tiempo completo (Ley, 26.474 art 1, inc. 4) Formato: 13 dígitos enteros y 2 decimales. 
                 $baseCalculoDiferencialLRT = str_pad($registro->baseCalculoDiferencialLRT ?? '0', 15, '0', STR_PAD_LEFT); // Para informar diferenciales que sumen a la base imponible 9 (contribuciones LRT) . Formato: 13 dígitos enteros y 2 decimales. 
                 $remuneracionMaternidad = str_pad($registro->remuneracionMaternidad ?? '0', 15, '0', STR_PAD_LEFT); // Informará el monto de la remuneración bruta que le hubiera correspondido percibir a la trabajadora si hubiera cumplido sus servicios normalmente.  Formato: 13 dígitos enteros y 2 decimales. 
-
                 $remuneracionBruta = str_pad($registro->remuneracionBruta ?? '0', 15, '0', STR_PAD_LEFT); // Es la suma de los conceptos remunerativos y no remunerativos liquidados en el mes. Formato: 13 dígitos enteros y 2 decimales. 
-                
                 $baseImponible1 = str_pad($registro->baseImponible1 ?? '0', 15, '0', STR_PAD_LEFT); // Base de cálculo para Aportes Previsionales Formato: 13 dígitos enteros y 2 decimales. 
                 $baseImponible2 = str_pad($registro->baseImponible2 ?? '0', 15, '0', STR_PAD_LEFT); // Base de cálculo para Contribuciones previsionales e INSSJyP Formato: 13 dígitos enteros y 2 decimales. 
                 $baseImponible3 = str_pad($registro->baseImponible3 ?? '0', 15, '0', STR_PAD_LEFT); // Base de cálculo para  Contribuciones FNE, asignaciones familiares y RENATRE Formato: 13 dígitos enteros y 2 decimales. 
