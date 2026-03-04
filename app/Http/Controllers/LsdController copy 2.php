@@ -45,7 +45,7 @@ class LsdController extends Controller
             // Obtener datos de la empresa
             $empresa = Sue086::find($request->id_empresa);
             $periodo = Sue100::find($request->periodo_id);
-            $tipoLiquidacion = $request->tipo_liquidacion; // Ver como tomar el periodo, deuda tecnica para avanzar con el desarrollo, se toma el periodo de sue090s directamente en la consulta
+            $tipoLiquidacion = $request->tipo_liquidacion;
 
             if (!$empresa || !$periodo) {
                 return response()->json(['success' => false, 'message' => 'Empresa o período no encontrados'], 404);
@@ -54,14 +54,13 @@ class LsdController extends Controller
             $cuit = str_replace('-', '', $empresa->cuit ?? ''); // Obtener el CUIT de la empresa
 
             $periodoStr = $periodo->periodo; // Asumiendo que el campo 'periodo' tiene el formato 'YYYY/MM'
-            $tipoLiquidacionImportada = $periodo->tipoliq;
 
             // Generar número de emisión
             $ultimaEmision = LsdEmision::where('id_empresa', $request->id_empresa)
                 ->max('numero_emision') ?? 0;
             $numeroEmision = $ultimaEmision + 1;
             
-            $fileData = $this->generarTxt($empresa, $periodo, $tipoLiquidacion, $tipoLiquidacionImportada, $numeroEmision);
+            $fileData = $this->generarTxt($empresa, $periodo, $tipoLiquidacion, $numeroEmision);
 
             // Si generarTxt devolvió un error (por ejemplo 404), retornarlo y no crear la emisión
             if (!is_array($fileData) || ($fileData['status'] ?? 200) !== 200) {
@@ -104,16 +103,14 @@ class LsdController extends Controller
         }
     }
 
-    public function generarTxt($empresa, $periodo, $tipoLiquidacion, $tipoLiquidacionImportada, $numero_emision)
+    public function generarTxt($empresa, $periodo, $tipoLiquidacion, $numero_emision)
     {
         $empresaId = $empresa->id;
         $empresaName = $empresa->detalle ?? '';
         $cuit = str_replace('-', '', $empresa->cuit ?? ''); // Obtener el CUIT de la empresa
         $periodoId = $periodo->id;
         $periodoStr = $periodo->periodo; // Asumiendo que el campo 'periodo' tiene el formato 'YYYY/MM'
-        $fechaPago = $periodo->fecha_pago
-            ? date('Ymd', strtotime($periodo->fecha_pago))
-            : '20260101'; // Formato YYYYMMDD requerido por SICOSS
+        $fechaPago = $periodo->fecha_pago ?? '20260101'; // Asumiendo que el campo 'fecha_pago' existe en la tabla de periodos
         $identificadorEnvio = 'SJ';  // 'SJ'=Informa la liquidación de SyJ y datos de la DJ F931  'RE'=Sólo informa datos de la   DJ F931 para casos donde se debe rectificar sólo información de la DJ
 
         $tipoLiquidacion2 = 'M';    // Mes;
@@ -140,9 +137,7 @@ class LsdController extends Controller
         $query = DB::table('sue090s')
             ->join('sue001s', 'sue090s.legajo', '=', 'sue001s.codigo')
             ->where('sue090s.periodo', $periodoStr)
-            ->where('sue090s.tipoliq', $tipoLiquidacionImportada);
-
-        // ->where('sue090s.legajo', 7009)
+            ->where('sue090s.legajo', 7009);
 
         if ($codEmpresa !== null && $codEmpresa !== '') {
             $query->where('sue001s.grupo_emp', $codEmpresa);
@@ -153,9 +148,7 @@ class LsdController extends Controller
             'sue001s.sicoss_conyuge as conyugue',
             'sue001s.sicoss_hijos as hijos',
             'sue001s.sicoss_adherentes as adherentes',
-            'sue001s.obra_sijp as obra_sijp',
-            'sue001s.alta as alta',
-            'sue001s.baja as baja')->get();
+            'sue001s.obra_sijp as obra_sijp')->get();
 
         // Debug: registrar información no intrusiva sobre $datos
         try {
@@ -170,26 +163,8 @@ class LsdController extends Controller
             return response()->json(['message' => 'No se encontraron datos'], 404);
         }
 
-        // -------------------------------------------------------------------
-        // Pre-cálculo para $diasTope: parseo del período y vacaciones sue028s
-        // -------------------------------------------------------------------
-        $periodoPartes = explode('/', $periodoStr); // 'YYYY/MM'
-        $periodoAnio   = (int)($periodoPartes[0] ?? date('Y'));
-        $periodoMes    = (int)($periodoPartes[1] ?? date('m'));
-        $ultimoDiaMes  = (int)date('t', mktime(0, 0, 0, $periodoMes, 1, $periodoAnio));
-        $periodoStr6   = str_pad($periodoAnio, 4, '0', STR_PAD_LEFT) . str_pad($periodoMes, 2, '0', STR_PAD_LEFT); // YYYYMM para sue028s
-
-        // Cargar días de vacaciones de sue028s agrupados por legajo para el período
-        $vacacionesPorLegajo = DB::table('sue028s')
-            ->where('periodo', $periodoStr6)
-            ->where('int_vac', '>', 0)
-            ->select('legajo', DB::raw('SUM(int_vac) as total_vac'))
-            ->groupBy('legajo')
-            ->get()
-            ->keyBy('legajo');
-
         $diasDePeriodo = '30'; // Si “identificación del envío” es igual a “RE”, dejar en blanco 
-        $cantidadEmpleados = $datos->unique('cuil')->count(); // Debe coincidir con la cantidad de registros tipo '04' informados en el archivo. Coincide con la cantidad de empleados del F931
+        $cantidadEmpleados = $datos->count(); // Debe coincidir con la cantidad de registros tipo ‘04’ informados en el archivo. Coincide con la cantidad de empleados del F931
         $montoTotal = $datos->sum('importe'); // Asumiendo que hay
 
         // Si es una rectificativa, se ajustan varios campos y no se informa el tipo de liquidación
@@ -221,17 +196,14 @@ class LsdController extends Controller
 
         }
 
-        //$contenido .= "EMPRESA: {$empresaId} | PERIODO: {$periodoId}\r\n";
-        //$contenido .= str_repeat('-', 80) . "\r\n";
-        $contenido .= "\r\n";
+        //$contenido .= "EMPRESA: {$empresaId} | PERIODO: {$periodoId}\n";
+        //$contenido .= str_repeat('-', 80) . "\n";
+        $contenido .= "\n";
 
         //---------------------------------------
         // Generar Registro del Cuerpo (Tipo 02)
         //---------------------------------------
-        // $diasTope se calcula por legajo dentro del loop (ver abajo)
-        // Cant. de días para proporcionar el tope: se usa cuando el período no es completo
-        // (inicio/fin de relación laboral o vacaciones). 0 = período completo sin proporción.
-
+        $diasTope = '  0'; // Cant. de días para proporcionar el tope:  Este valor se utiliza para proporcionar en más o en menos la base imponible máxima o "tope" para el cálculo de los descuentos de aportes al trabajador (SIPA, INSSJyP y obra social/Fondo Solidario de Redistribución). Si la liquidación no corresponde a periodo de inicio o fin de la relación laboral o relacionada con vacaciones,  este valor debe informarse en 0.
         //$fechaPago = $fechaPago ?? '20260101'; // Fecha de pago en formato YYYYMMDD
         $fechaRubrica = '        ';  // No se completa por el momento
         $formaPago = '1'; // Forma de pago: 1= efectivo , 2= cheque 3= acreditación
@@ -241,51 +213,7 @@ class LsdController extends Controller
         $datosPorCuil = $datos->unique('cuil');
 
         foreach ($datosPorCuil as $registro) {
-                // -----------------------------------------------------------
-                // Calcular $diasTope por legajo
-                // Control 1: alta o baja dentro del período → días proporcionales
-                // Control 2: vacaciones en sue028s → restar días de vacaciones
-                // -----------------------------------------------------------
-                $legajoId    = $registro->legajo_codigo ?? $registro->legajo ?? null;
-                $workDays    = $ultimoDiaMes; // Comenzar con todos los días del mes
-
-                // Control 1a: Alta dentro del período
-                if (!empty($registro->alta)) {
-                    $altaTs   = strtotime($registro->alta);
-                    $altaAnio = (int)date('Y', $altaTs);
-                    $altaMes  = (int)date('n', $altaTs);
-                    if ($altaAnio === $periodoAnio && $altaMes === $periodoMes) {
-                        $diaAlta  = (int)date('j', $altaTs);
-                        $workDays = $ultimoDiaMes - $diaAlta + 1;
-                    }
-                }
-
-                // Control 1b: Baja dentro del período
-                if (!empty($registro->baja)) {
-                    $bajaTs   = strtotime($registro->baja);
-                    $bajaAnio = (int)date('Y', $bajaTs);
-                    $bajaMes  = (int)date('n', $bajaTs);
-                    if ($bajaAnio === $periodoAnio && $bajaMes === $periodoMes) {
-                        $diaBaja   = (int)date('j', $bajaTs);
-                        $diasBaja  = ($workDays < $ultimoDiaMes) // ya había prorate por alta
-                            ? min($workDays, $diaBaja - (int)date('j', strtotime($registro->alta)) + 1)
-                            : $diaBaja;
-                        $workDays  = $diasBaja;
-                    }
-                }
-
-                // Control 2: Vacaciones en sue028s para el período
-                if (isset($vacacionesPorLegajo[$legajoId])) {
-                    $diasVac  = (int)$vacacionesPorLegajo[$legajoId]->total_vac;
-                    $workDays = max(0, $workDays - $diasVac);
-                }
-
-                // Si $workDays == $ultimoDiaMes no hubo proporción → informar 0
-                $diasTope = ($workDays < $ultimoDiaMes)
-                    ? str_pad((string)$workDays, 3, '0', STR_PAD_LEFT)
-                    : '000';
-
-                $legajoValue = str_pad($registro->legajo_codigo ?? $registro->legajo ?? '', 10, ' ', STR_PAD_RIGHT);
+                $legajoValue = str_pad($registro->legajo_codigo ?? $registro->legajo ?? '', 10, ' ', STR_PAD_LEFT);
                 $cuilValue = $registro->cuil ?? '';
                 $dependencia = str_pad($registro->dependenciaRevista ?? '', 50, ' ', STR_PAD_LEFT);
                 $cbu = $registro->cbu ?? str_repeat(' ', 22);
@@ -300,23 +228,23 @@ class LsdController extends Controller
                     . $fechaRubrica
                     . $formaPago;
 
-                $contenido .= $line02 . "\r\n";
+                $contenido .= $line02 . "\n";
         }
         
         //---------------------------------------
         // Generar Registro Tipo 03 - Detalle de los conceptos liquidados a cada trabajador
         //---------------------------------------
         foreach ($datos as $registro) {
-                $legajoValue = str_pad($registro->legajo_codigo ?? $registro->legajo ?? '', 10, ' ', STR_PAD_RIGHT);
+                $legajoValue = str_pad($registro->legajo_codigo ?? $registro->legajo ?? '', 10, ' ', STR_PAD_LEFT);
                 $cuilValue = $registro->cuil ?? '';
                 $concepto = str_pad($registro->concepto ?? '', 10, ' ', STR_PAD_LEFT);
                 //$cantidad = str_pad(number_format($registro->cantidad ?? 0, 2, '.', ''), 6, ' ', STR_PAD_LEFT);    
                 $cantidad = str_pad((string)(int)round(($registro->cantidad ?? 0) * 100), 5, '0', STR_PAD_LEFT); // 15 dígitos, sin punto decimal, los 2 últimos son decimales. Ej: $1234.56 → 000000000123456
                 $unidades = substr(str_pad($registro->unidades ?? ' ', 1, ' ', STR_PAD_LEFT), 0, 1);      // $=moneda; %=porcentuales;   A=año; Q=quincena; M=mes;   D=días; H=horas.  Valor optativo, puede informarse en blanco.
-                $importe = str_pad((string)(int)round(abs($registro->importe ?? 0) * 100), 15, '0', STR_PAD_LEFT); // 15 dígitos, sin punto decimal, los 2 últimos son decimales. Ej: $1234.56 → 000000000123456
+                $importe = str_pad((string)(int)round(($registro->importe ?? 0) * 100), 15, '0', STR_PAD_LEFT); // 15 dígitos, sin punto decimal, los 2 últimos son decimales. Ej: $1234.56 → 000000000123456
 
                 $debitoCredito = 'D';   // D=Débito (descuento); C=Crédito (remunerativo)
-                if ($registro->tiporem == 'sue' && $registro->importe >= 0)
+                if ($registro->tiporem == 'sue')
                     $debitoCredito = 'C';
                 else if ($registro->tiporem == 'nre')
                     $debitoCredito = 'C';
@@ -338,45 +266,14 @@ class LsdController extends Controller
                     . $debitoCredito
                     . $periodoAjuste;
 
-                $contenido .= $line03 . "\r\n";
+                $contenido .= $line03 . "\n";
         }
-        
-
 
         //---------------------------------------
-        // Generar Registro Tipo 04 - Atributos de la relación laboral - DJ - Una fila por cada empleado
-        // Se agrupa por CUIL y se calcula remuneracionBruta sumando importes H y NR según rangos de sue089s
+        // Generar Registro Tipo 04 - Atributos de la relación laboral - DJ - Una fila por cada empleado propio o eventual que se deba declarar en el F931
         //---------------------------------------
-        $rangosSue089 = DB::table('sue089s')->get();
-
-        foreach ($datos->unique('cuil') as $registro) {
-                // remuneracionBruta: suma de importes H y NR de todos los conceptos del legajo según rangos de sue089s
-                $remuneracionBrutaCalculada = $datos->where('cuil', $registro->cuil)->reduce(function (float $carry, $row) use ($rangosSue089) {
-                    foreach ($rangosSue089 as $rango) {
-                        if ($row->concepto >= $rango->desde && $row->concepto <= $rango->hasta) {
-                            if (in_array(strtoupper(trim($rango->tiporem)), ['H', 'NR'])) {
-                                $carry += (float)($row->importe ?? 0);
-                            }
-                            break;
-                        }
-                    }
-                    return $carry;
-                }, 0.0);
-
-                // totalHaberes: suma solo de importes remunerativos (tiporem = H)
-                $totalHaberesCalculado = $datos->where('cuil', $registro->cuil)->reduce(function (float $carry, $row) use ($rangosSue089) {
-                    foreach ($rangosSue089 as $rango) {
-                        if ($row->concepto >= $rango->desde && $row->concepto <= $rango->hasta) {
-                            if (strtoupper(trim($rango->tiporem)) === 'H') {
-                                $carry += (float)($row->importe ?? 0);
-                            }
-                            break;
-                        }
-                    }
-                    return $carry;
-                }, 0.0);
-
-                $legajoValue = str_pad($registro->legajo_codigo ?? $registro->legajo ?? '', 10, ' ', STR_PAD_RIGHT);
+        foreach ($datos as $registro) {
+                $legajoValue = str_pad($registro->legajo_codigo ?? $registro->legajo ?? '', 10, ' ', STR_PAD_LEFT);
                 $cuilValue = $registro->cuil ?? '';
                 $conyugue = str_pad($registro->conyugue ?? '', 1, '0', STR_PAD_LEFT); // 0 = NO  1= SI
                 $hijos = str_pad($registro->hijos ?? 0, 2, '0', STR_PAD_LEFT); // Cantidad de hijos menores de 18 años o incapacitados para el trabajo
@@ -391,29 +288,20 @@ class LsdController extends Controller
                 $modalidadContrato = str_pad($registro->modalidadContrato ?? '8', 3, ' ', STR_PAD_RIGHT); // Modalidad de contrato: 0-Contrato a plazo fijo; 1-Contrato por tiempo indeterminado; 2-Contrato de temporada; 3-Contrato eventual; 4-Contrato de aprendizaje; 5-Contrato de pasantía; 6-Contrato de trabajo a domicilio; 7-Contrato de teletrabajo; 8-Otra modalidad
                 $siniestro = str_pad($registro->siniestro ?? '0', 2, ' ', STR_PAD_RIGHT); // Sí/No de trabajador siniestrado. Valor optativo, puede informarse en blanco.
                 $localidad = str_pad($registro->localidad ?? '61', 2, ' ', STR_PAD_LEFT); // Localidad del trabajador. Valor optativo, puede informarse en blanco.
-                
-                $situacionRevista1 = str_pad($registro->situacionRevista ?? '01', 2, '0', STR_PAD_RIGHT); // Situación de revista: 0-Propio; 1-Eventual; 2-Contratista; 3-Monotributista; 4-Honorarios; 5-Servicio de locación; 6-Servicio de comisión; 7-Otra condición
-                $diaSituacionRevista1 = "01"; // Día del mes en que se produce el cambio de situación de revista. Solo se informa si el campo "Situación de revista" es distinto de 0 (Propio). En caso de corresponder, informar con ceros a la izquierda (Ejemplo: 01, 15, 30, etc.). Valor optativo, puede informarse en blanco.
+                $situacionRevista1 = str_pad($registro->situacionRevista ?? '1', 2, ' ', STR_PAD_RIGHT); // Situación de revista: 0-Propio; 1-Eventual; 2-Contratista; 3-Monotributista; 4-Honorarios; 5-Servicio de locación; 6-Servicio de comisión; 7-Otra condición
 
-                log::debug('$diaSituacionRevista1: ' . $diaSituacionRevista1);
-
+                $diaSituacionRevista1 = " 1"; // Día del mes en que se produce el cambio de situación de revista. Solo se informa si el campo "Situación de revista" es distinto de 0 (Propio). En caso de corresponder, informar con ceros a la izquierda (Ejemplo: 01, 15, 30, etc.). Valor optativo, puede informarse en blanco.
                 $situacionRevista2 = str_pad($registro->situacionRevista ?? '0', 2, '0', STR_PAD_LEFT); // Situación de revista: 0-Propio; 1-Eventual; 2-Contratista; 3-Monotributista; 4-Honorarios; 5-Servicio de locación; 6-Servicio de comisión; 7-Otra condición
-                $diaSituacionRevista2 = "00"; // Día del mes en que se produce el cambio de situación de revista. Solo se informa si el campo "Situación de revista" es distinto de 0 (Propio). En caso de corresponder, informar con ceros a la izquierda (Ejemplo: 01, 15, 30, etc.). Valor optativo, puede informarse en blanco.
-
-                log::debug('$diaSituacionRevista2: ' . $diaSituacionRevista2);
-
+                $diaSituacionRevista2 = " 1"; // Día del mes en que se produce el cambio de situación de revista. Solo se informa si el campo "Situación de revista" es distinto de 0 (Propio). En caso de corresponder, informar con ceros a la izquierda (Ejemplo: 01, 15, 30, etc.). Valor optativo, puede informarse en blanco.
                 $situacionRevista3 = str_pad($registro->situacionRevista ?? '0', 2, '0', STR_PAD_LEFT); // Situación de revista: 0-Propio; 1-Eventual; 2-Contratista; 3-Monotributista; 4-Honorarios; 5-Servicio de locación; 6-Servicio de comisión; 7-Otra condición
-                $diaSituacionRevista3 = "00"; // Día del mes en que se produce el cambio de situación de revista. Solo se informa si el campo "Situación de revista" es distinto de 0 (Propio). En caso de corresponder, informar con ceros a la izquierda (Ejemplo: 01, 15, 30, etc.). Valor optativo, puede informarse en blanco.
-
-                log::debug('$diaSituacionRevista3: ' . $diaSituacionRevista3);
-
+                $diaSituacionRevista3 = " 1"; // Día del mes en que se produce el cambio de situación de revista. Solo se informa si el campo "Situación de revista" es distinto de 0 (Propio). En caso de corresponder, informar con ceros a la izquierda (Ejemplo: 01, 15, 30, etc.). Valor optativo, puede informarse en blanco.
                 $cantidadDias = str_pad($registro->cantidadDias ?? '30', 2, '0', STR_PAD_LEFT); // Cantidad de días trabajados en el período. Valor optativo, puede informarse en blanco.
                 $cantidadHoras = str_pad($registro->cantidadHoras ?? '0', 3, '0', STR_PAD_LEFT); // Si se informa un valor, el campo Cantidad días trabajados debe ser 0. Formato: 3 dígitos enteros.
                 $porcAporteAdicionalSS = str_pad($registro->porcAporteAdicionalSS ?? '0', 5, '0', STR_PAD_LEFT); // Se consignarán los puntos porcentuales que superen los establecidos en la Ley N° 24241, artículo 11 o Decreto N° 1387/01, artículo 15. El programa adicionará el porcentaje adicional que se consigne en el campo al aporte obligatorio vigente a cada periodo y procederá al cálculo sobre la Base Imponible de aportes SIPA. 
                 $contribucionTareDif = str_pad($registro->contribucionTareDif ?? '0', 5, '0', STR_PAD_LEFT); // Refleja el cálculo de los aportes diferenciales sobre la Base Imponible de Regímenes Diferenciales (por ejemplo: 2% aporte diferencial de los docentes) 
                 $codObraSocial = str_pad($registro->obra_sijp ?? '      ', 6, ' ', STR_PAD_LEFT); // Código de obra social. Valor optativo, puede informarse en blanco.
 
-                $adherentes = str_pad($registro->sicoss_adherentes ?? '00', 2, '0', STR_PAD_LEFT);  // Se registra el número de aquellos que no integran el grupo familiar. Ese dato es tenido en cuenta para el incremento del porcentaje a considerar para el cálculo de aportes de Obra Social.
+                $adherentes = "00";  // Se registra el número de aquellos que no integran el grupo familiar. Ese dato es tenido en cuenta para el incremento del porcentaje a considerar para el cálculo de aportes de Obra Social.
                 $aporteAdicionalOS = str_pad($registro->aporteAdicionalOS ?? '0', 15, '0', STR_PAD_LEFT); // Se consignarán los aportes del trabajador, emergentes de la diferencia entre la remuneración efectivamente percibida por este y el mínimo fijado por ANSES, a los efectos de acceder a una cobertura médico asistencial (Dec. 492/95, art. 8) Formato: 13 dígitos enteros y 2 decimales
                 $contribAdicionalOS = str_pad($registro->aporteAdicionalOS ?? '0', 15, '0', STR_PAD_LEFT); // Se consignarán las contribuciones del empleador, emergentes de la diferencia entre la remuneración efectivamente percibida por el trabajador y el mínimo fijado por ANSES, a los efectos de permitirle a este acceder a una cobertura médico asistencial (Dec. 492/95, art. 8) Formato: 13 dígitos enteros y 2 decimales. 
                 $baseCalculoDiferencialAportes = str_pad($registro->baseCalculoDiferencialAportes ?? '0', 15, '0', STR_PAD_LEFT); // Para informar diferenciales que sumen a la base imponible 4 (aportes de obra social y FSR) en los casos de trabajadores a tiempo parcial que aportan como tiempo completo (Ley, 26.474 art 1, inc. 4) Formato: 13 dígitos enteros y 2 decimales. 
@@ -421,29 +309,21 @@ class LsdController extends Controller
                 $baseCalculoDiferencialLRT = str_pad($registro->baseCalculoDiferencialLRT ?? '0', 15, '0', STR_PAD_LEFT); // Para informar diferenciales que sumen a la base imponible 9 (contribuciones LRT) . Formato: 13 dígitos enteros y 2 decimales. 
                 $remuneracionMaternidad = str_pad($registro->remuneracionMaternidad ?? '0', 15, '0', STR_PAD_LEFT); // Informará el monto de la remuneración bruta que le hubiera correspondido percibir a la trabajadora si hubiera cumplido sus servicios normalmente.  Formato: 13 dígitos enteros y 2 decimales. 
 
-                // remuneracionBruta: suma de importes H y NR del legajo según rangos de sue089s (13 enteros + 2 decimales implícitos)
-                $remuneracionBruta = str_pad((string)(int)round($remuneracionBrutaCalculada * 100), 15, '0', STR_PAD_LEFT);
-                $totalHaberes = str_pad((string)(int)round($totalHaberesCalculado * 100), 15, '0', STR_PAD_LEFT);
-
-                Log::debug('Bruto: ' . $remuneracionBruta);
+                $remuneracionBruta = str_pad($registro->remuneracionBruta ?? '0', 15, '0', STR_PAD_LEFT); // Es la suma de los conceptos remunerativos y no remunerativos liquidados en el mes. Formato: 13 dígitos enteros y 2 decimales. 
                 
-                $baseImponible1 = $totalHaberes; // Base de cálculo para aportes al SIPA Formato: 13 dígitos enteros y 2 decimales. Se informa el total de haberes remunerativos (tiporem = H) del trabajador, resultante de la suma de los importes de los conceptos remunerativos (tiporem = H) informados en los registros tipo 03. Este campo se utiliza para el cálculo de los aportes al SIPA. En caso de corresponder, se deben adicionar los diferenciales que se informen en el campo "Base cálculo diferencial aportes SS".   
-                $baseImponible2 = $totalHaberes; // Base de cálculo para Contribuciones previsionales e INSSJyP Formato: 13 dígitos enteros y 2 decimales. 
-                $baseImponible3 = $totalHaberes; // Base de cálculo para  Contribuciones FNE, asignaciones familiares y RENATRE Formato: 13 dígitos enteros y 2 decimales. 
-                $baseImponible4 = $totalHaberes; // Base de cálculo para Aportes obra social y FSR Formato: 13 dígitos enteros y 2 decimales. 
-                $baseImponible5 = $totalHaberes; // Base de cálculo para Aportes INSSJyP Formato: 13 dígitos enteros y 2 decimales. 
+                $baseImponible1 = str_pad($registro->baseImponible1 ?? '0', 15, '0', STR_PAD_LEFT); // Base de cálculo para Aportes Previsionales Formato: 13 dígitos enteros y 2 decimales. 
+                $baseImponible2 = str_pad($registro->baseImponible2 ?? '0', 15, '0', STR_PAD_LEFT); // Base de cálculo para Contribuciones previsionales e INSSJyP Formato: 13 dígitos enteros y 2 decimales. 
+                $baseImponible3 = str_pad($registro->baseImponible3 ?? '0', 15, '0', STR_PAD_LEFT); // Base de cálculo para  Contribuciones FNE, asignaciones familiares y RENATRE Formato: 13 dígitos enteros y 2 decimales. 
+                $baseImponible4 = str_pad($registro->baseImponible4 ?? '0', 15, '0', STR_PAD_LEFT); // Base de cálculo para Aportes obra social y FSR Formato: 13 dígitos enteros y 2 decimales. 
+                $baseImponible5 = str_pad($registro->baseImponible5 ?? '0', 15, '0', STR_PAD_LEFT); // Base de cálculo para Aportes INSSJyP Formato: 13 dígitos enteros y 2 decimales. 
                 $baseImponible6 = str_pad($registro->baseImponible6 ?? '0', 15, '0', STR_PAD_LEFT); // Base de cálculo para Aportes diferenciales Formato: 13 dígitos enteros y 2 decimales. 
                 $baseImponible7 = str_pad($registro->baseImponible7 ?? '0', 15, '0', STR_PAD_LEFT); // Base de cálculo para Aportes personal regímenes especiales Formato: 13 dígitos enteros y 2 decimales. 
-                $baseImponible8 = $totalHaberes; // Base de cálculo para Contribuciones obra social y FSR Formato: 13 dígitos enteros y 2 decimales. 
-                $baseImponible9 = $totalHaberes; // Base de cálculo para Ley de riesgos del trabajo Formato: 13 dígitos enteros y 2 decimales. 
+                $baseImponible8 = str_pad($registro->baseImponible8 ?? '0', 15, '0', STR_PAD_LEFT); // Base de cálculo para Contribuciones obra social y FSR Formato: 13 dígitos enteros y 2 decimales. 
+                $baseImponible9 = str_pad($registro->baseImponible9 ?? '0', 15, '0', STR_PAD_LEFT); // Base de cálculo para Ley de riesgos del trabajo Formato: 13 dígitos enteros y 2 decimales. 
                 $baseCalculoDiferencialAportesSS = str_pad($registro->baseCalculoDiferencialAportesSS ?? '0', 15, '0', STR_PAD_LEFT); // Para informar diferenciales que sumen a la base imponible 1 Formato: 13 dígitos enteros y 2 decimales. 
                 $baseCalculoDiferencialContribSS = str_pad($registro->baseCalculoDiferencialContribSS ?? '0', 15, '0', STR_PAD_LEFT); // Para informar diferenciales que sumen a la base imponible 2 Formato: 13 dígitos enteros y 2 decimales. 
-                $baseImponible10 = $totalHaberes; // Para informar diferencia en REM2 y el importe a detraer establecido  por la ley 27430 Formato: 13 dígitos enteros y 2 decimales. 
-                $importeDetraer = str_pad($registro->importeDetraer ?? '700368', 15, '0', STR_PAD_LEFT); // Para informar el importe a detraer establecido por la ley 27430 Formato: 13 dígitos enteros y 2 decimales. 
-
-                Log::debug('baseImponible1: ' . $baseImponible1);
-                Log::debug('baseImponible2: ' . $baseImponible2);
-                Log::debug('importeDetraer: ' . $importeDetraer);
+                $baseImponible10 = str_pad($registro->baseImponible10 ?? '0', 15, '0', STR_PAD_LEFT); // Para informar diferencia en REM2 y el importe a detraer establecido  por la ley 27430 Formato: 13 dígitos enteros y 2 decimales. 
+                $importeDetraer = str_pad($registro->importeDetraer ?? '0', 15, '0', STR_PAD_LEFT); // Para informar el importe a detraer establecido por la ley 27430 Formato: 13 dígitos enteros y 2 decimales. 
                 
                 $line04 = '04'
                     . $cuilValue
@@ -493,7 +373,7 @@ class LsdController extends Controller
                     . $baseImponible10
                     . $importeDetraer;
 
-                $contenido .= $line04 . "\r\n";
+                $contenido .= $line04 . "\n";
         }
 
         
@@ -501,7 +381,7 @@ class LsdController extends Controller
         // Generar Registro Tipo 05 - Trabajadores Eventuales - Una fila por cada empleado declarado con modalidad 102 en el registro 4
         //---------------------------------------
         foreach ($datos as $registro) {
-                $legajoValue = str_pad($registro->legajo_codigo ?? $registro->legajo ?? '', 10, ' ', STR_PAD_RIGHT);
+                $legajoValue = str_pad($registro->legajo_codigo ?? $registro->legajo ?? '', 10, ' ', STR_PAD_LEFT);
                 $cuilValue = $registro->cuil ?? '';
                 $conyugue = str_pad($registro->conyugue ?? '', 1, ' ', STR_PAD_LEFT); // 0 = NO  1= SI
                 $hijos = str_pad($registro->hijos ?? 0, 2, '0', STR_PAD_LEFT); // Cantidad de hijos menores de 18 años o incapacitados para el trabajo
@@ -534,32 +414,7 @@ class LsdController extends Controller
                 $baseCalculoDiferencialOS = str_pad($registro->baseCalculoDiferencialOs ?? '0', 15, '0', STR_PAD_LEFT); // Para informar diferenciales que sumen a la base imponible 8 (contribuciones de obra social y FSR) en los casos de trabajadores a tiempo parcial que contribuyen como tiempo completo (Ley, 26.474 art 1, inc. 4) Formato: 13 dígitos enteros y 2 decimales. 
                 $baseCalculoDiferencialLRT = str_pad($registro->baseCalculoDiferencialLRT ?? '0', 15, '0', STR_PAD_LEFT); // Para informar diferenciales que sumen a la base imponible 9 (contribuciones LRT) . Formato: 13 dígitos enteros y 2 decimales. 
                 $remuneracionMaternidad = str_pad($registro->remuneracionMaternidad ?? '0', 15, '0', STR_PAD_LEFT); // Informará el monto de la remuneración bruta que le hubiera correspondido percibir a la trabajadora si hubiera cumplido sus servicios normalmente.  Formato: 13 dígitos enteros y 2 decimales. 
-                // remuneracionBruta: suma de importes H y NR del legajo según rangos de sue089s (13 enteros + 2 decimales implícitos)
-                $remuneracionBrutaCalc05 = $datos->where('cuil', $registro->cuil)->reduce(function (float $carry, $row) use ($rangosSue089) {
-                    foreach ($rangosSue089 as $rango) {
-                        if ($row->concepto >= $rango->desde && $row->concepto <= $rango->hasta) {
-                            if (in_array(strtoupper(trim($rango->tiporem)), ['H', 'NR'])) {
-                                $carry += (float)($row->importe ?? 0);
-                            }
-                            break;
-                        }
-                    }
-                    return $carry;
-                }, 0.0);
-                
-                // totalHaberes: suma solo de importes remunerativos (tiporem = H)
-                $totalHaberesCalc05 = $datos->where('cuil', $registro->cuil)->reduce(function (float $carry, $row) use ($rangosSue089) {
-                    foreach ($rangosSue089 as $rango) {
-                        if ($row->concepto >= $rango->desde && $row->concepto <= $rango->hasta) {
-                            if (strtoupper(trim($rango->tiporem)) === 'H') {
-                                $carry += (float)($row->importe ?? 0);
-                            }
-                            break;
-                        }
-                    }
-                    return $carry;
-                }, 0.0);
-                $remuneracionBruta = str_pad((string)(int)round($remuneracionBrutaCalc05 * 100), 15, '0', STR_PAD_LEFT);
+                $remuneracionBruta = str_pad($registro->remuneracionBruta ?? '0', 15, '0', STR_PAD_LEFT); // Es la suma de los conceptos remunerativos y no remunerativos liquidados en el mes. Formato: 13 dígitos enteros y 2 decimales. 
                 $baseImponible1 = str_pad($registro->baseImponible1 ?? '0', 15, '0', STR_PAD_LEFT); // Base de cálculo para Aportes Previsionales Formato: 13 dígitos enteros y 2 decimales. 
                 $baseImponible2 = str_pad($registro->baseImponible2 ?? '0', 15, '0', STR_PAD_LEFT); // Base de cálculo para Contribuciones previsionales e INSSJyP Formato: 13 dígitos enteros y 2 decimales. 
                 $baseImponible3 = str_pad($registro->baseImponible3 ?? '0', 15, '0', STR_PAD_LEFT); // Base de cálculo para  Contribuciones FNE, asignaciones familiares y RENATRE Formato: 13 dígitos enteros y 2 decimales. 
@@ -622,7 +477,7 @@ class LsdController extends Controller
                         . $baseCalculoDiferencialContribSS
                         . $baseImponible10;
 
-                    $contenido .= $line05 . "\r\n";
+                    $contenido .= $line05 . "\n";
                 }
         }
 
@@ -639,7 +494,7 @@ class LsdController extends Controller
         $fullPath = $dir . DIRECTORY_SEPARATOR . $filename;
 
         try {
-            file_put_contents($fullPath, rtrim($contenido, "\r\n"));    
+            file_put_contents($fullPath, rtrim($contenido, "\r\n"));
         } catch (\Throwable $e) {
             return [
                 'status' => 500,

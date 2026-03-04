@@ -1222,17 +1222,23 @@ watch(() => props.agregar, () => {
                                             <div class="row"></div>
                                             
                                             <!-- Adherentes -->
-                                            <div class="col-md-3">
-                                                <div class="form-check form-switch mt-4">
+                                            <div class="col-md-2">
+                                                <div class="form-floating form-floating-outline">
                                                     <input
-                                                        type="checkbox"
+                                                        type="number"
                                                         id="sicoss_adherentes"
                                                         name="sicoss_adherentes"
-                                                        class="form-check-input"
-                                                        v-model="form.sicoss_adherentes"
+                                                        class="form-control"
+                                                        placeholder="0"
+                                                        min="0"
+                                                        max="99"
+                                                        maxlength="2"
+                                                        autocomplete="off"
+                                                        v-model.number="form.sicoss_adherentes"
                                                         v-bind:disabled="!edicion"
                                                     />
-                                                    <label class="form-check-label" for="sicoss_adherentes">Adherentes</label>
+                                                    <label for="sicoss_adherentes">Adherentes</label>
+                                                    <InputError class="mt-2" :message="form.errors.sicoss_adherentes" />
                                                 </div>
                                             </div>
                                         </div>
