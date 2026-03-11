@@ -19,6 +19,7 @@ use App\Http\Controllers\LiquidacionImportarController;
 use App\Http\Controllers\LsdController;
 use App\Http\Controllers\ConceptosLiquidacionController;
 use App\Http\Controllers\LiquidacionIndividualController;
+use App\Http\Controllers\PeriodosController;
 use Inertia\Inertia;
 
 // Route::get('/', function () {
@@ -47,23 +48,23 @@ Route::middleware('auth')->group(function () {
     Route::patch('/profile', [ProfileController::class, 'update'])->name('profile.update');
     Route::delete('/profile', [ProfileController::class, 'destroy'])->name('profile.destroy');
 
-    // Empleados Routes
-    Route::resource('legajos', LegajosController::class);
-    // Rutas adicionales para navegación
+    // Empleados Routes - rutas literales ANTES del resource para evitar que {legajo} las capture
     Route::get('legajos/first', [LegajosController::class, 'first'])->name('legajos.first');
     Route::get('legajos/last', [LegajosController::class, 'last'])->name('legajos.last');
+    Route::get('legajos/search', [LegajosController::class, 'search'])->name('legajos.search');
+    Route::resource('legajos', LegajosController::class);
+    // Rutas adicionales para navegación
     Route::get('legajos/{id}/previous', [LegajosController::class, 'previous'])->name('legajos.previous');
     Route::get('legajos/{id}/next', [LegajosController::class, 'next'])->name('legajos.next');
-    Route::get('legajos/search', [LegajosController::class, 'search'])->name('legajos.search');
 
-    // Empleados Routes
-    Route::resource('bajas', BajasController::class);
-    // Rutas adicionales para navegación
+    // Empleados Routes - rutas literales ANTES del resource
     Route::get('bajas/first', [BajasController::class, 'first'])->name('bajas.first');
     Route::get('bajas/last', [BajasController::class, 'last'])->name('bajas.last');
+    Route::get('bajas/search', [BajasController::class, 'search'])->name('bajas.search');
+    Route::resource('bajas', BajasController::class);
+    // Rutas adicionales para navegación
     Route::get('bajas/{id}/previous', [BajasController::class, 'previous'])->name('bajas.previous');
     Route::get('bajas/{id}/next', [BajasController::class, 'next'])->name('bajas.next');
-    Route::get('bajas/search', [BajasController::class, 'search'])->name('bajas.search');
 
     // Sicoss: Actividades
     Route::get('sicoss/actividades/search', [SicossActivController::class, 'search'])
@@ -306,6 +307,45 @@ Route::middleware('auth')->group(function () {
     });
 
     //--------------------------------------------
+    // Liquidación: Períodos
+    //---------------------------------------------
+    Route::get('liquidacion/periodos/search', [PeriodosController::class, 'search'])
+        ->name('liquidacion.periodos.search');
+
+    Route::get('liquidacion/periodos/first', [PeriodosController::class, 'first'])
+        ->name('liquidacion.periodos.first');
+
+    Route::get('liquidacion/periodos/last', [PeriodosController::class, 'last'])
+        ->name('liquidacion.periodos.last');
+
+    Route::get('liquidacion/periodos/{periodo}/previous', [PeriodosController::class, 'previous'])
+        ->name('liquidacion.periodos.previous');
+
+    Route::get('liquidacion/periodos/{periodo}/next', [PeriodosController::class, 'next'])
+        ->name('liquidacion.periodos.next');
+
+    Route::get('liquidacion/periodos/create', [PeriodosController::class, 'create'])
+        ->name('liquidacion.periodos.create');
+
+    Route::get('liquidacion/periodos/{periodo}/edit', [PeriodosController::class, 'edit'])
+        ->name('liquidacion.periodos.edit');
+
+    Route::get('liquidacion/periodos/{periodo}/show', [PeriodosController::class, 'show'])
+        ->name('liquidacion.periodos.show');
+
+    Route::get('liquidacion/periodos/{id?}/{direction?}', [PeriodosController::class, 'index'])
+        ->name('liquidacion.periodos.index');
+
+    Route::resource('liquidacion/periodos', PeriodosController::class)
+        ->parameters(['periodos' => 'periodo'])
+        ->except(['index', 'create', 'edit', 'show'])
+        ->names([
+            'store'   => 'liquidacion.periodos.store',
+            'update'  => 'liquidacion.periodos.update',
+            'destroy' => 'liquidacion.periodos.destroy',
+        ]);
+
+    //--------------------------------------------
     // Liquidación: Conceptos
     //---------------------------------------------
     Route::get('liquidacion/conceptos/proximoCodigo', [ConceptosLiquidacionController::class, 'obtenerProximoCodigo'])
@@ -345,7 +385,12 @@ Route::middleware('auth')->group(function () {
 
     Route::resource('liquidacion/conceptos', ConceptosLiquidacionController::class)
         ->parameters(['conceptos' => 'concepto'])
-        ->except(['index','create','edit','show']);
+        ->except(['index','create','edit','show'])
+        ->names([
+            'store'   => 'liquidacion.conceptos.store',
+            'update'  => 'liquidacion.conceptos.update',
+            'destroy' => 'liquidacion.conceptos.destroy',
+        ]);
 
     //--------------------------------------------
     // Liquidación Individual

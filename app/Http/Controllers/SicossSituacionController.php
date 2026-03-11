@@ -275,15 +275,13 @@ class SicossSituacionController extends Controller
         if ($request->has('search')) {
             $search = $request->input('search');
             $query->where(function($q) use ($search) {
-                $q->where('nombre', 'LIKE', "%{$search}%")
-                  ->orWhere('apellido', 'LIKE', "%{$search}%")
-                  ->orWhere('documento', 'LIKE', "%{$search}%")
-                  ->orWhere('legajo_numero', 'LIKE', "%{$search}%");
+                $q->where('codigo', 'LIKE', "%{$search}%")
+                  ->orWhere('detalle', 'LIKE', "%{$search}%");
             });
         }
 
         return Inertia::render('Sicoss/Situacion/Search', [
-            'situacion' => $query->paginate(20),
+            'situacion' => $query->orderBy('codigo')->paginate(20),
             'filters' => $request->only('search')
         ]);
     }

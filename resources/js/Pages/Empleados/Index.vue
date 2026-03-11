@@ -106,6 +106,28 @@ const form = useForm({
     sicoss_ooss: props.legajo?.sicoss_ooss ?? '',
     sicoss_zona: props.legajo?.sicoss_zona ?? '',
     sicoss_sini: props.legajo?.sicoss_sini ?? '',
+    sicoss_conyuge:    props.legajo?.sicoss_conyuge    ?? false,
+    sicoss_hijos:      props.legajo?.sicoss_hijos      ?? false,
+    sicoss_adherentes: props.legajo?.sicoss_adherentes ?? 0,
+    alta:        props.legajo?.alta        ?? '',
+    fecha_naci:  props.legajo?.fecha_naci  ?? '',
+    est_civil:   props.legajo?.est_civil   ?? '',
+    antiguedad:  props.legajo?.antiguedad  ?? '',
+    edad:        props.legajo?.edad        ?? '',
+    domici:      props.legajo?.domici      ?? '',
+    nro:         props.legajo?.nro         ?? '',
+    piso:        props.legajo?.piso        ?? '',
+    dpto:        props.legajo?.dpto        ?? '',
+    locali:      props.legajo?.locali      ?? '',
+    tel1:        props.legajo?.tel1        ?? '',
+    tel2:        props.legajo?.tel2        ?? '',
+    tel3:        props.legajo?.tel3        ?? '',
+    email:       props.legajo?.email       ?? '',
+    web:         props.legajo?.web         ?? '',
+    tarea:       props.legajo?.tarea       ?? '',
+    fecha_vto:   props.legajo?.fecha_vto   ?? '',
+    cod_categ:   props.legajo?.cod_categ   ?? '',
+    activo:      props.legajo?.activo      ?? false,
 });
 
 // Función para determinar la ruta del formulario
@@ -264,7 +286,7 @@ watch(() => props.agregar, () => {
 
                         <Link
                             v-if="agregar || edicion"
-                            :href="route('legajos')"
+                            :href="route('legajos.index')"
                             class="btn btn-outline-secondary"
                             >
                             Cancelar
@@ -279,7 +301,7 @@ watch(() => props.agregar, () => {
                             Agregar
                         </Link>
                         <Link
-                            :href="route('legajos.edit', form.id)"
+                            :href="form.id ? route('legajos.edit', form.id) : '#'"
                             class="btn btn-outline-secondary"
                             @click="setFocus"
                             >
@@ -447,17 +469,24 @@ watch(() => props.agregar, () => {
                                                     name="alta"
                                                     class="form-control"
                                                     placeholder="dd/mm/aaaa"
-                                                    maxlength="15" autocomplete=""
+                                                    maxlength="15" 
+                                                    autocomplete=""
                                                     v-bind:disabled="!edicion"
                                                     v-model="form.alta" />
                                                 <label for="alta">Fecha de alta</label>
                                                 </div>
                                             </div>
-                                            <div class="col-md-1 select2-primary">
+                                            <div class="col-md-2 select2-primary">
                                                 <div class="form-floating {{ $outline }}">
-                                                <input type="text" id="antiguedad" name="antiguedad" class="form-control" placeholder="Codigo contable" maxlength="25" autocomplete=""
-                                                    v-model="form.antiguedad" />
-                                                <label for="antiguedad">Antiguedad</label>
+                                                <input 
+                                                    type="text" 
+                                                    id="antiguedad"
+                                                    name="antiguedad"
+                                                    class="form-control bg-transparent border-0 fw-semibold" 
+                                                    placeholder="" 
+                                                    readonly
+                                                    :value="form.antiguedad" />
+                                                <label for="antiguedad">Antigüedad</label>
                                                 </div>
                                             </div>
 
@@ -475,10 +504,16 @@ watch(() => props.agregar, () => {
                                                 <label for="fecha_naci">Fecha nacimiento</label>
                                                 </div>
                                             </div>
-                                            <div class="col-md-1 select2-primary">
+                                            <div class="col-md-2 select2-primary">
                                                 <div class="form-floating {{ $outline }}">
-                                                <input type="text" id="edad" name="edad" class="form-control" placeholder="Edad" maxlength="12" autocomplete=""
-                                                    v-model="form.edad" />
+                                                <input 
+                                                    type="text" 
+                                                    id="edad" 
+                                                    name="edad" 
+                                                    class="form-control bg-transparent border-0 fw-semibold" 
+                                                    placeholder="" 
+                                                    readonly
+                                                    :value="form.edad" />
                                                 <label for="edad">Edad</label>
                                                 </div>
                                             </div>
@@ -781,21 +816,6 @@ watch(() => props.agregar, () => {
                                                     <hr>
                                                 </div>
                                             </div>
-
-                                            <!-- Activo -->
-                                            <div class="col-md-3">
-                                                <div class="form-check form-switch mt-4">
-                                                    <input
-                                                        type="checkbox"
-                                                        id="activo"
-                                                        name="activo"
-                                                        class="form-check-input"
-                                                        v-model="form.activo"
-                                                        v-bind:disabled="!modoEdicion"
-                                                    />
-                                                    <label class="form-check-label" for="activo">Cónyuge</label>
-                                                </div>
-                                            </div>
                                         </div>
 
                                     </div>
@@ -955,12 +975,12 @@ watch(() => props.agregar, () => {
                                             <div class="col-md-4">
                                                 <div class="form-floating form-floating-outline">
                                                 <select
-                                                    id="cod_obsoc"
-                                                    name="cod_obsoc"
+                                                    id="obra_sijp"
+                                                    name="obra_sijp"
                                                     class="select2 form-select"
                                                     data-allow-clear="true"
                                                     v-bind:disabled="!edicion"
-                                                    v-model="form.cod_obsoc">
+                                                    v-model="form.obra_sijp">
 
                                                     <option disabled value="">(Seleccione una obra social)</option>
                                                     <option
@@ -971,7 +991,7 @@ watch(() => props.agregar, () => {
                                                             {{ p.codigo }} - {{ p.detalle }}
                                                     </option>
                                                 </select>
-                                                <label for="cod_obsoc">Obra Social</label>
+                                                <label for="obra_sijp">Obra Social</label>
                                                 </div>
                                             </div>
 
@@ -1261,18 +1281,27 @@ watch(() => props.agregar, () => {
                                         <div class="row g-6">
                                             <div class="col-md-6">
                                                 <div class="form-floating form-floating-outline">
-                                                    <input
-                                                        type="text"
-                                                        id="tarea" name="tarea" ref="txttarea"
-                                                        class="form-control"
-                                                        placeholder="Situacion de revista"
-                                                        autocomplete="off"
-                                                        v-bind:disabled="!edicion"
-                                                        v-model="form.tarea"/>
+                                                <select
+                                                    id="sicoss_situa"
+                                                    name="sicoss_situa"
+                                                    class="select2 form-select"
+                                                    data-allow-clear="true"
+                                                    v-bind:disabled="!edicion"
+                                                    v-model="form.sicoss_situa">
 
-                                                    <label for="tarea">Situacion de revista</label>
-
-                                                    <InputError class="mt-2" :message="form.errors.tarea" />
+                                                    <option disabled value="">(Seleccione una situación de revista)</option>
+                                                    <option
+                                                            v-for="p in situacionesLab"
+                                                            :key="p.codigo"
+                                                            :value="p.codigo"
+                                                        >
+                                                            {{ p.codigo }} - {{ p.detalle }}
+                                                    </option>
+                                                </select>
+                                                <label for="sicoss_situa">Situación de revista</label>
+                                                <div class="red-text" v-if="form.errors.sicoss_situa">
+                                                    {{ form.errors.sicoss_situa }}
+                                                </div>
                                                 </div>
                                             </div>
 
@@ -1376,12 +1405,12 @@ watch(() => props.agregar, () => {
                                             <div class="col-md-6">
                                                 <div class="form-floating form-floating-outline">
                                                 <select
-                                                    id="cod_obsoc"
-                                                    name="cod_obsoc"
+                                                    id="locali"
+                                                    name="locali"
                                                     class="select2 form-select"
                                                     data-allow-clear="true"
                                                     v-bind:disabled="!edicion"
-                                                    v-model="form.cod_obsoc">
+                                                    v-model="form.locali">
 
                                                     <option disabled value="">(Seleccione una localidad)</option>
                                                     <option
@@ -1392,7 +1421,7 @@ watch(() => props.agregar, () => {
                                                             {{ p.codigo }} - {{ p.detalle }}
                                                     </option>
                                                 </select>
-                                                <label for="cod_obsoc">Localidad</label>
+                                                <label for="locali">Localidad</label>
                                                 </div>
                                             </div>
 
@@ -1481,7 +1510,7 @@ watch(() => props.agregar, () => {
                         <div class="modal-footer">
                             <Link
                                 type="button"
-                                :href="route('legajos.destroy', form.id)"
+                                :href="form.id ? route('legajos.destroy', form.id) : '#'"
                                 class="btn btn-danger waves-effect waves-light"
                                 style="color: white"
                                 @click="closeModal"

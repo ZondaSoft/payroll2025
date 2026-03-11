@@ -79,10 +79,16 @@
             <a href="{{ url('/') }}" class="app-brand-link">
               <span class="app-brand-logo demo">
                 <span style="color: var(--bs-primary)">
-                  <img width="50" height="45" viewBox="0 0 38 20" src="{{ asset('img/logo_af.png') }}" alt="Agrotecnica Fueguina">
+                  @if ($GLOBALS['cliente_id'] == 1)
+                    <img width="150" height="70" class="ms-5 mt-5" viewBox="0 0 38 20" src="{{ asset('img/logo.png') }}" alt="Grupo Petroandina">
+                  @else
+                    <img width="50" height="45" viewBox="0 0 38 20" src="{{ asset('img/logo_af.png') }}" alt="Agrotecnica Fueguina">
+                  @endif
                 </span>
               </span>
-              <span class="app-brand-text demo menu-text fw-semibold ms-2">Agrotecnica</span>
+              @if ($GLOBALS['cliente_id'] == 2)
+                <span class="app-brand-text demo menu-text fw-semibold ms-2">Agrotecnica</span>
+              @endif
             </a>
 
             <a href="javascript:void(0);" class="layout-menu-toggle menu-link text-large ms-auto">

@@ -1,4 +1,4 @@
-@extends('layouts.legajos2')
+@extends('layouts.legajos')
 
 @section('styles')
 <link rel="stylesheet" href="{{ asset('css/bs-stepper.min.css') }}">

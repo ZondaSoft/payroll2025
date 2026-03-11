@@ -85,6 +85,12 @@ class Sue001 extends Model
 		return $this->belongsTo(Sue007::class,'convenio', 'codigo');
 	}
 
+	// $legajos -> obra social SICOSS (campo obra_sijp)
+	public function obraSijp()
+	{
+		return $this->belongsTo(SicossObras::class, 'obra_sijp', 'codigo');
+	}
+
 	// Accesor: $empleado->nom_grupo_empresario
     public function getNomConvenioAttribute()
     {

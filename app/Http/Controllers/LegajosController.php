@@ -45,7 +45,7 @@ class LegajosController extends Controller
         $legajo = null;
         $agregar = False;
         $edicion = False;    // True: Muestra botones Grabar - Cancelar   //  False: Muestra botones: Agregar, Editar, Borrar
-        $active = 65;
+        $active = 9;
         //$now = Carbon::now();
         $alta = '';
         $rol = '';
@@ -164,12 +164,13 @@ class LegajosController extends Controller
             //$legajo->hora = $legajo->created_at->format('H:i');
             $legajo->hora = optional($legajo->created_at)->format('H:i');
 
+            $this->calcularAntiguedad($legajo);
+            $this->calcularEdad($legajo);
+
             $familiares = Sue002::orderBy('paren')->Where('legajo', '=', $legajo->codigo)->get();
         } else {
             $familiares = new Sue002;
         }
-
-        // dd($legajo);
 
         // formulario vue via inertia
         return Inertia::render('Empleados/Index', [
@@ -197,7 +198,40 @@ class LegajosController extends Controller
      */
     public function create()
     {
-        return Inertia::render('Empleados/Form');
+        $legajo = new Sue001;
+        $agregar = true;
+        $edicion = false;
+
+        $grupos         = Sue086::orderBy('detalle')->whereNotNull('codigo')->where('codigo', '!=', '')->get();
+        $sectores       = Sue011::orderBy('detalle')->whereNotNull('codigo')->where('codigo', '!=', '')->get();
+        $situacionesLab = Sue005::orderBy('detalle')->whereNotNull('codigo')->where('codigo', '!=', '')->get();
+        $ccostos        = Sue030::orderBy('detalle')->get();
+        $jerarquias     = Sue014::orderBy('detalle')->get();
+        $categorias     = Sue006::orderBy('detalle')->whereNotNull('codigo')->where('codigo', '!=', '')->get();
+        $cuadrillas     = Sue054::orderBy('detalle')->get();
+        $obras2         = SicossObras::orderBy('codigo')->get();
+        $sindicatos     = Sue015::orderBy('detalle')->whereNotNull('codigo')->where('codigo', '!=', '')->get();
+        $convenios      = Sue007::orderBy('detalle')->get();
+        $contrataciones = Sicoss08::orderBy('codigo')->get();
+        $provincias     = Sue012::orderBy('codigo')->where('codigo', '!=', '')->get();
+
+        return Inertia::render('Empleados/Index', [
+            'legajo'         => $legajo,
+            'agregar'        => $agregar,
+            'edicion'        => $edicion,
+            'provincias'     => $provincias,
+            'grupos'         => $grupos,
+            'jerarquias'     => $jerarquias,
+            'categorias'     => $categorias,
+            'ccostos'        => $ccostos,
+            'sectores'       => $sectores,
+            'cuadrillas'     => $cuadrillas,
+            'obras'          => $obras2,
+            'sindicatos'     => $sindicatos,
+            'convenios'      => $convenios,
+            'contrataciones' => $contrataciones,
+            'situacionesLab' => $situacionesLab,
+        ]);
     }
 
     /**
@@ -229,12 +263,12 @@ class LegajosController extends Controller
     /**
      * Muestra los detalles de un empleado
      */
-    public function show(Sue001 $empleado)
+    public function show($id)
     {
-        $legajo = $empleado;
+        $legajo = Sue001::findOrFail($id);
         $agregar = False;
         $edicion = False;    // True: Muestra botones Grabar - Cancelar   //  False: Muestra botones: Agregar, Editar, Borrar
-        $active = 65;
+        $active = 9;
         //$now = Carbon::now();
         $alta = '';
         $rol = '';
@@ -274,7 +308,10 @@ class LegajosController extends Controller
         $capacidades = Sue052::orderBy('codigo')->paginate(12);
         $bancos = Fza002::orderBy('detalle')->get();
         $sicossCodBajas = SicossCodigosBaja::orderBy('detalle')->get();
-        $historial = Sue074::orderBy('id')->where('legajo_codigo', '=', $empleado->codigo)->get();
+        $historial = Sue074::orderBy('id')->where('legajo_codigo', '=', $legajo->codigo)->get();
+
+        $this->calcularAntiguedad($legajo);
+        $this->calcularEdad($legajo);
 
         return Inertia::render('Empleados/Index', [
             'legajo' => $legajo,
@@ -299,11 +336,44 @@ class LegajosController extends Controller
     /**
      * Muestra el formulario para editar un empleado
      */
-    public function edit(Sue001 $empleado)
+    public function edit($id)
     {
-        return Inertia::render('Empleados/Form', [
-            'empleado' => $empleado,
-            'isEditing' => true,
+        $legajo = Sue001::findOrFail($id);
+        $agregar = false;
+        $edicion = true;
+
+        $grupos         = Sue086::orderBy('detalle')->whereNotNull('codigo')->where('codigo', '!=', '')->get();
+        $sectores       = Sue011::orderBy('detalle')->whereNotNull('codigo')->where('codigo', '!=', '')->get();
+        $situacionesLab = Sue005::orderBy('detalle')->whereNotNull('codigo')->where('codigo', '!=', '')->get();
+        $ccostos        = Sue030::orderBy('detalle')->get();
+        $jerarquias     = Sue014::orderBy('detalle')->get();
+        $categorias     = Sue006::orderBy('detalle')->whereNotNull('codigo')->where('codigo', '!=', '')->get();
+        $cuadrillas     = Sue054::orderBy('detalle')->get();
+        $obras2         = SicossObras::orderBy('codigo')->get();
+        $sindicatos     = Sue015::orderBy('detalle')->whereNotNull('codigo')->where('codigo', '!=', '')->get();
+        $convenios      = Sue007::orderBy('detalle')->get();
+        $contrataciones = Sicoss08::orderBy('codigo')->get();
+        $provincias     = Sue012::orderBy('codigo')->where('codigo', '!=', '')->get();
+
+        $this->calcularAntiguedad($legajo);
+        $this->calcularEdad($legajo);
+
+        return Inertia::render('Empleados/Index', [
+            'legajo'         => $legajo,
+            'agregar'        => $agregar,
+            'edicion'        => $edicion,
+            'provincias'     => $provincias,
+            'grupos'         => $grupos,
+            'jerarquias'     => $jerarquias,
+            'categorias'     => $categorias,
+            'ccostos'        => $ccostos,
+            'sectores'       => $sectores,
+            'cuadrillas'     => $cuadrillas,
+            'obras'          => $obras2,
+            'sindicatos'     => $sindicatos,
+            'convenios'      => $convenios,
+            'contrataciones' => $contrataciones,
+            'situacionesLab' => $situacionesLab,
         ]);
     }
 
@@ -403,21 +473,72 @@ class LegajosController extends Controller
     // Búsqueda
     public function search(Request $request)
     {
-        $query = Sue001::query();
+        $query = Sue001::where(function($q) {
+            $q->whereNull('baja')->orWhere('baja', '');
+        });
 
-        if ($request->has('search')) {
+        if ($request->has('search') && $request->input('search') !== '') {
             $search = $request->input('search');
             $query->where(function($q) use ($search) {
-                $q->where('nombre', 'LIKE', "%{$search}%")
-                  ->orWhere('apellido', 'LIKE', "%{$search}%")
-                  ->orWhere('documento', 'LIKE', "%{$search}%")
-                  ->orWhere('legajo_numero', 'LIKE', "%{$search}%");
+                $q->where('detalle', 'LIKE', "%{$search}%")
+                  ->orWhere('nombres', 'LIKE', "%{$search}%")
+                  ->orWhere('cuil', 'LIKE', "%{$search}%")
+                  ->orWhere('codigo', 'LIKE', "%{$search}%");
             });
         }
 
-        return Inertia::render('Legajos/Search', [
-            'legajos' => $query->paginate(20),
+        return Inertia::render('Empleados/Search', [
+            'legajos' => $query->orderBy('detalle')->paginate(20),
             'filters' => $request->only('search')
         ]);
+    }
+
+    /**
+     * Calcula la antigüedad del empleado en base al campo 'alta' y la fecha actual.
+     * Agrega el atributo 'antiguedad' al modelo con formato: "X años Y meses"
+     */
+    private function calcularAntiguedad(Sue001 $legajo): void
+    {
+        if (empty($legajo->alta)) {
+            $legajo->antiguedad = '';
+            return;
+        }
+
+        $inicio = Carbon::parse($legajo->alta)->startOfDay();
+        $hoy    = Carbon::now()->startOfDay();
+
+        $diff  = $inicio->diff($hoy);
+        $anios = (int) $diff->y;   // años completos
+        $meses = (int) $diff->m;   // meses completos del año parcial (días descartados)
+
+        $partes = [];
+        if ($anios > 0) {
+            $partes[] = $anios . ' año' . ($anios !== 1 ? 's' : '');
+        }
+        if ($meses > 0) {
+            $partes[] = $meses . ' mes' . ($meses !== 1 ? 'es' : '');
+        }
+
+        $legajo->antiguedad = count($partes) > 0 ? implode(' ', $partes) : '0 meses';
+    }
+
+    /**
+     * Calcula la edad del empleado en base al campo 'fecha_naci' y la fecha actual.
+     * Agrega el atributo 'edad' al modelo con formato: "X años"
+     */
+    private function calcularEdad(Sue001 $legajo): void
+    {
+        if (empty($legajo->fecha_naci)) {
+            $legajo->edad = '';
+            return;
+        }
+
+        $nacimiento = Carbon::parse($legajo->fecha_naci)->startOfDay();
+        $hoy        = Carbon::now()->startOfDay();
+
+        $diff  = $nacimiento->diff($hoy);
+        $anios = (int) $diff->y;  // años completos, días descartados
+
+        $legajo->edad = $anios . ' año' . ($anios !== 1 ? 's' : '');
     }
 }

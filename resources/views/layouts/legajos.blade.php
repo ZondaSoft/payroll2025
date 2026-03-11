@@ -67,7 +67,7 @@
 
     @routes
     @vite('resources/js/app.js')
-    @inertiaHead
+    @if(isset($page)) @inertiaHead @endif
   </head>
 
   <body>
@@ -126,10 +126,16 @@
                     </defs>
                   </svg> -->
                   <!-- <svg width="268" height="150" viewBox="0 0 38 20" fill="none" xmlns="http://www.w3.org/2000/svg"> -->
-                  <img width="50" height="45" viewBox="0 0 38 20" src="{{ asset('/img/logo_af.png') }}" alt="Agrotecnica Fueguina">
+                  @if ($GLOBALS['cliente_id'] == 1)
+                    <img width="150" height="70" class="ms-5 mt-5" viewBox="0 0 38 20" src="{{ asset('img/logo.png') }}" alt="Grupo Petroandina">
+                  @else
+                    <img width="50" height="45" viewBox="0 0 38 20" src="{{ asset('img/logo_af.png') }}" alt="Agrotecnica Fueguina">
+                  @endif
                 </span>
               </span>
-              <span class="app-brand-text demo menu-text fw-semibold ms-2">Agrotecnica</span>
+              @if ($GLOBALS['cliente_id'] == 2)
+                <span class="app-brand-text demo menu-text fw-semibold ms-2">Agrotecnica</span>
+              @endif
             </a>
 
             <a href="javascript:void(0);" class="layout-menu-toggle menu-link text-large ms-auto">
@@ -151,47 +157,81 @@
             <li class="menu-header mt-5">
               <span class="menu-header-text" data-i18n="Principal">Principal</span>
             </li>
-            <li class="menu-item  {{ $active<20?'active open':' ' }}">
+            <li class="menu-item {{ request()->routeIs('legajos.*') || request()->routeIs('bajas.*') ? 'active open' : '' }}">
               <a href="javascript:void(0);" class="menu-link menu-toggle">
                 <i class="menu-icon tf-icons ri-bill-line"></i>
                 <div data-i18n="Personal">Personal</div>
               </a>
               <ul class="menu-sub">
-                <li class="menu-item {{ $active==9?'active':' ' }}">
+                <li class="menu-item {{ request()->routeIs('legajos.*') ? 'active' : '' }}">
                   <a href="{{ route('legajos.index') }}" class="menu-link">
                     <div data-i18n="Empleados activos">Empleados activos</div>
                   </a>
                 </li>
-                <li class="menu-item {{ $active==10?'active':' ' }}">
+                <li class="menu-item {{ request()->routeIs('bajas.*') ? 'active' : '' }}">
                   <a href="/bajas" class="menu-link">
                     <div data-i18n="Empleados de Baja">Empleados de Baja</div>
                   </a>
                 </li>
               </ul>
             </li>
+            <!-- Liquidaciones -->
+            <li class="menu-item {{ request()->is('liquidacion/*') ? 'active open' : '' }}">
+              <a href="javascript:void(0);" class="menu-link menu-toggle">
+                <i class="menu-icon tf-icons ri-money-dollar-circle-line"></i>
+                <div data-i18n="Liquidaciones">Liquidaciones</div>
+              </a>
+              <ul class="menu-sub">
+                <li class="menu-item {{ request()->is('liquidacion/periodos*') ? 'active' : '' }}">
+                  <a href="{{ route('liquidacion.periodos.index') }}" class="menu-link">
+                    <div data-i18n="Períodos">Períodos</div>
+                  </a>
+                </li>
+                <li class="menu-item {{ request()->routeIs('liquidacion.conceptos.*') ? 'active' : '' }}">
+                  <a href="{{ route('liquidacion.conceptos.index') }}" class="menu-link">
+                    <div data-i18n="Conceptos">Conceptos</div>
+                  </a>
+                </li>
+                <li class="menu-item {{ request()->routeIs('liquidacion.individual.*') ? 'active' : '' }}">
+                  <a href="{{ route('liquidacion.individual.index') }}" class="menu-link">
+                    <div data-i18n="Liquidación individual">Liquidación individual</div>
+                  </a>
+                </li>
+                <li class="menu-item {{ request()->is('liquidacion/lote*') ? 'active' : '' }}">
+                  <a href="#" class="menu-link">
+                    <div data-i18n="Liquidación por lote">Liquidación por lote</div>
+                  </a>
+                </li>
+                <li class="menu-item {{ request()->is('liquidacion/ganancias*') ? 'active' : '' }}">
+                  <a href="#" class="menu-link">
+                    <div data-i18n="Liquidación de ganancias">Liquidación de ganancias</div>
+                  </a>
+                </li>
+              </ul>
+            </li>
             <!-- Libro de sueldo digital -->
-            <li class="menu-item  {{ $active>=20?'active open':' ' }}">
+            <li class="menu-item {{ request()->routeIs('sicoss.importar*') || request()->routeIs('arca.importar*') || request()->routeIs('basedat.*') || request()->routeIs('lsd.*') ? 'active open' : '' }}">
               <a href="javascript:void(0);" class="menu-link menu-toggle">
                 <i class="menu-icon tf-icons ri-bill-line"></i>
                 <div data-i18n="Libro Sueldo Digital">Libro Sueldo Digital</div>
               </a>
               <ul class="menu-sub">
-                <li class="menu-item {{ $active==9?'active':' ' }}">
+                <li class="menu-item {{ request()->routeIs('sicoss.importar*') ? 'active' : '' }}">
                   <a href="{{ route('sicoss.importar') }}" class="menu-link">
                     <div data-i18n="Importar legajos Sicoss">Importar legajos Sicoss</div>
                   </a>
                 </li>
-                <li class="menu-item {{ $active==10?'active':' ' }}">
+                <li class="menu-item {{ request()->routeIs('arca.importar*') ? 'active' : '' }}">
                   <a href="{{ route('arca.importar') }}" class="menu-link">
                     <div data-i18n="Importar conceptos ARCA">Importar conceptos ARCA</div>
                   </a>
                 </li>
-                <li class="menu-item {{ $active==10?'active':' ' }}">
+                <li class="menu-item {{ request()->routeIs('basedat.*') ? 'active' : '' }}">
                   <a href="{{ route('basedat.importar') }}" class="menu-link">
                     <div data-i18n="Importar liquidación de haberes">Importar liquidación de haberes</div>
                   </a>
                 </li>
-                <li class="menu-item {{ $active==10?'active':' ' }}">
+                <li class="menu-item {{ request()->routeIs('lsd.*') ? 'active' : '' }}">
                   <a href="{{ route('lsd.generar') }}" class="menu-link">
                     <div data-i18n="Generar LSD">Generar LSD</div>
                   </a>
@@ -386,8 +426,11 @@
           <!-- Content wrapper -->
           <div class="content-wrapper">
             <!-- Content -->
-            <!-- {{-- @yield('content') --}} -->
-            @inertia
+            @if(isset($page))
+                @inertia
+            @else
+                @yield('content')
+            @endif
             <!-- / Content -->
 
             <!-- Footer -->
@@ -447,7 +490,9 @@
 
     <!-- Main JS -->
     <script src="{{ asset('/js/main.js') }}"></script>
+    @if(isset($page))
     @vite(['resources/js/app.js', "resources/js/Pages/{$page['component']}.vue"])
+    @endif
 
     @yield('scripts')
 

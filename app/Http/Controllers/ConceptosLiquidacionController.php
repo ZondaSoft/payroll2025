@@ -99,7 +99,7 @@ class ConceptosLiquidacionController extends Controller
         $validated = $request->validate([
             'codigo' => 'required|integer|min:0|max:999999|unique:sue102s,codigo',
             'detalle' => 'required|string|max:250',
-            'tipo' => 'required|integer|min:1|max:9',
+            'tipo' => 'required|string|in:H,D,NR,AS,GC,DG,R,AP,AU',
             'formula' => 'nullable|string',
             'porcentaje' => 'nullable|numeric|min:0|max:100',
             'importe_fijo' => 'nullable|numeric|min:0',
@@ -114,6 +114,10 @@ class ConceptosLiquidacionController extends Controller
             'sicoss_afecta' => 'boolean',
             'gcias_afecta' => 'boolean',
             'concepto_arca' => 'nullable|string',
+        ], [
+            'tipo.required' => 'El tipo de concepto es obligatorio.',
+            'tipo.string' => 'El tipo de concepto es obligatorio.',
+            'tipo.in'       => 'El tipo debe ser uno de los siguientes valores: H, D, NR, AS, GC, DG, R, AP, AU.',
         ]);
 
         // Recortar concepto_arca a 6 caracteres
@@ -196,7 +200,7 @@ class ConceptosLiquidacionController extends Controller
     {
         $validated = $request->validate([
             'detalle' => 'required|string|max:250',
-            'tipo' => 'required|integer|min:1|max:9',
+            'tipo' => 'required|string|in:H,D,NR,AS,GC,DG,R,AP,AU',
             'formula' => 'nullable|string',
             'porcentaje' => 'nullable|numeric|min:0|max:100',
             'importe_fijo' => 'nullable|numeric|min:0',
@@ -211,6 +215,10 @@ class ConceptosLiquidacionController extends Controller
             'sicoss_afecta' => 'boolean',
             'gcias_afecta' => 'boolean',
             'concepto_arca' => 'nullable|string',
+        ], [
+            'tipo.required' => 'El tipo de concepto es obligatorio.',
+            'tipo.string' => 'El tipo de concepto es obligatorio.',
+            'tipo.in'       => 'El tipo debe ser uno de los siguientes valores: H, D, NR, AS, GC, DG, R, AP, AU.',
         ]);
 
         // Recortar concepto_arca a 6 caracteres
@@ -220,7 +228,7 @@ class ConceptosLiquidacionController extends Controller
 
         $concepto->update($validated);
 
-        return redirect()->route('liquidacion.conceptos.index')
+        return redirect()->route('liquidacion.conceptos.show', $concepto->id)
             ->with('success', 'Concepto de liquidación actualizado exitosamente.');
     }
 

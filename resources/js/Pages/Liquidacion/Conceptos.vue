@@ -172,6 +172,13 @@ const conceptosFiltrados = computed(() => {
     });
 });
 
+// Obtener el concepto completo (código - descripción) si está seleccionado
+const conceptoArcaSeleccionado = computed(() => {
+    if (!form.concepto_arca) return '';
+    const concepto = conceptosArca.value.find(c => c.id === form.concepto_arca);
+    return concepto ? concepto.text : form.concepto_arca;
+});
+
 const setFocus = () => {
     if (modoAgregar.value) {
         txttipo.value?.focus();
@@ -267,16 +274,23 @@ const buscarConceptosArca = async (search) => {
 };
 
 // Cargar concepto seleccionado en la entrada
-const cargarConceptoSeleccionado = () => {
-    if (form.concepto_arca) {
-        // Buscar el concepto en la lista y mostrar su texto
-        const concepto = conceptosArca.value.find(c => c.id === form.concepto_arca);
-        if (concepto) {
-            conceptoSearchInput.value = concepto.text;
-        } else {
-            conceptoSearchInput.value = form.concepto_arca;
-        }
+const cargarConceptoSeleccionado = async () => {
+    if (!form.concepto_arca) {
+        conceptoSearchInput.value = '';
+        return;
     }
+    // Buscar primero en la lista ya cargada
+    let concepto = conceptosArca.value.find(c => c.id === form.concepto_arca);
+    if (concepto) {
+        conceptoSearchInput.value = concepto.text;
+        return;
+    }
+    // Si no está en los primeros 100, hacer búsqueda dirigida
+    await buscarConceptosArca(form.concepto_arca);
+    concepto = conceptosArca.value.find(c => c.id === form.concepto_arca);
+    conceptoSearchInput.value = concepto ? concepto.text : form.concepto_arca;
+    // Restaurar lista completa en background para el dropdown
+    buscarConceptosArca('');
 };
 
 // Cerrar el dropdown después de perder el foco
@@ -285,6 +299,34 @@ const cerrarDropdownConDelay = () => {
         showConceptoDropdown.value = false;
         selectedConceptoIndex.value = -1;
     }, 200);
+};
+
+// Abrir dropdown y auto-seleccionar el concepto que coincida con los datos cargados
+const abrirDropdownYSeleccionar = async () => {
+    isFocused.value = true;
+    showConceptoDropdown.value = true;
+    await buscarConceptosArca('');
+    
+    // Auto-seleccionar el primer elemento que coincida con form.concepto_arca
+    if (form.concepto_arca) {
+        const indiceCoincidencia = conceptosFiltrados.value.findIndex(c => c.id === form.concepto_arca);
+        if (indiceCoincidencia >= 0) {
+            selectedConceptoIndex.value = indiceCoincidencia;
+            // Hacer scroll para mostrar el elemento seleccionado y los siguientes
+            nextTick(() => {
+                const dropdown = document.querySelector('.position-absolute[style*="z-index: 1000"]');
+                if (dropdown) {
+                    const items = dropdown.querySelectorAll('div[class*="px-3"]');
+                    if (items[indiceCoincidencia]) {
+                        items[indiceCoincidencia].scrollIntoView({ block: 'start' });
+                    }
+                }
+            });
+        }
+    } else if (conceptosFiltrados.value.length > 0) {
+        // Si no hay concepto seleccionado, seleccionar el primero
+        selectedConceptoIndex.value = 0;
+    }
 };
 
 // Manejar navegación del dropdown con teclas de dirección
@@ -386,6 +428,30 @@ watch(() => form.codigo, () => {
         validarCodigoEnRango();
     }
 });
+
+// Sincronizar form y conceptoSearchInput cuando Inertia actualiza props.concepto (navegación)
+watch(() => props.concepto, (nuevo) => {
+    if (!nuevo) return;
+    form.id             = nuevo.id ?? null;
+    form.codigo         = nuevo.codigo ?? 0;
+    form.detalle        = nuevo.detalle ?? '';
+    form.tipo           = nuevo.tipo ?? '';
+    form.formula        = nuevo.formula ?? '';
+    form.porcentaje     = nuevo.porcentaje ?? null;
+    form.importe_fijo   = nuevo.importe_fijo ?? null;
+    form.imponible      = nuevo.imponible ?? true;
+    form.afecta_sac     = nuevo.afecta_sac ?? true;
+    form.afecta_vacaciones = nuevo.afecta_vacaciones ?? true;
+    form.imprime_recibo = nuevo.imprime_recibo ?? true;
+    form.orden_impresion = nuevo.orden_impresion ?? null;
+    form.activo         = nuevo.activo ?? true;
+    form.cuenta_contable = nuevo.cuenta_contable ?? '';
+    form.observaciones  = nuevo.observaciones ?? '';
+    form.sicoss_afecta  = nuevo.sicoss_afecta ?? false;
+    form.gcias_afecta   = nuevo.gcias_afecta ?? false;
+    form.concepto_arca  = nuevo.concepto_arca ?? null;
+    cargarConceptoSeleccionado();
+}, { deep: true });
 
 // Función para pasar el foco del tipo al código
 const moverFocoACodigoDesdeSelect = () => {
@@ -662,9 +728,10 @@ const moverFocoACodigoDesdeSelect = () => {
                                             <input
                                                 type="text"
                                                 id="concepto_arca"
+                                                name="concepto_arca"
                                                 class="form-control pe-5"
                                                 v-model="conceptoSearchInput"
-                                                @focus="() => { isFocused = true; showConceptoDropdown = true; buscarConceptosArca(''); }"
+                                                @focus="abrirDropdownYSeleccionar"
                                                 @blur="() => { isFocused = false; cerrarDropdownConDelay(); }"
                                                 @input="buscarConceptosArca(conceptoSearchInput)"
                                                 @keydown="manejarNavegacionDropdown"
@@ -701,8 +768,7 @@ const moverFocoACodigoDesdeSelect = () => {
                                                     @mouseleave="selectedConceptoIndex = -1"
                                                     style="cursor: pointer;"
                                                 >
-                                                    <div class="fw-bold">{{ concepto.id }}</div>
-                                                    <div class="small text-muted">{{ concepto.text.split(' - ')[1] }}</div>
+                                                    <div class="text-body">{{ concepto.text }}</div>
                                                 </div>
                                             </div>
                                             <!-- Indicador de carga -->
@@ -712,8 +778,8 @@ const moverFocoACodigoDesdeSelect = () => {
                                             <InputError class="mt-2" :message="form.errors.concepto_arca" />
                                         </div>
                                         <!-- Modo visualización (no edición) -->
-                                        <div v-else class="form-control bg-light text-muted" style="cursor: not-allowed;">
-                                            <span v-if="form.concepto_arca">{{ form.concepto_arca }}</span>
+                                        <div v-else class="form-control bg-light" style="cursor: not-allowed;">
+                                            <span v-if="conceptoArcaSeleccionado" class="text-body">{{ conceptoArcaSeleccionado }}</span>
                                             <span v-else class="text-muted">(vacío)</span>
                                         </div>
                                     </div>
