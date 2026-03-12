@@ -1031,8 +1031,10 @@ watch(() => props.agregar, () => {
                                             </div>
 
                                             <div class="col-md-4">
-                                                <div class="form-floating form-floating-outline">
+                                                <div class="ms-float-outline">
                                                     <Multiselect
+                                                        id="obra_sijp"
+                                                        name="obra_sijp"
                                                         v-model="form.obra_sijp"
                                                         :options="obrasOptions"
                                                         :searchable="true"
@@ -1043,7 +1045,7 @@ watch(() => props.agregar, () => {
                                                         :disabled="!edicion"
                                                         :class="{'is-invalid': form.errors.obra_sijp}"
                                                     />
-                                                    <label>Obra Social</label>
+                                                    <label for="obra_sijp">Obra Social</label>
                                                 </div>
                                                 <div class="text-danger small mt-1" v-if="form.errors.obra_sijp">
                                                     {{ form.errors.obra_sijp }}
@@ -1576,30 +1578,41 @@ watch(() => props.agregar, () => {
 
 <style src="@vueform/multiselect/themes/default.css"></style>
 <style>
-/* ── Multiselect adaptado a form-floating-outline de Materialize ── */
+/* ── Multiselect con label flotante, estilo form-floating-outline de Materialize ── */
 
-/* 1. Control: geometría y colores alineados al form-select de la plantilla */
-.form-floating.form-floating-outline .multiselect {
-    --ms-border-color:         #cfd0d6;
-    --ms-border-color-active:  #666cff;
-    --ms-border-width:         1px;
-    --ms-border-width-active:  2px;
-    --ms-radius:               0.5rem;
-    --ms-font-size:            0.9375rem;
-    --ms-line-height:          1.375;
-    --ms-py:                   0.8455rem;
-    --ms-px:                   0.99rem;
-    --ms-ring-width:           0px;
-    --ms-bg-disabled:          transparent;
-    --ms-option-bg-selected:         #666cff;
-    --ms-option-bg-selected-pointed: #5f64e8;
-    --ms-option-color-selected:      #fff;
-    --ms-option-color-selected-pointed: #fff;
-    height: 3.0000625rem;
+/* Wrapper propio: solo position:relative, sin interferencia de Bootstrap form-floating */
+.ms-float-outline {
+    position: relative;
 }
 
-/* 2. Label siempre flotada sobre el borde (igual que <select> en form-floating-outline) */
-.form-floating.form-floating-outline .multiselect ~ label {
+/* Control: geometría y colores alineados al form-select de la plantilla */
+.ms-float-outline .multiselect {
+    --ms-border-color:                  #cfd0d6;
+    --ms-border-color-active:           #666cff;
+    --ms-border-width:                  1px;
+    --ms-border-width-active:           2px;
+    --ms-radius:                        0.5rem;
+    --ms-font-size:                     0.9375rem;
+    --ms-line-height:                   1.375;
+    --ms-py:                            0.8455rem;
+    --ms-px:                            0.99rem;
+    --ms-ring-width:                    0px;
+    --ms-bg-disabled:                   var(--bs-secondary-bg);
+    --ms-option-bg-selected:            #666cff;
+    --ms-option-bg-selected-pointed:    #5f64e8;
+    --ms-option-color-selected:         #fff;
+    --ms-option-color-selected-pointed: #fff;
+    height: calc(3.0000625rem + 2px);
+}
+
+/* Evita que el wrapper desborde el borde del multiselect cuando está habilitado */
+.ms-float-outline .multiselect-wrapper {
+    align-self: stretch;
+    min-height: 0;
+}
+
+/* Label siempre flotada sobre el borde (igual que <select> en form-floating-outline) */
+.ms-float-outline .multiselect ~ label {
     position: absolute;
     top: 0;
     left: 0;
@@ -1614,39 +1627,27 @@ watch(() => props.agregar, () => {
     font-size: 0.8125rem;
     line-height: 1.375;
     color: #a8aab4;
-    opacity: 1;
+    background: var(--bs-card-bg);
     transition: color 0.15s ease-in-out;
 }
 
-/* 3. Fondo blanco que "corta" el borde bajo el texto del label */
-.form-floating.form-floating-outline .multiselect ~ label::after {
-    content: "";
-    position: absolute;
-    inset-inline-start: 0;
-    top: 0.35rem;
-    z-index: -1;
-    width: 100%;
-    height: 3px;
-    background: #fff;
-}
-
-/* 4. Estado activo/abierto: label en color primario */
-.form-floating.form-floating-outline .multiselect.is-open ~ label,
-.form-floating.form-floating-outline .multiselect.is-active ~ label {
+/* Estado activo/abierto: label en color primario */
+.ms-float-outline .multiselect.is-open ~ label,
+.ms-float-outline .multiselect.is-active ~ label {
     color: #666cff;
 }
 
-/* 5. Estado inválido */
-.form-floating.form-floating-outline .multiselect.is-invalid {
+/* Estado inválido */
+.ms-float-outline .multiselect.is-invalid {
     --ms-border-color:        #ff3e1d;
     --ms-border-color-active: #ff3e1d;
 }
-.form-floating.form-floating-outline .multiselect.is-invalid ~ label {
+.ms-float-outline .multiselect.is-invalid ~ label {
     color: #ff3e1d;
 }
 
-/* 6. Disabled */
-.form-floating.form-floating-outline .multiselect.is-disabled {
+/* Disabled */
+.ms-float-outline .multiselect.is-disabled {
     opacity: 0.65;
 }
 </style>

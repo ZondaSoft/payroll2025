@@ -957,7 +957,7 @@ watch(() => props.agregar, () => {
                                             </div>
 
                                             <div class="col-md-4">
-                                                <div class="form-floating form-floating-outline">
+                                                <div class="ms-float-outline">
                                                     <Multiselect
                                                         v-model="form.cod_obsoc"
                                                         :options="obrasOptions"
@@ -1438,7 +1438,11 @@ watch(() => props.agregar, () => {
 <style>
 /* ── Multiselect adaptado a form-floating-outline de Materialize ── */
 
-.form-floating.form-floating-outline .multiselect {
+.ms-float-outline {
+    position: relative;
+}
+
+.ms-float-outline .multiselect {
     --ms-border-color:         #cfd0d6;
     --ms-border-color-active:  #666cff;
     --ms-border-width:         1px;
@@ -1449,15 +1453,21 @@ watch(() => props.agregar, () => {
     --ms-py:                   0.8455rem;
     --ms-px:                   0.99rem;
     --ms-ring-width:           0px;
-    --ms-bg-disabled:          transparent;
-    --ms-option-bg-selected:         #666cff;
-    --ms-option-bg-selected-pointed: #5f64e8;
-    --ms-option-color-selected:      #fff;
+    --ms-bg-disabled:          var(--bs-secondary-bg);
+    --ms-option-bg-selected:            #666cff;
+    --ms-option-bg-selected-pointed:    #5f64e8;
+    --ms-option-color-selected:         #fff;
     --ms-option-color-selected-pointed: #fff;
-    height: 3.0000625rem;
+    height: calc(3.0000625rem + 2px);
 }
 
-.form-floating.form-floating-outline .multiselect ~ label {
+/* Evita que el wrapper desborde el borde del multiselect cuando está habilitado */
+.ms-float-outline .multiselect-wrapper {
+    align-self: stretch;
+    min-height: 0;
+}
+
+.ms-float-outline .multiselect ~ label {
     position: absolute;
     top: 0;
     left: 0;
@@ -1472,27 +1482,16 @@ watch(() => props.agregar, () => {
     font-size: 0.8125rem;
     line-height: 1.375;
     color: #a8aab4;
-    opacity: 1;
+    background: var(--bs-card-bg);
     transition: color 0.15s ease-in-out;
 }
 
-.form-floating.form-floating-outline .multiselect ~ label::after {
-    content: "";
-    position: absolute;
-    inset-inline-start: 0;
-    top: 0.35rem;
-    z-index: -1;
-    width: 100%;
-    height: 3px;
-    background: #fff;
-}
-
-.form-floating.form-floating-outline .multiselect.is-open ~ label,
-.form-floating.form-floating-outline .multiselect.is-active ~ label {
+.ms-float-outline .multiselect.is-open ~ label,
+.ms-float-outline .multiselect.is-active ~ label {
     color: #666cff;
 }
 
-.form-floating.form-floating-outline .multiselect.is-disabled {
+.ms-float-outline .multiselect.is-disabled {
     opacity: 0.65;
 }
 </style>
