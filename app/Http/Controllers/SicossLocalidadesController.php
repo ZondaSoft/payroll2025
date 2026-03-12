@@ -165,9 +165,9 @@ class SicossLocalidadesController extends Controller
         ]);
     }
 
-    public function edit(SicossZona $actividad)
+    public function edit(SicossZona $localidad)
     {
-        if (!$actividad->exists) {
+        if (!$localidad->exists) {
             return redirect()
                 ->route('sicoss.localidades.index')
                 ->with('warning', 'No hay registros para modificar.');
@@ -177,7 +177,7 @@ class SicossLocalidadesController extends Controller
         if (!$empresa) return redirect('/empresa/');
 
         return Inertia::render('Sicoss/Localidades', [
-            'legajo' => $actividad,
+            'legajo' => $localidad,
             'agregar' => false,
             'edicion' => true,
             'active' => 64,
@@ -186,29 +186,29 @@ class SicossLocalidadesController extends Controller
     }
 
     /**
-     * Actualiza un actividad en la base de datos
+     * Actualiza una localidad en la base de datos
      */
-    public function update(Request $request, SicossZona $actividad)
+    public function update(Request $request, SicossZona $localidad)
     {
         $validated = $request->validate([
             'detalle' => 'required|string|max:100',
         ]);
 
-        $actividad->update($validated);
+        $localidad->update($validated);
 
         return redirect()->route('sicoss.localidades.index')
-            ->with('success', 'Actividad actualizada exitosamente.');
+            ->with('success', 'Localidad actualizada exitosamente.');
     }
 
     /**
-     * Elimina un actividad de la base de datos
+     * Elimina una localidad de la base de datos
      */
-    public function destroy(SicossZona $actividad)
+    public function destroy(SicossZona $localidad)
     {
-        $actividad->delete();
+        $localidad->delete();
 
         return redirect()->route('sicoss.localidades.index')
-            ->with('success', 'Actividad eliminada exitosamente.');
+            ->with('success', 'Localidad eliminada exitosamente.');
     }
 
     // Primer registro

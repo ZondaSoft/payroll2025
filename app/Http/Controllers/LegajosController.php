@@ -240,12 +240,12 @@ class LegajosController extends Controller
     public function store(Request $request)
     {
         $validated = $request->validate([
-            'codigo' => 'required|numeric|unique:empleados,dni',
+            'codigo' => 'required|numeric|unique:sue001s,codigo',
             'detalle' => 'required|string|max:100',
             'nombres' => 'required|string|max:100',
             'fecha_naci' => 'required|date',
             'sexo' => 'required|in:Masculino,Femenino,Otro',
-            'email' => 'required|email|max:100|unique:empleados,email',
+            'email' => 'required|email|max:100|unique:sue001s,email',
             'telefono' => 'nullable|string|max:20',
             'direccion' => 'nullable|string|max:255',
             'fecha_ingreso' => 'required|date',
@@ -380,38 +380,83 @@ class LegajosController extends Controller
     /**
      * Actualiza un empleado en la base de datos
      */
-    public function update(Request $request, Sue001 $empleado)
+    public function update(Request $request, $id)
     {
+        $legajo = Sue001::findOrFail($id);
+
         $validated = $request->validate([
-            'codigo' => 'required|string|max:20|unique:empleados,dni,' . $empleado->id,
-            'detalle' => 'required|string|max:100',
-            'nombres' => 'required|string|max:100',
-            'fecha_naci' => 'required|date',
-            'sexo' => 'required|in:Masculino,Femenino,Otro',
-            'email' => 'required|email|max:100|unique:empleados,email,' . $empleado->id,
-            'telefono' => 'nullable|string|max:20',
-            'direccion' => 'nullable|string|max:255',
-            'fecha_ingreso' => 'required|date',
-            'puesto' => 'required|string|max:100',
-            'salario' => 'required|numeric|min:0',
-            'estado' => 'required|boolean',
+            'detalle'           => 'required|string|max:100',
+            'nombres'           => 'required|string|max:100',
+            'email'             => 'nullable|email|max:100',
+            'cuil'              => 'required|string|max:13',
+            'fecha_naci'        => 'nullable|date',
+            'obra_sijp'         => 'required|string|max:6',
+            'sexo'              => 'nullable|string|max:20',
+        ], [
+            'detalle.required' => 'El campo Apellidos es obligatorio.',
+            'nombres.required' => 'El campo Nombres es obligatorio.',
+            'email.required'   => 'El campo Correo electrónico es obligatorio.',
+            'email.email'      => 'El Correo electrónico no tiene un formato válido.',
+            'email.unique'     => 'El Correo electrónico ya está registrado.',
+            'est_civil'         => 'nullable|string|max:20',
+            'nacionali'         => 'nullable|string|max:10',
+            'provin'            => 'nullable|string|max:10',
+            'salud'             => 'nullable|string|max:10',
+            'alta'              => 'nullable|date',
+            'fecha_vto'         => 'nullable|date',
+            'activo'            => 'nullable|boolean',
+            'grupo_emp'         => 'nullable|string|max:10',
+            'cod_centro'        => 'nullable|string|max:10',
+            'cod_jerarq'        => 'nullable|string|max:10',
+            'cod_categ'         => 'nullable|string|max:10',
+            'codsector'         => 'nullable|string|max:10',
+            'cuadrilla'         => 'nullable|string|max:10',
+            'obra_sijp'         => 'La obra social es obligatoria.',
+            'cod_sindic'        => 'nullable|string|max:10',
+            'situacion'         => 'nullable|string|max:10',
+            'cod_contra'        => 'nullable|string|max:10',
+            'jornada_id'        => 'nullable|integer',
+            'convenio'          => 'nullable|string|max:10',
+            'tarea'             => 'nullable|string|max:100',
+            'bruto'             => 'nullable|numeric|min:0',
+            'bruto_azul'        => 'nullable|numeric|min:0',
+            'domici'            => 'nullable|string|max:255',
+            'nro'               => 'nullable|string|max:20',
+            'piso'              => 'nullable|string|max:10',
+            'dpto'              => 'nullable|string|max:10',
+            'locali'            => 'nullable|string|max:100',
+            'tel1'              => 'nullable|string|max:20',
+            'tel2'              => 'nullable|string|max:20',
+            'tel3'              => 'nullable|string|max:20',
+            'web'               => 'nullable|string|max:255',
+            'sicoss_activ'      => 'nullable|string|max:10',
+            'sicoss_condi'      => 'nullable|string|max:10',
+            'sicoss_modal'      => 'nullable|string|max:10',
+            'sicoss_situa'      => 'nullable|string|max:10',
+            'sicoss_ooss'       => 'nullable|string|max:10',
+            'sicoss_zona'       => 'nullable|string|max:10',
+            'sicoss_sini'       => 'nullable|string|max:10',
+            'sicoss_conyuge'    => 'nullable|boolean',
+            'sicoss_hijos'      => 'nullable|boolean',
+            'sicoss_adherentes' => 'nullable|integer|min:0|max:99',
         ]);
 
-        $empleado->update($validated);
+        $legajo->update($validated);
 
-        return redirect()->route('empleados.index')
-            ->with('success', 'Empleado actualizado exitosamente.');
+        return redirect()->route('legajos.show', $legajo->id)
+            ->with('success', 'Legajo actualizado exitosamente.');
     }
 
     /**
-     * Elimina un empleado de la base de datos
+     * Elimina un legajo de la base de datos
      */
-    public function destroy(Sue001 $empleado)
+    public function destroy($id)
     {
-        $empleado->delete();
+        $legajo = Sue001::findOrFail($id);
+        $legajo->delete();
 
-        return redirect()->route('empleados.index')
-            ->with('success', 'Empleado eliminado exitosamente.');
+        return redirect()->route('legajos.index')
+            ->with('success', 'Legajo eliminado exitosamente.');
     }
 
     // Primer registro
@@ -463,11 +508,11 @@ class LegajosController extends Controller
             ->first()?->id;
 
         if (!$nextId) {
-            return redirect()->route('legajos.index', $id)
+            return redirect()->route('legajos.show', $id)
                 ->with('warning', 'No hay registro siguiente');
         }
 
-        return redirect()->route('legajos.index', $nextId);
+        return redirect()->route('legajos.show', $nextId);
     }
 
     // Búsqueda

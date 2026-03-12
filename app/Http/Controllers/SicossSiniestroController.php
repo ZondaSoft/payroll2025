@@ -166,9 +166,9 @@ class SicossSiniestroController extends Controller
         ]);
     }
 
-    public function edit(SicossSinie $actividad)
+    public function edit(SicossSinie $siniestro)
     {
-        if (!$actividad->exists) {
+        if (!$siniestro->exists) {
             return redirect()
                 ->route('sicoss.siniestros.index')
                 ->with('warning', 'No hay registros para modificar.');
@@ -178,7 +178,7 @@ class SicossSiniestroController extends Controller
         if (!$empresa) return redirect('/empresa/');
 
         return Inertia::render('Sicoss/Sinie', [
-            'legajo' => $actividad,
+            'legajo' => $siniestro,
             'agregar' => false,
             'edicion' => true,
             'active' => 64,
@@ -187,29 +187,29 @@ class SicossSiniestroController extends Controller
     }
 
     /**
-     * Actualiza un actividad en la base de datos
+     * Actualiza un siniestro en la base de datos
      */
-    public function update(Request $request, SicossSinie $actividad)
+    public function update(Request $request, SicossSinie $siniestro)
     {
         $validated = $request->validate([
             'detalle' => 'required|string|max:100',
         ]);
 
-        $actividad->update($validated);
+        $siniestro->update($validated);
 
         return redirect()->route('sicoss.siniestros.index')
-            ->with('success', 'Condición actualizada exitosamente.');
+            ->with('success', 'Siniestro actualizado exitosamente.');
     }
 
     /**
-     * Elimina un actividad de la base de datos
+     * Elimina un siniestro de la base de datos
      */
-    public function destroy(SicossSinie $actividad)
+    public function destroy(SicossSinie $siniestro)
     {
-        $actividad->delete();
+        $siniestro->delete();
 
         return redirect()->route('sicoss.siniestros.index')
-            ->with('success', 'Condición eliminada exitosamente.');
+            ->with('success', 'Siniestro eliminado exitosamente.');
     }
 
     // Primer registro

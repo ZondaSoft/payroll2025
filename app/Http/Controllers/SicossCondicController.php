@@ -165,9 +165,9 @@ class SicossCondicController extends Controller
         ]);
     }
 
-    public function edit(Sicoss05 $actividad)
+    public function edit(Sicoss05 $condicion)
     {
-        if (!$actividad->exists) {
+        if (!$condicion->exists) {
             return redirect()
                 ->route('sicoss.condiciones.index')
                 ->with('warning', 'No hay registros para modificar.');
@@ -177,7 +177,7 @@ class SicossCondicController extends Controller
         if (!$empresa) return redirect('/empresa/');
 
         return Inertia::render('Sicoss/Condiciones', [
-            'legajo' => $actividad,
+            'legajo' => $condicion,
             'agregar' => false,
             'edicion' => true,
             'active' => 64,
@@ -186,26 +186,26 @@ class SicossCondicController extends Controller
     }
 
     /**
-     * Actualiza un actividad en la base de datos
+     * Actualiza una condición en la base de datos
      */
-    public function update(Request $request, Sicoss05 $actividad)
+    public function update(Request $request, Sicoss05 $condicion)
     {
         $validated = $request->validate([
             'detalle' => 'required|string|max:100',
         ]);
 
-        $actividad->update($validated);
+        $condicion->update($validated);
 
         return redirect()->route('sicoss.condiciones.index')
             ->with('success', 'Condición actualizada exitosamente.');
     }
 
     /**
-     * Elimina un actividad de la base de datos
+     * Elimina una condición de la base de datos
      */
-    public function destroy(Sicoss05 $actividad)
+    public function destroy(Sicoss05 $condicion)
     {
-        $actividad->delete();
+        $condicion->delete();
 
         return redirect()->route('sicoss.condiciones.index')
             ->with('success', 'Condición eliminada exitosamente.');

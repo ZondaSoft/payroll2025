@@ -6,5 +6,5 @@ use Illuminate\Database\Eloquent\Model;
 
 class Sicoss12 extends Model
 {
-    //
+    protected $fillable = ['codigo', 'detalle'];
 }

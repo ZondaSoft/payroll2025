@@ -165,9 +165,9 @@ class SicossSituacionController extends Controller
         ]);
     }
 
-    public function edit(Sicoss12 $actividad)
+    public function edit(Sicoss12 $situacion)
     {
-        if (!$actividad->exists) {
+        if (!$situacion->exists) {
             return redirect()
                 ->route('sicoss.situacion.index')
                 ->with('warning', 'No hay registros para modificar.');
@@ -177,7 +177,7 @@ class SicossSituacionController extends Controller
         if (!$empresa) return redirect('/empresa/');
 
         return Inertia::render('Sicoss/Situacion', [
-            'legajo' => $actividad,
+            'legajo' => $situacion,
             'agregar' => false,
             'edicion' => true,
             'active' => 64,
@@ -186,29 +186,29 @@ class SicossSituacionController extends Controller
     }
 
     /**
-     * Actualiza un actividad en la base de datos
+     * Actualiza una situación en la base de datos
      */
-    public function update(Request $request, Sicoss12 $actividad)
+    public function update(Request $request, Sicoss12 $situacion)
     {
         $validated = $request->validate([
             'detalle' => 'required|string|max:100',
         ]);
 
-        $actividad->update($validated);
+        $situacion->update($validated);
 
         return redirect()->route('sicoss.situacion.index')
-            ->with('success', 'Condición actualizada exitosamente.');
+            ->with('success', 'Situación actualizada exitosamente.');
     }
 
     /**
-     * Elimina un actividad de la base de datos
+     * Elimina una situación de la base de datos
      */
-    public function destroy(Sicoss12 $actividad)
+    public function destroy(Sicoss12 $situacion)
     {
-        $actividad->delete();
+        $situacion->delete();
 
         return redirect()->route('sicoss.situacion.index')
-            ->with('success', 'Condición eliminada exitosamente.');
+            ->with('success', 'Situación eliminada exitosamente.');
     }
 
     // Primer registro

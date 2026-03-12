@@ -213,7 +213,7 @@ Route::middleware('auth')->group(function () {
 
     // Resource al final
     Route::resource('sicoss/localidades', SicossLocalidadesController::class)
-        ->parameters(['localidades' => 'siniestro'])
+        ->parameters(['localidades' => 'localidad'])
         ->names('sicoss.localidades');
 
     //--------------------------------------------

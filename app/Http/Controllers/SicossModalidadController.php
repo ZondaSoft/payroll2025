@@ -165,9 +165,9 @@ class SicossModalidadController extends Controller
         ]);
     }
 
-    public function edit(Sicoss08 $actividad)
+    public function edit(Sicoss08 $modalidad)
     {
-        if (!$actividad->exists) {
+        if (!$modalidad->exists) {
             return redirect()
                 ->route('sicoss.modalidades.index')
                 ->with('warning', 'No hay registros para modificar.');
@@ -177,7 +177,7 @@ class SicossModalidadController extends Controller
         if (!$empresa) return redirect('/empresa/');
 
         return Inertia::render('Sicoss/Modalidades', [
-            'legajo' => $actividad,
+            'legajo' => $modalidad,
             'agregar' => false,
             'edicion' => true,
             'active' => 64,
@@ -186,29 +186,29 @@ class SicossModalidadController extends Controller
     }
 
     /**
-     * Actualiza un actividad en la base de datos
+     * Actualiza una modalidad en la base de datos
      */
-    public function update(Request $request, Sicoss08 $actividad)
+    public function update(Request $request, Sicoss08 $modalidad)
     {
         $validated = $request->validate([
             'detalle' => 'required|string|max:100',
         ]);
 
-        $actividad->update($validated);
+        $modalidad->update($validated);
 
         return redirect()->route('sicoss.modalidades.index')
-            ->with('success', 'Condición actualizada exitosamente.');
+            ->with('success', 'Modalidad actualizada exitosamente.');
     }
 
     /**
-     * Elimina un actividad de la base de datos
+     * Elimina una modalidad de la base de datos
      */
-    public function destroy(Sicoss08 $actividad)
+    public function destroy(Sicoss08 $modalidad)
     {
-        $actividad->delete();
+        $modalidad->delete();
 
         return redirect()->route('sicoss.modalidades.index')
-            ->with('success', 'Condición eliminada exitosamente.');
+            ->with('success', 'Modalidad eliminada exitosamente.');
     }
 
     // Primer registro

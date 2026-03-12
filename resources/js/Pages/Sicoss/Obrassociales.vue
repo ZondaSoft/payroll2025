@@ -294,7 +294,7 @@ watch(() => props.agregar, () => {
                                             </div>
 
                                             <div class="row mt-6 col-md-12">
-                                                <div class="col-md-6">
+                                                <div class="col-md-8    ">
                                                     <div class="form-floating form-floating-outline">
                                                         <input
                                                             type="text"

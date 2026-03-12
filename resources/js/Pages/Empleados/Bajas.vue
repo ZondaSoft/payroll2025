@@ -4,8 +4,9 @@
 // import PrimaryButton from '@/Components/PrimaryButton.vue';
 import TextInput from '@/Components/TextInput.vue';
 import InputError from '@/Components/InputError.vue';
+import Multiselect from '@vueform/multiselect';
 import { Link, useForm, usePage } from '@inertiajs/vue3';
-import { reactive, ref, onMounted, watch } from 'vue';
+import { reactive, ref, onMounted, watch, computed } from 'vue';
 import { PAISES } from '@/Data/paises';
 
 // Recibir la prop agregar desde Laravel
@@ -122,6 +123,38 @@ const determineActionRoute = () => {
 
 const errors = usePage().props.errors;
 
+// Opciones formateadas para el multiselect de obras sociales
+const obrasOptions = computed(() =>
+    props.obras.map(p => ({ value: p.codigo, label: `${p.codigo} - ${p.detalle}` }))
+);
+
+// Errores por tab para mostrar indicadores visuales
+const tabErrors = computed(() => ({
+    personal: !!(form.errors.codigo || form.errors.cuil || form.errors.detalle || form.errors.nombres ||
+                 form.errors.est_civil || form.errors.salud || form.errors.sexo || form.errors.provin ||
+                 form.errors.locali || form.errors.domici || form.errors.nro || form.errors.piso ||
+                 form.errors.dpto || form.errors.tel1 || form.errors.tel2 || form.errors.tel3 ||
+                 form.errors.email || form.errors.web),
+    categorias: !!(form.errors.tarea || form.errors.bruto || form.errors.bruto_azul),
+    sicoss: false,
+}));
+
+// Navega automáticamente al primer tab que tenga errores
+const goToFirstErrorTab = () => {
+    const tabOrder = [
+        { key: 'personal',   target: '#form-tabs-personal' },
+        { key: 'categorias', target: '#form-tabs-categorias' },
+        { key: 'sicoss',     target: '#form-tabs-sicoss' },
+    ];
+    for (const t of tabOrder) {
+        if (tabErrors.value[t.key]) {
+            const btn = document.querySelector(`[data-bs-target="${t.target}"]`);
+            if (btn) window.bootstrap.Tab.getOrCreateInstance(btn).show();
+            break;
+        }
+    }
+};
+
 // Funcion para grabar datos
 const submit = () => {
     let ruta = 'bajas.update';
@@ -140,7 +173,7 @@ const submit = () => {
                 //console.log(response.data);
             },
             onError: () => {
-                // Manejar los errores de validación
+                goToFirstErrorTab();
             }
         });
     } else {
@@ -150,7 +183,7 @@ const submit = () => {
                 //console.log(form);
             },
             onError: () => {
-                // Manejar los errores de validación
+                goToFirstErrorTab();
             }
         });
     }
@@ -292,6 +325,7 @@ watch(() => props.agregar, () => {
                                     <ul class="nav nav-tabs" role="tablist">
                                         <li class="nav-item">
                                             <button
+                                                type="button"
                                                 class="nav-link active"
                                                 data-bs-toggle="tab"
                                                 data-bs-target="#form-tabs-personal"
@@ -299,10 +333,12 @@ watch(() => props.agregar, () => {
                                                 aria-selected="true">
                                                 <span class="ri-user-line ri-20px d-sm-none"></span
                                                 ><span class="d-none d-sm-block">Información Principal</span>
+                                                <span v-if="tabErrors.personal" class="badge bg-danger rounded-pill ms-1" style="width:8px;height:8px;padding:0;">&nbsp;</span>
                                             </button>
                                         </li>
                                         <li class="nav-item">
                                             <button
+                                                type="button"
                                                 class="nav-link"
                                                 data-bs-toggle="tab"
                                                 data-bs-target="#form-tabs-categorias"
@@ -310,10 +346,12 @@ watch(() => props.agregar, () => {
                                                 aria-selected="false">
                                                 <span class="ri-folder-user-line ri-20px d-sm-none"></span
                                                 ><span class="d-none d-sm-block">Categorización</span>
+                                                <span v-if="tabErrors.categorias" class="badge bg-danger rounded-pill ms-1" style="width:8px;height:8px;padding:0;">&nbsp;</span>
                                             </button>
                                         </li>
                                         <li class="nav-item">
                                             <button
+                                                type="button"
                                                 class="nav-link"
                                                 data-bs-toggle="tab"
                                                 data-bs-target="#form-tabs-sicoss"
@@ -321,6 +359,7 @@ watch(() => props.agregar, () => {
                                                 aria-selected="false">
                                                 <span class="ri-file-line ri-20px d-sm-none"></span
                                                 ><span class="d-none d-sm-block">Sicoss</span>
+                                                <span v-if="tabErrors.sicoss" class="badge bg-danger rounded-pill ms-1" style="width:8px;height:8px;padding:0;">&nbsp;</span>
                                             </button>
                                         </li>
                                     </ul>
@@ -919,24 +958,17 @@ watch(() => props.agregar, () => {
 
                                             <div class="col-md-4">
                                                 <div class="form-floating form-floating-outline">
-                                                <select
-                                                    id="cod_obsoc"
-                                                    name="cod_obsoc"
-                                                    class="select2 form-select"
-                                                    data-allow-clear="true"
-                                                    v-bind:disabled="!edicion"
-                                                    v-model="form.cod_obsoc">
-
-                                                    <option disabled value="">(Seleccione una obra social)</option>
-                                                    <option
-                                                            v-for="p in obras"
-                                                            :key="p.codigo"
-                                                            :value="p.codigo"
-                                                        >
-                                                            {{ p.codigo }} - {{ p.detalle }}
-                                                    </option>
-                                                </select>
-                                                <label for="cod_obsoc">Obra Social</label>
+                                                    <Multiselect
+                                                        v-model="form.cod_obsoc"
+                                                        :options="obrasOptions"
+                                                        :searchable="true"
+                                                        :can-clear="true"
+                                                        placeholder=""
+                                                        no-options-text="Sin opciones"
+                                                        no-results-text="Sin resultados"
+                                                        :disabled="!edicion"
+                                                    />
+                                                    <label>Obra Social</label>
                                                 </div>
                                             </div>
 
@@ -1401,3 +1433,66 @@ watch(() => props.agregar, () => {
         </div>
     </div> -->
 </template>
+
+<style src="@vueform/multiselect/themes/default.css"></style>
+<style>
+/* ── Multiselect adaptado a form-floating-outline de Materialize ── */
+
+.form-floating.form-floating-outline .multiselect {
+    --ms-border-color:         #cfd0d6;
+    --ms-border-color-active:  #666cff;
+    --ms-border-width:         1px;
+    --ms-border-width-active:  2px;
+    --ms-radius:               0.5rem;
+    --ms-font-size:            0.9375rem;
+    --ms-line-height:          1.375;
+    --ms-py:                   0.8455rem;
+    --ms-px:                   0.99rem;
+    --ms-ring-width:           0px;
+    --ms-bg-disabled:          transparent;
+    --ms-option-bg-selected:         #666cff;
+    --ms-option-bg-selected-pointed: #5f64e8;
+    --ms-option-color-selected:      #fff;
+    --ms-option-color-selected-pointed: #fff;
+    height: 3.0000625rem;
+}
+
+.form-floating.form-floating-outline .multiselect ~ label {
+    position: absolute;
+    top: 0;
+    left: 0;
+    z-index: 3;
+    pointer-events: none;
+    width: auto;
+    height: auto;
+    padding: 2px 0.375rem;
+    margin-left: 0.625rem;
+    margin-top: 0.125rem;
+    transform: translateY(-0.8rem) translateX(-2px);
+    font-size: 0.8125rem;
+    line-height: 1.375;
+    color: #a8aab4;
+    opacity: 1;
+    transition: color 0.15s ease-in-out;
+}
+
+.form-floating.form-floating-outline .multiselect ~ label::after {
+    content: "";
+    position: absolute;
+    inset-inline-start: 0;
+    top: 0.35rem;
+    z-index: -1;
+    width: 100%;
+    height: 3px;
+    background: #fff;
+}
+
+.form-floating.form-floating-outline .multiselect.is-open ~ label,
+.form-floating.form-floating-outline .multiselect.is-active ~ label {
+    color: #666cff;
+}
+
+.form-floating.form-floating-outline .multiselect.is-disabled {
+    opacity: 0.65;
+}
+</style>

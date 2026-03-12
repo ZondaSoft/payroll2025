@@ -165,9 +165,9 @@ class SicossObrasSocialesController extends Controller
         ]);
     }
 
-    public function edit(SicossObras $actividad)
+    public function edit(SicossObras $obra)
     {
-        if (!$actividad->exists) {
+        if (!$obra->exists) {
             return redirect()
                 ->route('sicoss.obras.index')
                 ->with('warning', 'No hay registros para modificar.');
@@ -177,7 +177,7 @@ class SicossObrasSocialesController extends Controller
         if (!$empresa) return redirect('/empresa/');
 
         return Inertia::render('Sicoss/Obrassociales', [
-            'legajo' => $actividad,
+            'legajo' => $obra,
             'agregar' => false,
             'edicion' => true,
             'active' => 64,
@@ -186,29 +186,29 @@ class SicossObrasSocialesController extends Controller
     }
 
     /**
-     * Actualiza un actividad en la base de datos
+     * Actualiza una obra social en la base de datos
      */
-    public function update(Request $request, SicossObras $actividad)
+    public function update(Request $request, SicossObras $obra)
     {
         $validated = $request->validate([
             'detalle' => 'required|string|max:100',
         ]);
 
-        $actividad->update($validated);
+        $obra->update($validated);
 
         return redirect()->route('sicoss.obras.index')
-            ->with('success', 'Condición actualizada exitosamente.');
+            ->with('success', 'Obra social actualizada exitosamente.');
     }
 
     /**
-     * Elimina un actividad de la base de datos
+     * Elimina una obra social de la base de datos
      */
-    public function destroy(SicossObras $actividad)
+    public function destroy(SicossObras $obra)
     {
-        $actividad->delete();
+        $obra->delete();
 
         return redirect()->route('sicoss.obras.index')
-            ->with('success', 'Condición eliminada exitosamente.');
+            ->with('success', 'Obra social eliminada exitosamente.');
     }
 
     // Primer registro

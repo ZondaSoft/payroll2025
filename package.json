@@ -21,6 +21,7 @@
         "vue": "^3.4.0"
     },
     "dependencies": {
+        "@vueform/multiselect": "^2.6.11",
         "vue-select": "^3.20.4"
     }
 }

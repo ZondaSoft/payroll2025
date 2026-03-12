@@ -46,9 +46,9 @@ return [
     | Mensajes personalizados por campo
     |--------------------------------------------------------------------------
     */
-    'custom' => [
-        'codigo' => [
-            'unique' => 'Ya existe una actividad SICOSS con ese código.',
-        ],
-    ],
+    // 'custom' => [
+    //     'codigo' => [
+    //         'unique' => 'Ya existe una actividad SICOSS con ese código.',
+    //     ],
+    // ],
 ];

@@ -9,6 +9,8 @@ class SicossSinie extends Model
 {
     use HasFactory;
 
+    protected $table = 'sicoss_sinies';
+
     protected $fillable = [
         'codigo',
         'detalle',

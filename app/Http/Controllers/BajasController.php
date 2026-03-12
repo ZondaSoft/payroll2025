@@ -330,11 +330,11 @@ class BajasController extends Controller
             ->first()?->id;
 
         if (!$nextId) {
-            return redirect()->route('bajas.index', $id)
+            return redirect()->route('bajas.show', $id)
                 ->with('warning', 'No hay registro siguiente');
         }
 
-        return redirect()->route('bajas.index', $nextId);
+        return redirect()->route('bajas.show', $nextId);
     }
 
     // Búsqueda

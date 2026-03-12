@@ -42,14 +42,12 @@ class LiquidacionIndividualController extends Controller
         $legajosQuery = Sue001::query();
 
         if ($periodoFiltro && $filterByPeriodo) {
-            // Mostrar solo legajos que tienen liquidación en sue090s para el período/tipoliq
+            // Mostrar solo legajos que tienen liquidación en sue090s para el período y tipoliq
             $legajosQuery->whereExists(function ($sub) use ($periodoStr, $tipoliq) {
                 $sub->from('sue090s')
                     ->whereColumn('sue090s.legajo', 'sue001s.codigo')
-                    ->where('sue090s.periodo', $periodoStr);
-                if ($tipoliq !== null) {
-                    $sub->where('sue090s.tipoliq', $tipoliq);
-                }
+                    ->where('sue090s.periodo', $periodoStr)
+                    ->where('sue090s.tipoliq', $tipoliq);
             });
         } elseif ($periodoFiltro) {
             // Extraer año y mes del período de filtro (YYYYMM -> YYYY-MM)
