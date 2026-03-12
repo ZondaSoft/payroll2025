@@ -1597,7 +1597,9 @@ watch(() => props.agregar, () => {
     --ms-py:                            0.8455rem;
     --ms-px:                            0.99rem;
     --ms-ring-width:                    0px;
-    --ms-bg-disabled:                   var(--bs-secondary-bg);
+    --ms-max-height:                    20rem;
+    --ms-option-font-size:              0.8125rem;
+    --ms-bg-disabled:                   #f9f9f9;
     --ms-option-bg-selected:            #666cff;
     --ms-option-bg-selected-pointed:    #5f64e8;
     --ms-option-color-selected:         #fff;
@@ -1620,7 +1622,7 @@ watch(() => props.agregar, () => {
     pointer-events: none;
     width: auto;
     height: auto;
-    padding: 2px 0.375rem;
+    padding: 2px 0.375rem 0;
     margin-left: 0.625rem;
     margin-top: 0.125rem;
     transform: translateY(-0.8rem) translateX(-2px);
@@ -1649,5 +1651,10 @@ watch(() => props.agregar, () => {
 /* Disabled */
 .ms-float-outline .multiselect.is-disabled {
     opacity: 0.65;
+    --ms-color: #000;
+}
+.ms-float-outline .multiselect.is-disabled .multiselect-single-label,
+.ms-float-outline .multiselect.is-disabled .multiselect-placeholder {
+    color: #000 !important;
 }
 </style>
