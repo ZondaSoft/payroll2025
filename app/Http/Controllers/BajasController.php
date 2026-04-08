@@ -186,6 +186,9 @@ class BajasController extends Controller
             'convenios' => $convenios,
             'contrataciones' => $contrataciones,
             'situacionesLab' => $situacionesLab,
+            'actividades' => $actividades,
+            'situaciones' => $situaciones,
+            'sinie' => $sinie,
         ]);
     }
 

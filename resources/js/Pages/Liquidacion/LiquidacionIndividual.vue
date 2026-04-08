@@ -181,13 +181,13 @@ const netoTotal = computed(() =>
         <div class="row mb-4">
             <div class="col">
                 <div class="card">
-                    <div class="card-body py-3">
+                    <div class="card-body py-3" style="font-size: 0.875rem;">
                         <div class="row g-3 align-items-end">
                             <!-- Selector de empleado -->
-                            <div class="col-12 col-md-5">
+                            <div class="col-12 col-md-5 mt-1">
                                 <i class="ri-user-line ri-20px text-primary"></i>
                                 <label class="form-label mb-1">&nbsp;Empleado</label>
-                                <select class="form-select" v-model="selectedLegajoId">
+                                <select class="form-select" style="font-size: 0.75rem; max-height: 39px;" v-model="selectedLegajoId">
                                     <option value="">— Seleccionar empleado —</option>
                                     <option v-for="leg in legajos" :key="leg.id" :value="leg.id">
                                         {{ leg.codigo }} — {{ leg.detalle }}, {{ leg.nombres }}
@@ -195,7 +195,7 @@ const netoTotal = computed(() =>
                                 </select>
                             </div>
                             <!-- Selector de período -->
-                            <div class="col-6 col-md-3">
+                            <div class="col-6 col-md-3 mt-1">
                                 <label class="form-label mb-1 d-flex align-items-center gap-1">
                                     Período
                                     <button
@@ -218,7 +218,7 @@ const netoTotal = computed(() =>
                                         ></i>
                                     </button>
                                 </label>
-                                <select class="form-select" v-model="selectedPeriodoKey">
+                                <select class="form-select" style="font-size: 0.75rem; max-height: 39px;" v-model="selectedPeriodoKey">
                                     <option value="">— Seleccionar período —</option>
                                     <option v-for="per in periodos" :key="per.id" :value="`${per.periodo}|${per.tipoliq ?? ''}`">
                                         {{ formatPeriodoConTipo(per) }}
@@ -227,7 +227,7 @@ const netoTotal = computed(() =>
                             </div>
                             <!-- Botón buscar -->
                             <div class="col-6 col-md-2 align-self-center pt-5">
-                                <button type="button" class="btn btn-primary w-100" @click="buscar">
+                                <button type="button" class="btn btn-primary w-100" style="font-size: 0.75rem;" @click="buscar">
                                     <i class="ri-search-line me-1"></i> Buscar
                                 </button>
                             </div>
@@ -241,7 +241,7 @@ const netoTotal = computed(() =>
         <div class="row mb-4" v-if="empleado">
             <div class="col">
                 <div class="card">
-                    <div class="card-body py-3">
+                    <div class="card-body py-3" style="font-size: 0.875rem;">
                         <div class="row g-4">
                             <!-- Legajo -->
                             <!-- <div class="col-6 col-md-2">
@@ -288,10 +288,8 @@ const netoTotal = computed(() =>
                             <div class="col-6 col-md-2">
                                 <small class="text-muted d-block">Obra Social</small>
                                     <span class="fw-semibold">
-                                        {{ empleado?.obra_sijp
-                                            ? ((empleado?.obraSijp?.detalle || empleado?.obraSijp?.descripcion)
-                                                ? `${empleado.obra_sijp} - ${empleado?.obraSijp?.detalle ?? empleado?.obraSijp?.descripcion}`
-                                                : empleado.obra_sijp)
+                                        {{ empleado?.obra_sijp?.codigo
+                                            ? `${empleado.obra_sijp.codigo} - ${empleado.obra_sijp.detalle ?? ''}`.substring(0, 22)
                                             : '—' }}
                                     </span>
                             </div>
@@ -387,7 +385,7 @@ const netoTotal = computed(() =>
                     </div>
                     <div class="tab-content pt-0" style="padding-left: 0px;">
                         <div class="tab-pane fade active show" id="form-tabs-conceptos" role="tabpanel">
-                            <div class="card-body p-0">
+                            <div class="card-body p-0" style="font-size: 0.875rem;">
                                 <div class="d-flex">
                                     <div class="barra-acciones-conceptos d-flex flex-column align-items-center py-2">
                                         <button

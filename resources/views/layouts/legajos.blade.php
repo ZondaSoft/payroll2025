@@ -169,7 +169,7 @@
                   </a>
                 </li>
                 <li class="menu-item {{ request()->routeIs('bajas.*') ? 'active' : '' }}">
-                  <a href="/bajas" class="menu-link">
+                  <a href="{{ url('/bajas') }}" class="menu-link">
                     <div data-i18n="Empleados de Baja">Empleados de Baja</div>
                   </a>
                 </li>
@@ -281,28 +281,28 @@
 
               <ul class="menu-sub">
                 <li class="menu-item {{ request()->routeIs('sicoss.actividades.*') ? 'active' : '' }}">
-                  <a href="/sicoss/actividades" class="menu-link">
+                  <a href="{{ url('/sicoss/actividades') }}" class="menu-link">
                     <div data-i18n="Actividades">Actividades</div>
                   </a>
                 </li>
               </ul>
               <ul class="menu-sub">
                 <li class="menu-item {{ request()->routeIs('sicoss.condiciones.*') ? 'active' : '' }}">
-                  <a href="/sicoss/condiciones" class="menu-link">
+                  <a href="{{ url('/sicoss/condiciones') }}" class="menu-link">
                     <div data-i18n="Condiciones">Condiciones</div>
                   </a>
                 </li>
               </ul>
               <ul class="menu-sub">
                 <li class="menu-item {{ request()->routeIs('sicoss.modalidades.*') ? 'active' : '' }}">
-                  <a href="/sicoss/modalidades" class="menu-link">
+                  <a href="{{ url('/sicoss/modalidades') }}" class="menu-link">
                     <div data-i18n="Modalidades contrato">Modalidades contrato</div>
                   </a>
                 </li>
               </ul>
               <ul class="menu-sub">
                 <li class="menu-item {{ request()->routeIs('sicoss.situacion.*') ? 'active' : '' }}">
-                  <a href="/sicoss/situacion" class="menu-link">
+                  <a href="{{ url('/sicoss/situacion') }}" class="menu-link">
                     <div data-i18n="Situación de revista">Situación de revista</div>
                   </a>
                 </li>
@@ -310,7 +310,7 @@
 
               <ul class="menu-sub">
                 <li class="menu-item {{ request()->routeIs('sicoss.obras.*') ? 'active' : '' }}">
-                  <a href="/sicoss/obras" class="menu-link">
+                  <a href="{{ url('/sicoss/obras') }}" class="menu-link">
                     <div data-i18n="Obras sociales">Obras sociales</div>
                   </a>
                 </li>
@@ -318,7 +318,7 @@
 
               <ul class="menu-sub">
                 <li class="menu-item {{ request()->routeIs('sicoss.localidades.*') ? 'active' : '' }}">
-                  <a href="/sicoss/localidades" class="menu-link">
+                  <a href="{{ url('/sicoss/localidades') }}" class="menu-link">
                     <div data-i18n="Zonas/Localidades">Zonas/Localidades</div>
                   </a>
                 </li>
@@ -326,7 +326,7 @@
 
               <ul class="menu-sub">
                 <li class="menu-item {{ request()->routeIs('sicoss.siniestros.*') ? 'active' : '' }}">
-                    <a href="/sicoss/siniestros" class="menu-link">
+                    <a href="{{ url('/sicoss/siniestros') }}" class="menu-link">
                         <div data-i18n="Códigos de siniestro">Códigos de siniestro</div>
                     </a>
                 </li>

@@ -4,7 +4,7 @@
 // import PrimaryButton from '@/Components/PrimaryButton.vue';
 import TextInput from '@/Components/TextInput.vue';
 import InputError from '@/Components/InputError.vue';
-import Multiselect from '@vueform/multiselect';
+import FloatMultiselect from '@/Components/FloatMultiselect.vue';
 import { Link, useForm, usePage } from '@inertiajs/vue3';
 import { reactive, ref, onMounted, watch, computed } from 'vue';
 import { PAISES } from '@/Data/paises';
@@ -70,7 +70,19 @@ const props = defineProps({
     contrataciones: {
         type: Object,
         required: true,
-    }
+    },
+    actividades: {
+        type: Array,
+        required: true,
+    },
+    situaciones: {
+        type: Array,
+        required: true,
+    },
+    sinie: {
+        type: Array,
+        required: true,
+    },
 });
 
 // Accediendo a las props pasadas desde el controlador
@@ -126,6 +138,18 @@ const errors = usePage().props.errors;
 // Opciones formateadas para el multiselect de obras sociales
 const obrasOptions = computed(() =>
     props.obras.map(p => ({ value: p.codigo, label: `${p.codigo} - ${p.detalle}` }))
+);
+
+const actividadesOptions = computed(() =>
+    props.actividades.map(p => ({ value: p.codigo, label: `${p.codigo} - ${p.detalle}` }))
+);
+
+const situacionesOptions = computed(() =>
+    props.situaciones.map(p => ({ value: p.codigo, label: `${p.codigo} - ${p.detalle}` }))
+);
+
+const sinieOptions = computed(() =>
+    props.sinie.map(p => ({ value: p.codigo, label: `${p.codigo} - ${p.detalle}` }))
 );
 
 // Errores por tab para mostrar indicadores visuales
@@ -957,19 +981,14 @@ watch(() => props.agregar, () => {
                                             </div>
 
                                             <div class="col-md-4">
-                                                <div class="ms-float-outline">
-                                                    <Multiselect
-                                                        v-model="form.cod_obsoc"
-                                                        :options="obrasOptions"
-                                                        :searchable="true"
-                                                        :can-clear="true"
-                                                        placeholder=""
-                                                        no-options-text="Sin opciones"
-                                                        no-results-text="Sin resultados"
-                                                        :disabled="!edicion"
-                                                    />
-                                                    <label>Obra Social</label>
-                                                </div>
+                                                <FloatMultiselect
+                                                    id="cod_obsoc"
+                                                    label="Obra Social"
+                                                    v-model="form.cod_obsoc"
+                                                    :options="obrasOptions"
+                                                    :disabled="!edicion"
+                                                    :error="form.errors.cod_obsoc"
+                                                />
                                             </div>
 
                                             <div class="col-md-4">
@@ -1227,26 +1246,14 @@ watch(() => props.agregar, () => {
 
                                             <div class="row"></div>
                                             <div class="col-md-6">
-                                                <div class="form-floating form-floating-outline">
-                                                <select
+                                                <FloatMultiselect
                                                     id="sicoss_activ"
-                                                    name="sicoss_activ"
-                                                    class="select2 form-select"
-                                                    data-allow-clear="true"
-                                                    v-bind:disabled="!edicion"
-                                                    v-model="form.sicoss_activ">
-
-                                                    <option disabled value="">(Seleccione una actividad)</option>
-                                                    <option
-                                                            v-for="p in grupos"
-                                                            :key="p.codigo"
-                                                            :value="p.codigo"
-                                                        >
-                                                            {{ p.codigo }} - {{ p.detalle }}
-                                                    </option>
-                                                </select>
-                                                <label for="sicoss_activ">01 - Actividad</label>
-                                                </div>
+                                                    label="01 - Actividad"
+                                                    v-model="form.sicoss_activ"
+                                                    :options="actividadesOptions"
+                                                    :disabled="!edicion"
+                                                    :error="form.errors.sicoss_activ"
+                                                />
                                             </div>
 
                                             <div class="row"></div>
@@ -1275,26 +1282,14 @@ watch(() => props.agregar, () => {
 
                                             <div class="row"></div>
                                             <div class="col-md-6">
-                                                <div class="form-floating form-floating-outline">
-                                                <select
+                                                <FloatMultiselect
                                                     id="sicoss_sini"
-                                                    name="sicoss_sini"
-                                                    class="select2 form-select"
-                                                    data-allow-clear="true"
-                                                    v-bind:disabled="!edicion"
-                                                    v-model="form.sicoss_sini">
-
-                                                    <option disabled value="">(Seleccione un cód.siniestro)</option>
-                                                    <option
-                                                            v-for="p in sindicatos"
-                                                            :key="p.codigo"
-                                                            :value="p.codigo"
-                                                        >
-                                                            {{ p.codigo }} - {{ p.detalle }}
-                                                    </option>
-                                                </select>
-                                                <label for="sicoss_sini">Codigo de siniestrado</label>
-                                                </div>
+                                                    label="Código de siniestrado"
+                                                    v-model="form.sicoss_sini"
+                                                    :options="sinieOptions"
+                                                    :disabled="!edicion"
+                                                    :error="form.errors.sicoss_sini"
+                                                />
                                             </div>
 
                                             <div class="row"></div>
@@ -1434,71 +1429,3 @@ watch(() => props.agregar, () => {
     </div> -->
 </template>
 
-<style src="@vueform/multiselect/themes/default.css"></style>
-<style>
-/* ── Multiselect adaptado a form-floating-outline de Materialize ── */
-
-.ms-float-outline {
-    position: relative;
-}
-
-.ms-float-outline .multiselect {
-    --ms-border-color:         #cfd0d6;
-    --ms-border-color-active:  #666cff;
-    --ms-border-width:         1px;
-    --ms-border-width-active:  2px;
-    --ms-radius:               0.5rem;
-    --ms-font-size:            0.9375rem;
-    --ms-line-height:          1.375;
-    --ms-py:                   0.8455rem;
-    --ms-px:                   0.99rem;
-    --ms-ring-width:           0px;
-    --ms-max-height:           20rem;
-    --ms-option-font-size:     0.8125rem;
-    --ms-bg-disabled:          #f9f9f9;
-    --ms-option-bg-selected:            #666cff;
-    --ms-option-bg-selected-pointed:    #5f64e8;
-    --ms-option-color-selected:         #fff;
-    --ms-option-color-selected-pointed: #fff;
-    height: calc(3.0000625rem + 2px);
-}
-
-/* Evita que el wrapper desborde el borde del multiselect cuando está habilitado */
-.ms-float-outline .multiselect-wrapper {
-    align-self: stretch;
-    min-height: 0;
-}
-
-.ms-float-outline .multiselect ~ label {
-    position: absolute;
-    top: 0;
-    left: 0;
-    z-index: 3;
-    pointer-events: none;
-    width: auto;
-    height: auto;
-    padding: 2px 0.375rem 0;
-    margin-left: 0.625rem;
-    margin-top: 0.125rem;
-    transform: translateY(-0.8rem) translateX(-2px);
-    font-size: 0.8125rem;
-    line-height: 1.375;
-    color: #a8aab4;
-    background: var(--bs-card-bg);
-    transition: color 0.15s ease-in-out;
-}
-
-.ms-float-outline .multiselect.is-open ~ label,
-.ms-float-outline .multiselect.is-active ~ label {
-    color: #666cff;
-}
-
-.ms-float-outline .multiselect.is-disabled {
-    opacity: 0.65;
-    --ms-color: #000;
-}
-.ms-float-outline .multiselect.is-disabled .multiselect-single-label,
-.ms-float-outline .multiselect.is-disabled .multiselect-placeholder {
-    color: #000 !important;
-}
-</style>

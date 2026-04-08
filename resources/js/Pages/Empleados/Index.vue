@@ -4,7 +4,7 @@
 // import PrimaryButton from '@/Components/PrimaryButton.vue';
 import TextInput from '@/Components/TextInput.vue';
 import InputError from '@/Components/InputError.vue';
-import Multiselect from '@vueform/multiselect';
+import FloatMultiselect from '@/Components/FloatMultiselect.vue';
 import { Link, useForm, usePage } from '@inertiajs/vue3';
 import { reactive, ref, onMounted, watch, computed } from 'vue';
 import { PAISES } from '@/Data/paises';
@@ -68,9 +68,29 @@ const props = defineProps({
         required: true,
     },
     contrataciones: {
-        type: Object,
+        type: Array,
         required: true,
-    }
+    },
+    actividades: {
+        type: Array,
+        required: true,
+    },
+    condiciones: {
+        type: Array,
+        required: true,
+    },
+    zonas: {
+        type: Array,
+        required: true,
+    },
+    situaciones: {
+        type: Array,
+        required: true,
+    },
+    sinie: {
+        type: Array,
+        required: true,
+    },
 });
 
 // Accediendo a las props pasadas desde el controlador
@@ -149,6 +169,26 @@ const errors = usePage().props.errors;
 // Opciones formateadas para el multiselect de obras sociales
 const obrasOptions = computed(() =>
     props.obras.map(p => ({ value: p.codigo, label: `${p.codigo} - ${p.detalle}` }))
+);
+
+const actividadesOptions = computed(() =>
+    props.actividades.map(p => ({ value: p.codigo, label: `${p.codigo} - ${p.detalle}` }))
+);
+
+const situacionesOptions = computed(() =>
+    props.situaciones.map(p => ({ value: p.codigo, label: `${p.codigo} - ${p.detalle}` }))
+);
+
+const sinieOptions = computed(() =>
+    props.sinie.map(p => ({ value: p.codigo, label: `${p.codigo} - ${p.detalle}` }))
+);
+
+const contratacionesOptions = computed(() =>
+    props.contrataciones.map(p => ({ value: p.codigo, label: `${p.codigo} - ${p.detalle}` }))
+);
+
+const zonasOptions = computed(() =>
+    props.zonas.map(p => ({ value: p.codigo, label: `${p.codigo} - ${p.detalle}` }))
 );
 
 // Errores por tab para mostrar indicadores visuales
@@ -1031,25 +1071,14 @@ watch(() => props.agregar, () => {
                                             </div>
 
                                             <div class="col-md-4">
-                                                <div class="ms-float-outline">
-                                                    <Multiselect
-                                                        id="obra_sijp"
-                                                        name="obra_sijp"
-                                                        v-model="form.obra_sijp"
-                                                        :options="obrasOptions"
-                                                        :searchable="true"
-                                                        :can-clear="true"
-                                                        placeholder=""
-                                                        no-options-text="Sin opciones"
-                                                        no-results-text="Sin resultados"
-                                                        :disabled="!edicion"
-                                                        :class="{'is-invalid': form.errors.obra_sijp}"
-                                                    />
-                                                    <label for="obra_sijp">Obra Social</label>
-                                                </div>
-                                                <div class="text-danger small mt-1" v-if="form.errors.obra_sijp">
-                                                    {{ form.errors.obra_sijp }}
-                                                </div>
+                                                <FloatMultiselect
+                                                    id="obra_sijp"
+                                                    label="Obra Social"
+                                                    v-model="form.obra_sijp"
+                                                    :options="obrasOptions"
+                                                    :disabled="!edicion"
+                                                    :error="form.errors.obra_sijp"
+                                                />
                                             </div>
 
                                             <div class="col-md-4">
@@ -1123,7 +1152,7 @@ watch(() => props.agregar, () => {
 
                                             <div class="row"></div>
 
-                                            <div class="col-md-4">
+                                            <!-- <div class="col-md-4">
                                                 <div class="form-floating form-floating-outline">
                                                 <select
                                                     id="situacion"
@@ -1144,7 +1173,7 @@ watch(() => props.agregar, () => {
                                                 </select>
                                                 <label for="situacion">Situación</label>
                                                 </div>
-                                            </div>
+                                            </div> -->
 
                                             <div class="col-md-3">
                                                 <div class="form-floating form-floating-outline">
@@ -1339,150 +1368,87 @@ watch(() => props.agregar, () => {
 
                                         <div class="row g-6">
                                             <div class="col-md-6">
-                                                <div class="form-floating form-floating-outline">
-                                                <select
+                                                <FloatMultiselect
                                                     id="sicoss_situa"
-                                                    name="sicoss_situa"
-                                                    class="select2 form-select"
-                                                    data-allow-clear="true"
-                                                    v-bind:disabled="!edicion"
-                                                    v-model="form.sicoss_situa">
-
-                                                    <option disabled value="">(Seleccione una situación de revista)</option>
-                                                    <option
-                                                            v-for="p in situacionesLab"
-                                                            :key="p.codigo"
-                                                            :value="p.codigo"
-                                                        >
-                                                            {{ p.codigo }} - {{ p.detalle }}
-                                                    </option>
-                                                </select>
-                                                <label for="sicoss_situa">Situación de revista</label>
-                                                <div class="text-danger small mt-1" v-if="form.errors.sicoss_situa">
-                                                    {{ form.errors.sicoss_situa }}
-                                                </div>
-                                                </div>
+                                                    label="Situación de revista"
+                                                    v-model="form.sicoss_situa"
+                                                    :options="situacionesOptions"
+                                                    :disabled="!edicion"
+                                                    :error="form.errors.sicoss_situa"
+                                                />
                                             </div>
 
                                             <div class="row"></div>
                                             <div class="col-md-6">
                                                 <div class="form-floating form-floating-outline">
                                                 <select
-                                                    id="cod_centro"
-                                                    name="cod_centro"
+                                                    id="sicoss_condi"
+                                                    name="sicoss_condi"
                                                     class="select2 form-select"
                                                     data-allow-clear="true"
                                                     v-bind:disabled="!edicion"
-                                                    v-model="form.cod_centro">
+                                                    v-model="form.sicoss_condi">
 
                                                     <option disabled value="">(Seleccione una condición)</option>
                                                     <option
-                                                            v-for="p in ccostos"
+                                                            v-for="p in condiciones"
                                                             :key="p.codigo"
                                                             :value="p.codigo"
                                                         >
                                                             {{ p.codigo }} - {{ p.detalle }}
                                                     </option>
                                                 </select>
-                                                <label for="cod_centro">Condición</label>
+                                                <label for="sicoss_condi">Condición de contratación</label>
                                                 </div>
                                             </div>
 
                                             <div class="row"></div>
                                             <div class="col-md-6">
-                                                <div class="form-floating form-floating-outline">
-                                                <select
+                                                <FloatMultiselect
                                                     id="sicoss_activ"
-                                                    name="sicoss_activ"
-                                                    class="select2 form-select"
-                                                    data-allow-clear="true"
-                                                    v-bind:disabled="!edicion"
-                                                    v-model="form.sicoss_activ">
-
-                                                    <option disabled value="">(Seleccione una actividad)</option>
-                                                    <option
-                                                            v-for="p in grupos"
-                                                            :key="p.codigo"
-                                                            :value="p.codigo"
-                                                        >
-                                                            {{ p.codigo }} - {{ p.detalle }}
-                                                    </option>
-                                                </select>
-                                                <label for="sicoss_activ">01 - Actividad</label>
-                                                </div>
+                                                    label="01 - Actividad"
+                                                    v-model="form.sicoss_activ"
+                                                    :options="actividadesOptions"
+                                                    :disabled="!edicion"
+                                                    :error="form.errors.sicoss_activ"
+                                                />
                                             </div>
 
                                             <div class="row"></div>
                                             <div class="col-md-6">
-                                                <div class="form-floating form-floating-outline">
-                                                <select
-                                                    id="cod_jerarq"
-                                                    name="cod_jerarq"
-                                                    class="select2 form-select"
-                                                    data-allow-clear="true"
-                                                    v-bind:disabled="!edicion"
-                                                    v-model="form.cod_jerarq">
-
-                                                    <option disabled value="">(Seleccione la modalidad)</option>
-                                                    <option
-                                                            v-for="p in jerarquias"
-                                                            :key="p.codigo"
-                                                            :value="p.codigo"
-                                                        >
-                                                            {{ p.codigo }} - {{ p.detalle }}
-                                                    </option>
-                                                </select>
-                                                <label for="cod_jerarq">08 - Modalidad de Contratacion</label>
-                                                </div>
+                                                <FloatMultiselect
+                                                    id="sicoss_modal"
+                                                    label="08 - Modalidad de Contratacion"
+                                                    v-model="form.sicoss_modal"
+                                                    :options="contratacionesOptions"
+                                                    :disabled="!edicion"
+                                                    :error="form.errors.sicoss_modal"
+                                                />
                                             </div>
 
                                             <div class="row"></div>
                                             <div class="col-md-6">
-                                                <div class="form-floating form-floating-outline">
-                                                <select
+                                                <FloatMultiselect
                                                     id="sicoss_sini"
-                                                    name="sicoss_sini"
-                                                    class="select2 form-select"
-                                                    data-allow-clear="true"
-                                                    v-bind:disabled="!edicion"
-                                                    v-model="form.sicoss_sini">
-
-                                                    <option disabled value="">(Seleccione un cód.siniestro)</option>
-                                                    <option
-                                                            v-for="p in sindicatos"
-                                                            :key="p.codigo"
-                                                            :value="p.codigo"
-                                                        >
-                                                            {{ p.codigo }} - {{ p.detalle }}
-                                                    </option>
-                                                </select>
-                                                <label for="sicoss_sini">Codigo de siniestrado</label>
-                                                </div>
+                                                    label="Código de siniestrado"
+                                                    v-model="form.sicoss_sini"
+                                                    :options="sinieOptions"
+                                                    :disabled="!edicion"
+                                                    :error="form.errors.sicoss_sini"
+                                                />
                                             </div>
 
                                             <div class="row"></div>
                                             
                                             <div class="col-md-6">
-                                                <div class="form-floating form-floating-outline">
-                                                <select
-                                                    id="locali"
-                                                    name="locali"
-                                                    class="select2 form-select"
-                                                    data-allow-clear="true"
-                                                    v-bind:disabled="!edicion"
-                                                    v-model="form.locali">
-
-                                                    <option disabled value="">(Seleccione una localidad)</option>
-                                                    <option
-                                                            v-for="p in obras"
-                                                            :key="p.codigo"
-                                                            :value="p.codigo"
-                                                        >
-                                                            {{ p.codigo }} - {{ p.detalle }}
-                                                    </option>
-                                                </select>
-                                                <label for="locali">Localidad</label>
-                                                </div>
+                                                <FloatMultiselect
+                                                    id="sicoss_zona"
+                                                    label="Localidad"
+                                                    v-model="form.sicoss_zona"
+                                                    :options="zonasOptions"
+                                                    :disabled="!edicion"
+                                                    :error="form.errors.sicoss_zona"
+                                                />
                                             </div>
 
                                             <div class="row"></div>
@@ -1576,85 +1542,3 @@ watch(() => props.agregar, () => {
     </div> -->
 </template>
 
-<style src="@vueform/multiselect/themes/default.css"></style>
-<style>
-/* ── Multiselect con label flotante, estilo form-floating-outline de Materialize ── */
-
-/* Wrapper propio: solo position:relative, sin interferencia de Bootstrap form-floating */
-.ms-float-outline {
-    position: relative;
-}
-
-/* Control: geometría y colores alineados al form-select de la plantilla */
-.ms-float-outline .multiselect {
-    --ms-border-color:                  #cfd0d6;
-    --ms-border-color-active:           #666cff;
-    --ms-border-width:                  1px;
-    --ms-border-width-active:           2px;
-    --ms-radius:                        0.5rem;
-    --ms-font-size:                     0.9375rem;
-    --ms-line-height:                   1.375;
-    --ms-py:                            0.8455rem;
-    --ms-px:                            0.99rem;
-    --ms-ring-width:                    0px;
-    --ms-max-height:                    20rem;
-    --ms-option-font-size:              0.8125rem;
-    --ms-bg-disabled:                   #f9f9f9;
-    --ms-option-bg-selected:            #666cff;
-    --ms-option-bg-selected-pointed:    #5f64e8;
-    --ms-option-color-selected:         #fff;
-    --ms-option-color-selected-pointed: #fff;
-    height: calc(3.0000625rem + 2px);
-}
-
-/* Evita que el wrapper desborde el borde del multiselect cuando está habilitado */
-.ms-float-outline .multiselect-wrapper {
-    align-self: stretch;
-    min-height: 0;
-}
-
-/* Label siempre flotada sobre el borde (igual que <select> en form-floating-outline) */
-.ms-float-outline .multiselect ~ label {
-    position: absolute;
-    top: 0;
-    left: 0;
-    z-index: 3;
-    pointer-events: none;
-    width: auto;
-    height: auto;
-    padding: 2px 0.375rem 0;
-    margin-left: 0.625rem;
-    margin-top: 0.125rem;
-    transform: translateY(-0.8rem) translateX(-2px);
-    font-size: 0.8125rem;
-    line-height: 1.375;
-    color: #a8aab4;
-    background: var(--bs-card-bg);
-    transition: color 0.15s ease-in-out;
-}
-
-/* Estado activo/abierto: label en color primario */
-.ms-float-outline .multiselect.is-open ~ label,
-.ms-float-outline .multiselect.is-active ~ label {
-    color: #666cff;
-}
-
-/* Estado inválido */
-.ms-float-outline .multiselect.is-invalid {
-    --ms-border-color:        #ff3e1d;
-    --ms-border-color-active: #ff3e1d;
-}
-.ms-float-outline .multiselect.is-invalid ~ label {
-    color: #ff3e1d;
-}
-
-/* Disabled */
-.ms-float-outline .multiselect.is-disabled {
-    opacity: 0.65;
-    --ms-color: #000;
-}
-.ms-float-outline .multiselect.is-disabled .multiselect-single-label,
-.ms-float-outline .multiselect.is-disabled .multiselect-placeholder {
-    color: #000 !important;
-}
-</style>

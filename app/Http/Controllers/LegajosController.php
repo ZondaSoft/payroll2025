@@ -190,6 +190,11 @@ class LegajosController extends Controller
             'convenios' => $convenios,
             'contrataciones' => $contrataciones,
             'situacionesLab' => $situacionesLab,
+            'actividades' => $actividades,
+            'condiciones' => $condiciones,
+            'zonas' => $zonas,
+            'situaciones' => $situaciones,
+            'sinie' => $sinie,
         ]);
     }
 
@@ -213,6 +218,11 @@ class LegajosController extends Controller
         $sindicatos     = Sue015::orderBy('detalle')->whereNotNull('codigo')->where('codigo', '!=', '')->get();
         $convenios      = Sue007::orderBy('detalle')->get();
         $contrataciones = Sicoss08::orderBy('codigo')->get();
+        $condiciones    = Sicoss05::orderBy('codigo')->get();
+        $actividades    = Sicoss01::orderBy('codigo')->get();
+        $zonas          = SicossZona::orderBy('codigo')->get();
+        $situaciones    = Sicoss12::orderBy('codigo')->get();
+        $sinie          = SicossSinie::orderBy('codigo')->get();
         $provincias     = Sue012::orderBy('codigo')->where('codigo', '!=', '')->get();
 
         return Inertia::render('Empleados/Index', [
@@ -231,6 +241,11 @@ class LegajosController extends Controller
             'convenios'      => $convenios,
             'contrataciones' => $contrataciones,
             'situacionesLab' => $situacionesLab,
+            'actividades'    => $actividades,
+            'condiciones'    => $condiciones,
+            'zonas'          => $zonas,
+            'situaciones'    => $situaciones,
+            'sinie'          => $sinie,
         ]);
     }
 
@@ -330,6 +345,11 @@ class LegajosController extends Controller
             'convenios' => $convenios,
             'contrataciones' => $contrataciones,
             'situacionesLab' => $situacionesLab,
+            'actividades' => $actividades,
+            'condiciones' => $condiciones,
+            'zonas' => $zonas,
+            'situaciones' => $situaciones,
+            'sinie' => $sinie,
         ]);
     }
 
@@ -353,6 +373,11 @@ class LegajosController extends Controller
         $sindicatos     = Sue015::orderBy('detalle')->whereNotNull('codigo')->where('codigo', '!=', '')->get();
         $convenios      = Sue007::orderBy('detalle')->get();
         $contrataciones = Sicoss08::orderBy('codigo')->get();
+        $condiciones    = Sicoss05::orderBy('codigo')->get();
+        $actividades    = Sicoss01::orderBy('codigo')->get();
+        $zonas          = SicossZona::orderBy('codigo')->get();
+        $situaciones    = Sicoss12::orderBy('codigo')->get();
+        $sinie          = SicossSinie::orderBy('codigo')->get();
         $provincias     = Sue012::orderBy('codigo')->where('codigo', '!=', '')->get();
 
         $this->calcularAntiguedad($legajo);
@@ -374,6 +399,11 @@ class LegajosController extends Controller
             'convenios'      => $convenios,
             'contrataciones' => $contrataciones,
             'situacionesLab' => $situacionesLab,
+            'actividades'    => $actividades,
+            'condiciones'    => $condiciones,
+            'zonas'          => $zonas,
+            'situaciones'    => $situaciones,
+            'sinie'          => $sinie,
         ]);
     }
 
@@ -392,12 +422,6 @@ class LegajosController extends Controller
             'fecha_naci'        => 'nullable|date',
             'obra_sijp'         => 'required|string|max:6',
             'sexo'              => 'nullable|string|max:20',
-        ], [
-            'detalle.required' => 'El campo Apellidos es obligatorio.',
-            'nombres.required' => 'El campo Nombres es obligatorio.',
-            'email.required'   => 'El campo Correo electrónico es obligatorio.',
-            'email.email'      => 'El Correo electrónico no tiene un formato válido.',
-            'email.unique'     => 'El Correo electrónico ya está registrado.',
             'est_civil'         => 'nullable|string|max:20',
             'nacionali'         => 'nullable|string|max:10',
             'provin'            => 'nullable|string|max:10',
@@ -411,7 +435,6 @@ class LegajosController extends Controller
             'cod_categ'         => 'nullable|string|max:10',
             'codsector'         => 'nullable|string|max:10',
             'cuadrilla'         => 'nullable|string|max:10',
-            'obra_sijp'         => 'La obra social es obligatoria.',
             'cod_sindic'        => 'nullable|string|max:10',
             'situacion'         => 'nullable|string|max:10',
             'cod_contra'        => 'nullable|string|max:10',
@@ -439,6 +462,13 @@ class LegajosController extends Controller
             'sicoss_conyuge'    => 'nullable|boolean',
             'sicoss_hijos'      => 'nullable|boolean',
             'sicoss_adherentes' => 'nullable|integer|min:0|max:99',
+        ], [
+            'detalle.required'  => 'El campo Apellidos es obligatorio.',
+            'nombres.required'  => 'El campo Nombres es obligatorio.',
+            'email.required'    => 'El campo Correo electrónico es obligatorio.',
+            'email.email'       => 'El Correo electrónico no tiene un formato válido.',
+            'email.unique'      => 'El Correo electrónico ya está registrado.',
+            'obra_sijp.required' => 'La obra social es obligatoria.',
         ]);
 
         $legajo->update($validated);
