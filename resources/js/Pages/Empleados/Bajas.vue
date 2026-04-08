@@ -271,7 +271,7 @@ watch(() => props.agregar, () => {
                     :ruta-next="form.id ? route('bajas.next', form.id) : null"
                     :ruta-last="route('bajas.last')"
                     :ruta-search="route('bajas.search')"
-                    :ruta-index="route('bajas')"
+                    :ruta-index="route('bajas.index')"
                     :on-submit="submit"
                 />
                 <!-- END HEAD Y BOTONES -->
