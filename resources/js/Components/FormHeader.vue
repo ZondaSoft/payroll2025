@@ -57,6 +57,18 @@ defineProps({
     onSubmit: {
         type: Function,
         default: null
+    },
+    textoCrear: {
+        type: String,
+        default: 'Agregar'
+    },
+    mostrarModificar: {
+        type: Boolean,
+        default: true
+    },
+    mostrarBorrar: {
+        type: Boolean,
+        default: true
     }
 });
 
@@ -120,7 +132,7 @@ defineEmits(['edit', 'delete', 'grabar', 'cancelar']);
                 </Link>
                 <a v-if="rutaSearch" :href="rutaSearch" class="btn btn-outline-secondary waves-effect" 
                     data-bs-toggle="tooltip" data-bs-placement="top" data-bs-original-title="Buscar">
-                    <i class="ri-checkbox-circle-line"></i>
+                    <i class="ri-search-line"></i>
                 </a>
             </div>
         </div>
@@ -141,19 +153,20 @@ defineEmits(['edit', 'delete', 'grabar', 'cancelar']);
                 :href="rutaCreate"
                 class="btn btn-info waves-effect waves-light"
                 @click="$emit('edit')">
-                Agregar
+                {{ textoCrear }}
             </Link>
             <Link
-                v-if="formId"
+                v-if="formId && mostrarModificar"
                 :href="rutaEdit"
                 class="btn btn-outline-secondary"
                 @click="$emit('edit')">
                 Modificar
             </Link>
-            <a type="button" 
-                class="btn btn-danger waves-effect waves-light" 
+            <a v-if="mostrarBorrar"
+                type="button"
+                class="btn btn-danger waves-effect waves-light"
                 style="color: white"
-                data-bs-toggle="modal" 
+                data-bs-toggle="modal"
                 data-bs-target="#modalDelete"
                 @click="$emit('delete')">
                 Borrar

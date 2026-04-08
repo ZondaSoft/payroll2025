@@ -5,6 +5,7 @@
 import TextInput from '@/Components/TextInput.vue';
 import InputError from '@/Components/InputError.vue';
 import FloatMultiselect from '@/Components/FloatMultiselect.vue';
+import FormHeader from '@/Components/FormHeader.vue';
 import { Link, useForm, usePage } from '@inertiajs/vue3';
 import { reactive, ref, onMounted, watch, computed } from 'vue';
 import { PAISES } from '@/Data/paises';
@@ -256,88 +257,23 @@ watch(() => props.agregar, () => {
         <div class="container-xxl flex-grow-1 container-p-y">
             <div class="app-ecommerce">
                 <!-- HEAD Y BOTONES -->
-                <div class="d-flex flex-column flex-md-row justify-content-between align-items-start align-items-md-center mb-6 row-gap-4">
-                    <!-- Sección de agregar -->
-                    <div v-if="agregar" class="d-flex flex-column justify-content-center">
-                        <h4 class="mb-1">Agregar empleado de baja</h4>
-                    </div>
-                    <!-- Sección de edición -->
-                    <div v-if="!agregar && edicion" class="d-flex flex-column justify-content-center">
-                        <h4 class="mb-1">Modificar empleado de baja</h4>
-                    </div>
-                    <!-- Si ni agregar ni edicion están activados, muestra este mensaje -->
-                    <div v-if="!agregar && !edicion" class="d-flex flex-column justify-content-center">
-                        <h4 class="mb-1">Empleados de baja</h4>
-                    </div>
-
-                    <div class="d-flex flex-column justify-content-center" v-if="!agregar && !edicion && form.id">
-                        <div class="btn-group" role="group" aria-label="First group">
-                            <Link
-                                :href="route('bajas.first')"
-                                class="btn btn-outline-secondary waves-effect"
-                                data-bs-toggle="tooltip"
-                                data-bs-placement="top"
-                                data-bs-original-title="ir al primer registro"
-                                >
-                                <i class="ri-arrow-left-double-line"></i>
-                            </Link>
-                            <Link
-                                :href="route('bajas.previous', form.id)"
-                                class="btn btn-outline-secondary waves-effect"
-                                data-bs-toggle="tooltip"
-                                data-bs-placement="top"
-                                data-bs-original-title="ir al registro anterior"
-                                >
-                                <i class="ri-arrow-left-line"></i>
-                            </Link>
-                            <Link
-                                :href="route('bajas.next', form.id)"
-                                class="btn btn-outline-secondary waves-effect"
-                                data-bs-toggle="tooltip"
-                                data-bs-placement="top"
-                                data-bs-original-title="ir al registro siguiente"
-                                >
-                                <i class="ri-arrow-right-line"></i>
-                            </Link>
-                            <Link
-                                :href="route('bajas.last')"
-                                class="btn btn-outline-secondary waves-effect"
-                                data-bs-toggle="tooltip"
-                                data-bs-placement="top"
-                                data-bs-original-title="ir al ultimo registro"
-                                >
-                                <i class="ri-arrow-right-double-fill"></i>
-                            </Link>
-                            <a type="button" href="/bajas/search" class="btn btn-outline-secondary waves-effect" data-bs-toggle="tooltip" data-bs-placement="top" data-bs-original-title="Buscar ...">
-                                <i class="ri-checkbox-circle-line"></i>
-                            </a>
-                        </div>
-                    </div>
-
-                    <!-- Botones de agregar/Grabar -->
-                    <div v-if="agregar || edicion" class="d-flex align-content-center flex-wrap gap-4">
-                        <button type="submit" class="btn btn-primary">Grabar</button>
-                        <!-- <a href="/bajas" class="btn btn-outline-secondary">Cancelar 1</a> -->
-
-                        <Link
-                            v-if="agregar || edicion"
-                            :href="route('bajas')"
-                            class="btn btn-outline-secondary"
-                            >
-                            Cancelar
-                        </Link>
-                    </div>
-                    <!-- Botones de CRUD -->
-                    <div v-else class="d-flex align-content-center flex-wrap gap-4">
-                        <Link
-                            :href="route('bajas.create')"
-                            class="btn btn-info waves-effect waves-light"
-                            >
-                            Restaurar
-                        </Link>
-                        <!-- <a href="/bajas/edit/{{form.id}}" class="btn btn-outline-secondary">Modificar2</a> -->
-                    </div>
-                </div>
+                <FormHeader
+                    :agregar="agregar"
+                    :edicion="edicion"
+                    :form-id="form.id"
+                    titulo="Empleados de baja"
+                    texto-crear="Restaurar"
+                    :mostrar-modificar="false"
+                    :mostrar-borrar="false"
+                    :ruta-create="route('bajas.create')"
+                    :ruta-first="route('bajas.first')"
+                    :ruta-previous="form.id ? route('bajas.previous', form.id) : null"
+                    :ruta-next="form.id ? route('bajas.next', form.id) : null"
+                    :ruta-last="route('bajas.last')"
+                    :ruta-search="route('bajas.search')"
+                    :ruta-index="route('bajas')"
+                    :on-submit="submit"
+                />
                 <!-- END HEAD Y BOTONES -->
 
                 <div class="row">
