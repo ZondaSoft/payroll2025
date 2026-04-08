@@ -344,9 +344,7 @@ class BajasController extends Controller
     // Búsqueda
     public function search(Request $request)
     {
-        $query = Sue001::where(function($q) {
-            $q->whereNotNull('baja')->where('baja', '!=', '');
-        });
+        $query = Sue070::query();
 
         if ($request->has('search') && $request->input('search') !== '') {
             $search = $request->input('search');
