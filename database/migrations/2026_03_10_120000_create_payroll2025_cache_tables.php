@@ -11,8 +11,8 @@ return new class extends Migration
      */
     public function up(): void
     {
-        $cacheTable = config('cache.stores.database.table', 'cache');
-        $lockTable = config('cache.stores.database.lock_table', 'cache_locks');
+        $cacheTable = env('DB_CACHE_TABLE', 'payroll2025_cache');
+        $lockTable = env('DB_CACHE_LOCK_TABLE', 'payroll2025_cache_locks');
 
         if (!Schema::hasTable($cacheTable)) {
             Schema::create($cacheTable, function (Blueprint $table) {
@@ -36,8 +36,8 @@ return new class extends Migration
      */
     public function down(): void
     {
-        $cacheTable = config('cache.stores.database.table', 'cache');
-        $lockTable = config('cache.stores.database.lock_table', 'cache_locks');
+        $cacheTable = env('DB_CACHE_TABLE', 'payroll2025_cache');
+        $lockTable = env('DB_CACHE_LOCK_TABLE', 'payroll2025_cache_locks');
 
         Schema::dropIfExists($cacheTable);
         Schema::dropIfExists($lockTable);
