@@ -3,6 +3,7 @@
 namespace App\Http\Controllers;
 
 use Carbon\Carbon;
+use App\Models\Sue001;
 use App\Models\Sue070;
 use App\Models\Sue002;
 use App\Models\Sue019;
@@ -343,20 +344,22 @@ class BajasController extends Controller
     // Búsqueda
     public function search(Request $request)
     {
-        $query = Sue070::query();
+        $query = Sue001::where(function($q) {
+            $q->whereNotNull('baja')->where('baja', '!=', '');
+        });
 
-        if ($request->has('search')) {
+        if ($request->has('search') && $request->input('search') !== '') {
             $search = $request->input('search');
             $query->where(function($q) use ($search) {
-                $q->where('nombre', 'LIKE', "%{$search}%")
-                  ->orWhere('apellido', 'LIKE', "%{$search}%")
-                  ->orWhere('documento', 'LIKE', "%{$search}%")
-                  ->orWhere('legajo_numero', 'LIKE', "%{$search}%");
+                $q->where('detalle', 'LIKE', "%{$search}%")
+                  ->orWhere('nombres', 'LIKE', "%{$search}%")
+                  ->orWhere('cuil', 'LIKE', "%{$search}%")
+                  ->orWhere('codigo', 'LIKE', "%{$search}%");
             });
         }
 
-        return Inertia::render('Legajos/Search', [
-            'legajos' => $query->paginate(20),
+        return Inertia::render('Empleados/BajasSearch', [
+            'legajos' => $query->orderBy('detalle')->paginate(20),
             'filters' => $request->only('search')
         ]);
     }
