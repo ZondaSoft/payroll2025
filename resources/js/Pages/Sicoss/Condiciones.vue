@@ -5,6 +5,7 @@
 import TextInput from '@/Components/TextInput.vue';
 import Input from '@/Components/Input.vue';
 import InputError from '@/Components/InputError.vue';
+import FormHeader from '@/Components/FormHeader.vue';
 import { router, Link, useForm, usePage } from '@inertiajs/vue3';
 import { reactive, ref, onMounted, watch } from 'vue';
 import { PAISES } from '@/Data/paises';
@@ -141,99 +142,21 @@ watch(() => props.agregar, () => {
         <div class="container-xxl flex-grow-1 container-p-y">
             <div class="app-ecommerce">
                 <!-- HEAD Y BOTONES -->
-                <div class="d-flex flex-column flex-md-row justify-content-between align-items-start align-items-md-center mb-6 row-gap-4">
-                    <!-- Sección de agregar -->
-                    <div v-if="agregar" class="d-flex flex-column justify-content-center">
-                        <h4 class="mb-1">Agregar Condiciones</h4>
-                    </div>
-                    <!-- Sección de edición -->
-                    <div v-if="!agregar && edicion" class="d-flex flex-column justify-content-center">
-                        <h4 class="mb-1">Modificar Condiciones</h4>
-                    </div>
-                    <!-- Si ni agregar ni edicion están activados, muestra este mensaje -->
-                    <div v-if="!agregar && !edicion" class="d-flex flex-column justify-content-center">
-                        <h4 class="mb-1">Sicoss - Condiciones</h4>
-                    </div>
-
-                    <div class="d-flex flex-column justify-content-center" v-if="!agregar && !edicion && form.id">
-                        <div class="btn-group" role="group" aria-label="First group">
-                            <Link
-                                :href="route('sicoss.condiciones.first')"
-                                class="btn btn-outline-secondary waves-effect"
-                                data-bs-toggle="tooltip"
-                                data-bs-placement="top"
-                                data-bs-original-title="ir al primer registro"
-                                >
-                                <i class="ri-arrow-left-double-line"></i>
-                            </Link>
-                            <Link
-                                :href="route('sicoss.condiciones.previous', form.id)"
-                                class="btn btn-outline-secondary waves-effect"
-                                data-bs-toggle="tooltip"
-                                data-bs-placement="top"
-                                data-bs-original-title="ir al registro anterior"
-                                >
-                                <i class="ri-arrow-left-line"></i>
-                            </Link>
-                            <Link
-                                :href="route('sicoss.condiciones.next', form.id)"
-                                class="btn btn-outline-secondary waves-effect"
-                                data-bs-toggle="tooltip"
-                                data-bs-placement="top"
-                                data-bs-original-title="ir al registro siguiente"
-                                >
-                                <i class="ri-arrow-right-line"></i>
-                            </Link>
-                            <Link
-                                :href="route('sicoss.condiciones.last')"
-                                class="btn btn-outline-secondary waves-effect"
-                                data-bs-toggle="tooltip"
-                                data-bs-placement="top"
-                                data-bs-original-title="ir al ultimo registro"
-                                >
-                                <i class="ri-arrow-right-double-fill"></i>
-                            </Link>
-                            <a type="button" href="/sicoss/condiciones/search" class="btn btn-outline-secondary waves-effect" data-bs-toggle="tooltip" data-bs-placement="top" data-bs-original-title="Buscar ...">
-                                <i class="ri-checkbox-circle-line"></i>
-                            </a>
-                        </div>
-                    </div>
-
-                    <!-- Botones de agregar/Grabar -->
-                    <div v-if="agregar || edicion" class="d-flex align-content-center flex-wrap gap-4">
-                        <button type="submit" class="btn btn-primary">Grabar</button>
-                        <!-- <a href="/legajos" class="btn btn-outline-secondary">Cancelar 1</a> -->
-
-                        <Link
-                            v-if="agregar || edicion"
-                            :href="route('sicoss.condiciones.index')"
-                            class="btn btn-outline-secondary"
-                            >
-                            Cancelar
-                        </Link>
-                    </div>
-                    <!-- Botones de CRUD -->
-                    <div v-else class="d-flex align-content-center flex-wrap gap-4">
-                        <Link
-                            :href="route('sicoss.condiciones.create')"
-                            class="btn btn-info waves-effect waves-light"
-                            >
-                            Agregar
-                        </Link>
-                        <Link
-                            v-if="props.legajo?.id"
-                            :href="route('sicoss.condiciones.edit', props.legajo.id)"
-                            class="btn btn-outline-secondary"
-                            @click="setFocus"
-                            >
-                            Modificar
-                        </Link>
-                        <!-- <a href="/legajos/edit/{{form.id}}" class="btn btn-outline-secondary">Modificar2</a> -->
-
-                        <a type="button" 
-                            class="btn btn-danger waves-effect waves-light" style="color: white"  data-bs-toggle="modal" data-bs-target="#modalDelete">Borrar</a>
-                    </div>
-                </div>
+                <FormHeader
+                    :agregar="agregar"
+                    :edicion="edicion"
+                    :form-id="form.id"
+                    titulo="Sicoss - Condiciones"
+                    :ruta-create="route('sicoss.condiciones.create')"
+                    :ruta-edit="form.id ? route('sicoss.condiciones.edit', form.id) : null"
+                    :ruta-first="route('sicoss.condiciones.first')"
+                    :ruta-previous="form.id ? route('sicoss.condiciones.previous', form.id) : null"
+                    :ruta-next="form.id ? route('sicoss.condiciones.next', form.id) : null"
+                    :ruta-last="route('sicoss.condiciones.last')"
+                    :ruta-search="route('sicoss.condiciones.search')"
+                    :ruta-index="route('sicoss.condiciones.index')"
+                    :on-submit="submit"
+                />
                 <!-- END HEAD Y BOTONES -->
 
                 <div class="row">
