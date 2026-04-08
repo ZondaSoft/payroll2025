@@ -120,7 +120,7 @@ defineEmits(['edit', 'delete', 'grabar', 'cancelar']);
                 </Link>
                 <a v-if="rutaSearch" :href="rutaSearch" class="btn btn-outline-secondary waves-effect" 
                     data-bs-toggle="tooltip" data-bs-placement="top" data-bs-original-title="Buscar">
-                    <i class="ri-search-line"></i>
+                    <i class="ri-checkbox-circle-line"></i>
                 </a>
             </div>
         </div>

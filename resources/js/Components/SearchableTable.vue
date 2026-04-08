@@ -192,7 +192,7 @@ const getDetailUrl = (item) => {
                                     data-bs-toggle="tooltip" 
                                     data-bs-placement="top" 
                                     data-bs-original-title="Ver detalle">
-                                    <i class="ri-search-line"></i>
+                                    <i class="ri-checkbox-circle-line"></i>
                                 </Link>
                             </td>
                         </tr>

@@ -194,7 +194,7 @@ watch(() => props.agregar, () => {
                                 <i class="ri-arrow-right-double-fill"></i>
                             </Link>
                             <a type="button" href="/sicoss/situacion/search" class="btn btn-outline-secondary waves-effect" data-bs-toggle="tooltip" data-bs-placement="top" data-bs-original-title="Buscar ...">
-                                <i class="ri-search-line"></i>
+                                <i class="ri-checkbox-circle-line"></i>
                             </a>
                         </div>
                     </div>
