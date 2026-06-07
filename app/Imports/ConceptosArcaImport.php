@@ -121,7 +121,7 @@ class ConceptosArcaImport
                     'id_empresa'     => $this->idEmpresa,
                     'nombre_archivo' => $this->nom_arch,
                     'tamanio_archivo'=> $this->tam_arch,
-                    'detalle' => 'Fila incompleta: falta Código AFIP o Código Contribuyente',
+                    'detalle' => 'Fila incompleta: falta Código ARCA o Código Contribuyente',
                 ]);
                 return;
             }
@@ -179,7 +179,7 @@ class ConceptosArcaImport
                 'aportes_especiales' => $this->parseDecimal($row[19] ?? null),
             ];
 
-            // Si el checkbox de generar concepto de liquidación interno está activo y no existe un concepto con ese código AFIP, lo creo automáticamente
+            // Si el checkbox de generar concepto de liquidación interno está activo y no existe un concepto con ese código ARCA, lo creo automáticamente
             $existeConcepto = Sue102::where('codigo', $codigoContribuyente)
                     ->exists();
             

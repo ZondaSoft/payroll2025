@@ -29,15 +29,23 @@ class LsdEmision extends Model
         'fecha_envio',
         'archivo_pdf',
         'archivo_xml',
+        'archivo_txt',
+        'hash_txt',
+        'cantidad_lineas',
+        'tipo_liquidacion',
+        'fecha_pago',
+        'identificador_envio',
     ];
 
     protected $casts = [
         'fecha_emision' => 'date',
         'periodo_desde' => 'date',
         'periodo_hasta' => 'date',
+        'fecha_pago' => 'date',
         'fecha_generacion' => 'datetime',
         'fecha_envio' => 'datetime',
         'monto_total' => 'decimal:2',
+        'tipo_liquidacion' => 'integer',
     ];
 
     // Relaciones
@@ -53,7 +61,7 @@ class LsdEmision extends Model
 
     public function items()
     {
-        return $this->hasMany(LsdItem::class, 'lsd_periodo_id');
+        return $this->hasMany(LsdItem::class, 'lsd_emision_id');
     }
 
     // Scopes

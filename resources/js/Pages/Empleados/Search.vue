@@ -17,8 +17,17 @@ const columns = [
     { key: 'detalle', label: 'Apellido y Nombre' },
     { key: 'nombres', label: 'Nombres' },
     { key: 'cuil',    label: 'CUIL' },
+    { key: 'empresa', label: 'Empresa' },
     { key: 'alta',    label: 'Alta' },
+    { key: 'baja',    label: 'BAJA' },
 ];
+
+// Formatea "YYYY-MM-DD..." como "DD/MM/AAAA" sin parsear con Date (evita corrimiento por timezone).
+const fmtFecha = (d) => {
+    if (!d) return '—';
+    const [y, m, day] = String(d).slice(0, 10).split('-');
+    return (y && m && day) ? `${day}/${m}/${y}` : String(d);
+};
 </script>
 
 <template>
@@ -29,14 +38,18 @@ const columns = [
         :detail-route="route('legajos.show', ':id')"
         :columns="columns"
         title="Búsqueda de Empleados"
-        subtitle="Búsqueda rápida entre los empleados activos"
+        subtitle="Búsqueda rápida de empleados (incluye activos y de baja)"
         :back-route="route('legajos.index')"
         back-text="Volver"
         search-placeholder="Buscar por apellido, nombre, CUIL o legajo..."
-        no-results-text="No se encontraron empleados activos"
+        no-results-text="No se encontraron empleados"
     >
         <template #column-alta="{ item }">
-            {{ item.alta ? new Date(item.alta).toLocaleDateString('es-AR') : '—' }}
+            {{ fmtFecha(item.alta) }}
+        </template>
+        <template #column-baja="{ item }">
+            <span v-if="item.baja" class="badge bg-danger">{{ fmtFecha(item.baja) }}</span>
+            <span v-else class="text-muted">—</span>
         </template>
     </SearchableTable>
 </template>

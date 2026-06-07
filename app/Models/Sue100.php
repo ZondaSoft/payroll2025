@@ -22,11 +22,13 @@ class Sue100 extends Model
         'banco',
         'fecha_aportes',
         'periodo_aporte',
+        'importe_detraer',
     ];
 
     protected $casts = [
         'fecha' => 'date',
         'fecha_pago' => 'date',
         'fecha_aportes' => 'date',
+        'importe_detraer' => 'decimal:2',
     ];
 }

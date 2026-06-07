@@ -12,6 +12,9 @@ class ConceptosLiquidacionController extends Controller
 {
     public function index($id = null, $direction = null)
     {
+        // Corrige conceptos con tipo numérico legacy según los Rangos de conceptos (sue089s).
+        $ajustesTipos = Sue102::normalizarTiposNumericos();
+
         $concepto = null;
         $agregar = false;
         $edicion = false;
@@ -71,18 +74,25 @@ class ConceptosLiquidacionController extends Controller
             'active' => $active,
             'empresa' => $empresa,
             'csrf_token' => csrf_token(),
+            'ajustesTipos' => $ajustesTipos,
         ]);
     }
 
-    public function create()
+    public function create(Request $request)
     {
         $empresa = Datoempr::first();
         if (!$empresa) {
             return redirect('/empresa/');
         }
 
+        // Permite precargar el código (ej. al venir desde "conceptos sin parametrizar" del LSD)
+        $concepto = new Sue102();
+        if ($request->filled('codigo')) {
+            $concepto->codigo = (int) $request->query('codigo');
+        }
+
         return Inertia::render('Liquidacion/Conceptos', [
-            'concepto' => new Sue102(),
+            'concepto' => $concepto,
             'agregar' => true,
             'edicion' => true,
             'active' => 65,

@@ -5,6 +5,7 @@ import InputError from '@/Components/InputError.vue';
 import FormHeader from '@/Components/FormHeader.vue';
 import { router, Link, useForm, usePage } from '@inertiajs/vue3';
 import { reactive, ref, onMounted, watch, nextTick, computed } from 'vue';
+import { avisarAjustesTipos } from '@/utils/avisarAjustesTipos';
 
 const props = defineProps({
     concepto: {
@@ -41,7 +42,13 @@ const props = defineProps({
         type: Object,
         required: true
     },
+    ajustesTipos: {
+        type: Array,
+        default: () => [],
+    },
 });
+
+onMounted(() => avisarAjustesTipos(props.ajustesTipos));
 
 // Estado local para mantener el modo edición/agregar
 const modoEdicion = ref(props.edicion);

@@ -57,6 +57,11 @@ class HandleInertiaRequests extends Middleware
             return 'layouts/legajos';
         }
 
+        // Convenios Colectivos (CCT)
+        if ($request->is('convenios*')) {
+            return 'layouts/legajos';
+        }
+
         // Liquidaciones
         // dd($request);
 
@@ -77,6 +82,21 @@ class HandleInertiaRequests extends Middleware
 
         // LSD
         if ($request->is('lsd*')) {
+            return 'layouts/legajos';
+        }
+
+        // Grupos Empresarios
+        if ($request->is('grupos-empresarios*')) {
+            return 'layouts/legajos';
+        }
+
+        // Config / Parametrizaciones
+        if ($request->is('config*')) {
+            return 'layouts/legajos';
+        }
+
+        // ARCA (conceptos)
+        if ($request->is('arca*')) {
             return 'layouts/legajos';
         }
 

@@ -3,6 +3,7 @@
 namespace App\Models;
 
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Support\Facades\DB;
 
 class Sue102 extends Model
 {
@@ -51,5 +52,59 @@ class Sue102 extends Model
     public function getTipoNombreAttribute()
     {
         return self::TIPOS[$this->tipo] ?? 'Desconocido';
+    }
+
+    /**
+     * Corrige "on the fly" los conceptos cuyo `tipo` quedó en formato numérico legacy
+     * (1..9) en vez de letra, asignándoles el tiporem del rango de sue089s
+     * (Configuración > Rangos de conceptos) que contiene su código.
+     *
+     * Es idempotente: tras corregir, no quedan tipos numéricos y devuelve [].
+     *
+     * @return array<int, array{codigo:mixed, detalle:?string, anterior:string, nuevo:string}>
+     *         Lista de ajustes realizados (vacía si no hubo ninguno).
+     */
+    public static function normalizarTiposNumericos(): array
+    {
+        // Conceptos con tipo en formato numérico (no letra)
+        $numericos = static::whereRaw("tipo REGEXP '^[0-9]+$'")
+            ->get(['id', 'codigo', 'detalle', 'tipo']);
+
+        if ($numericos->isEmpty()) {
+            return [];
+        }
+
+        $rangos = DB::table('sue089s')->get();
+
+        $tipoPorCodigo = function ($codigo) use ($rangos): ?string {
+            foreach ($rangos as $r) {
+                if ($codigo >= $r->desde && $codigo <= $r->hasta) {
+                    $t = trim($r->tiporem ?? '');
+                    return $t !== '' ? $t : null;
+                }
+            }
+            return null;
+        };
+
+        $ajustes = [];
+        foreach ($numericos as $c) {
+            $nuevo = $tipoPorCodigo($c->codigo);
+
+            // Sin rango que lo cubra → no se puede corregir, se deja como está
+            if ($nuevo === null || $nuevo === $c->tipo) {
+                continue;
+            }
+
+            static::where('id', $c->id)->update(['tipo' => $nuevo]);
+
+            $ajustes[] = [
+                'codigo'   => $c->codigo,
+                'detalle'  => $c->detalle,
+                'anterior' => $c->tipo,
+                'nuevo'    => $nuevo,
+            ];
+        }
+
+        return $ajustes;
     }
 }

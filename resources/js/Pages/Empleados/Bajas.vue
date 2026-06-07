@@ -105,7 +105,9 @@ const form = useForm({
     cod_jerarq: props.legajo?.cod_jerarq ?? '',
     codsector: props.legajo?.codsector ?? '',
     cuadrilla: props.legajo?.cuadrilla ?? '',
-    cod_obsoc: props.legajo?.cod_obsoc ?? '',
+    cod_obsoc: (props.legajo?.cod_obsoc ?? '') !== ''
+        ? String(props.legajo.cod_obsoc).padStart(6, '0')
+        : '',
     cod_sindic: props.legajo?.cod_sindic ?? '',
     situacion: props.legajo?.situacion ?? '',
     cod_contra: props.legajo?.cod_contra ?? '',
@@ -137,8 +139,12 @@ const determineActionRoute = () => {
 const errors = usePage().props.errors;
 
 // Opciones formateadas para el multiselect de obras sociales
+// Código de obra social = 6 dígitos con ceros a la izquierda (varchar(6)).
 const obrasOptions = computed(() =>
-    props.obras.map(p => ({ value: p.codigo, label: `${p.codigo} - ${p.detalle}` }))
+    props.obras.map(p => {
+        const cod = String(p.codigo ?? '').padStart(6, '0');
+        return { value: cod, label: `${cod} - ${p.detalle}` };
+    })
 );
 
 const actividadesOptions = computed(() =>

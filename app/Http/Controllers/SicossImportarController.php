@@ -127,10 +127,10 @@ class SicossImportarController extends Controller
     public function importar(Request $request)
     {
         $request->validate([
-            'file' => 'required|mimes:xls,xlsx|max:2048',
+            'file' => 'required|mimes:xlsx|max:2048',
             ], [
             'file.required' => 'Por favor, selecciona un archivo para subir.',
-            'file.mimes' => 'El archivo debe ser un documento Excel con extensión .xls o .xlsx.',
+            'file.mimes' => 'El archivo debe ser un libro Excel en formato .xlsx. Si tiene un archivo .xls debe convertirlo a .xlsx antes de importarlo.',
             'file.max' => 'El archivo no debe ser mayor a 2 MB.', // 1024 KB = 1 MB
         ]);
 
@@ -158,6 +158,7 @@ class SicossImportarController extends Controller
 
         //$tipoliq = (int) $request->input('tipoliq');
         $idEmpresa = (int) $request->input('empresa');
+        session(['sicoss_import_empresa_id' => $idEmpresa]);
 
         $comenta1 = $request->input('comenta1');
         $nom_arch = $request->input('nom_arch');
@@ -170,6 +171,31 @@ class SicossImportarController extends Controller
         // ⚡️ Limpio los logs antes de correr el import:
         ImportLiquidacionOk::truncate();
         ImportLiquidacionErr::truncate();
+
+        // Chequeo de CUIL duplicados en legajos activos de la empresa seleccionada
+        $codEmpresa = Sue086::find($idEmpresa)?->codigo;
+        $queryDup = Sue001::whereNull('baja')
+            ->select('cuil', DB::raw('COUNT(*) as cantidad'))
+            ->groupBy('cuil')
+            ->having('cantidad', '>', 1);
+
+        if ($codEmpresa !== null && $codEmpresa !== '') {
+            $queryDup->where('grupo_emp', $codEmpresa);
+        }
+
+        $duplicados = $queryDup->get();
+
+        foreach ($duplicados as $dup) {
+            $qLeg = Sue001::where('cuil', $dup->cuil)->whereNull('baja');
+            if ($codEmpresa !== null && $codEmpresa !== '') {
+                $qLeg->where('grupo_emp', $codEmpresa);
+            }
+            $legajos = $qLeg->pluck('codigo')->implode(', ');
+            ImportLiquidacionErr::create([
+                'registro' => 0,
+                'detalle' => "CUIL duplicado: {$dup->cuil} ({$dup->cantidad} legajos activos: {$legajos})",
+            ]);
+        }
 
         // Limites de tiempo desactivoados
         set_time_limit(0); // sin límite (o pon 300 para 5 min)
@@ -299,7 +325,9 @@ class SicossImportarController extends Controller
     }
 
     public function exportarOk() {
-        return Excel::download(new ImportSicossOkExport, 'importacion_liquidacion.xlsx');
+        $idEmpresa = session('sicoss_import_empresa_id');
+        $empresa = Sue086::find($idEmpresa);
+        return Excel::download(new ImportSicossOkExport($empresa), 'importacion_liquidacion.xlsx');
     }
 
     public function exportarErr() {

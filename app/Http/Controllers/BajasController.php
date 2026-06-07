@@ -15,7 +15,6 @@ use App\Models\Sue030;
 use App\Models\Sue014;
 use App\Models\Sue006;
 use App\Models\Sue054;
-use App\Models\Sue009;
 use App\Models\Sue015;
 use App\Models\Sue007;
 use App\Models\Sue107;
@@ -130,7 +129,6 @@ class BajasController extends Controller
         $jerarquias = Sue014::orderBy('detalle')->get();
         $categorias = Sue006::orderBy('detalle')->whereNotNull('codigo')->where('codigo', '!=', "")->get();
         $cuadrillas = Sue054::orderBy('detalle')->get();
-        $obras      = Sue009::orderBy('detalle')->whereNotNull('codigo')->where('codigo', '!=', "")->get();
         $sindicatos = Sue015::orderBy('detalle')->whereNotNull('codigo')->where('codigo', '!=', "")->get();
         $convenios  = Sue007::orderBy('detalle')->get();
         $contratos = Sue107::orderBy('detalle')->get(['codigo','detalle','duracion']);
@@ -228,12 +226,62 @@ class BajasController extends Controller
     }
 
     /**
-     * Muestra los detalles de un empleado
+     * Muestra los detalles de un empleado de baja
      */
-    public function show(Sue070 $empleado)
+    public function show($id)
     {
-        return Inertia::render('Empleados/Show', [
-            'empleado' => $empleado,
+        $legajo = Sue070::findOrFail($id);
+        $agregar = false;
+        $edicion = false;
+        $active = 65;
+
+        // Tablas complementarias
+        $grupos     = Sue086::orderBy('detalle')->whereNotNull('codigo')->where('codigo', '!=', "")->get();
+        $sectores   = Sue011::orderBy('detalle')->whereNotNull('codigo')->where('codigo', '!=', "")->get();
+        $situacionesLab = Sue005::orderBy('detalle')->whereNotNull('codigo')->where('codigo', '!=', "")->get();
+        $ccostos    = Sue030::orderBy('detalle')->get();
+        $jerarquias = Sue014::orderBy('detalle')->get();
+        $categorias = Sue006::orderBy('detalle')->whereNotNull('codigo')->where('codigo', '!=', "")->get();
+        $cuadrillas = Sue054::orderBy('detalle')->get();
+        $sindicatos = Sue015::orderBy('detalle')->whereNotNull('codigo')->where('codigo', '!=', "")->get();
+        $convenios  = Sue007::orderBy('detalle')->get();
+        $contrataciones = Sicoss08::orderBy('codigo')->get();
+        $actividades = Sicoss01::orderBy('codigo')->get();
+        $situaciones = Sicoss12::orderBy('codigo')->get();
+        $obras2 = SicossObras::orderBy('codigo')->get();
+        $sinie = SicossSinie::orderBy('codigo')->get();
+        $provincias = Sue012::orderBy('codigo')->where('codigo','!=','')->get();
+
+        if ($legajo->created_at) {
+            $legajo->fecha_alta = Carbon::parse($legajo->created_at)->format('d/m/Y');
+            $legajo->hora = $legajo->created_at->format('H:i');
+        } else {
+            $legajo->fecha_alta = null;
+            $legajo->hora = null;
+        }
+
+        $familiares = Sue002::orderBy('paren')->where('legajo', '=', $legajo->codigo)->get();
+
+        return Inertia::render('Empleados/Bajas', [
+            'legajo' => $legajo,
+            'agregar' => $agregar,
+            'edicion' => $edicion,
+            'active' => $active,
+            'provincias' => $provincias,
+            'grupos' => $grupos,
+            'jerarquias' => $jerarquias,
+            'categorias' => $categorias,
+            'ccostos' => $ccostos,
+            'sectores' => $sectores,
+            'cuadrillas' => $cuadrillas,
+            'obras' => $obras2,
+            'sindicatos' => $sindicatos,
+            'convenios' => $convenios,
+            'contrataciones' => $contrataciones,
+            'situacionesLab' => $situacionesLab,
+            'actividades' => $actividades,
+            'situaciones' => $situaciones,
+            'sinie' => $sinie,
         ]);
     }
 
@@ -288,7 +336,7 @@ class BajasController extends Controller
     // Primer registro
     public function first()
     {
-        $legajo = Sue070::orderBy('id', 'asc')->first();
+        $legajo = Sue070::orderBy('codigo', 'asc')->first();
 
         if (!$legajo) {
             return redirect()->route('bajas.index')
@@ -301,7 +349,7 @@ class BajasController extends Controller
     // Último registro
     public function last()
     {
-        $legajo = Sue070::orderBy('id', 'desc')->first();
+        $legajo = Sue070::orderBy('codigo', 'desc')->first();
 
         if (!$legajo) {
             return redirect()->route('bajas.index')
@@ -314,31 +362,35 @@ class BajasController extends Controller
     // Registro anterior
     public function previous($id)
     {
-        $previousId = Sue070::where('id', '<', $id)
-            ->orderBy('id', 'desc')
-            ->first()?->id;
+        $current = Sue070::findOrFail($id);
 
-        if (!$previousId) {
+        $previous = Sue070::where('codigo', '<', $current->codigo)
+            ->orderBy('codigo', 'desc')
+            ->first();
+
+        if (!$previous) {
             return redirect()->route('bajas.show', $id)
                 ->with('warning', 'No hay registro anterior');
         }
 
-        return redirect()->route('bajas.show', $previousId);
+        return redirect()->route('bajas.show', $previous->id);
     }
 
     // Registro siguiente
     public function next($id)
     {
-        $nextId = Sue070::where('id', '>', $id)
-            ->orderBy('id', 'asc')
-            ->first()?->id;
+        $current = Sue070::findOrFail($id);
 
-        if (!$nextId) {
+        $next = Sue070::where('codigo', '>', $current->codigo)
+            ->orderBy('codigo', 'asc')
+            ->first();
+
+        if (!$next) {
             return redirect()->route('bajas.show', $id)
                 ->with('warning', 'No hay registro siguiente');
         }
 
-        return redirect()->route('bajas.show', $nextId);
+        return redirect()->route('bajas.show', $next->id);
     }
 
     // Búsqueda

@@ -23,6 +23,7 @@
 
     <title>Payroll 2025 | Zonda Software</title>
 
+    <meta name="csrf-token" content="{{ csrf_token() }}">
     <meta name="description" content="" />
 
     <!-- Favicon -->
@@ -157,7 +158,7 @@
             <li class="menu-header mt-5">
               <span class="menu-header-text" data-i18n="Principal">Principal</span>
             </li>
-            <li class="menu-item {{ request()->routeIs('legajos.*') || request()->routeIs('bajas.*') ? 'active open' : '' }}">
+            <li class="menu-item {{ request()->routeIs('legajos.*') || request()->routeIs('bajas.*') || request()->routeIs('convenios.*') ? 'active open' : '' }}">
               <a href="javascript:void(0);" class="menu-link menu-toggle">
                 <i class="menu-icon tf-icons ri-bill-line"></i>
                 <div data-i18n="Personal">Personal</div>
@@ -165,12 +166,17 @@
               <ul class="menu-sub">
                 <li class="menu-item {{ request()->routeIs('legajos.*') ? 'active' : '' }}">
                   <a href="{{ route('legajos.index') }}" class="menu-link">
-                    <div data-i18n="Empleados activos">Empleados activos</div>
+                    <div data-i18n="Empleados">Empleados</div>
                   </a>
                 </li>
-                <li class="menu-item {{ request()->routeIs('bajas.*') ? 'active' : '' }}">
-                  <a href="{{ url('/bajas') }}" class="menu-link">
+                <!-- <li class="menu-item { { request()->routeIs('bajas.*') ? 'active' : '' }}">
+                  <a href="{ { url('/bajas') }}" class="menu-link">
                     <div data-i18n="Empleados de Baja">Empleados de Baja</div>
+                  </a>
+                </li> -->
+                <li class="menu-item {{ request()->routeIs('convenios.*') ? 'active' : '' }}">
+                  <a href="{{ route('convenios.index') }}" class="menu-link">
+                    <div data-i18n="Convenios Colectivos CCT">Convenios Colectivos CCT</div>
                   </a>
                 </li>
               </ul>
@@ -210,7 +216,7 @@
               </ul>
             </li>
             <!-- Libro de sueldo digital -->
-            <li class="menu-item {{ request()->routeIs('sicoss.importar*') || request()->routeIs('arca.importar*') || request()->routeIs('basedat.*') || request()->routeIs('lsd.*') ? 'active open' : '' }}">
+            <li class="menu-item {{ request()->routeIs('sicoss.importar*') || request()->routeIs('arca.importar*') || request()->routeIs('arca.conceptos.*') || request()->routeIs('basedat.*') || request()->routeIs('lsd.*') ? 'active open' : '' }}">
               <a href="javascript:void(0);" class="menu-link menu-toggle">
                 <i class="menu-icon tf-icons ri-bill-line"></i>
                 <div data-i18n="Libro Sueldo Digital">Libro Sueldo Digital</div>
@@ -221,9 +227,9 @@
                     <div data-i18n="Importar legajos Sicoss">Importar legajos Sicoss</div>
                   </a>
                 </li>
-                <li class="menu-item {{ request()->routeIs('arca.importar*') ? 'active' : '' }}">
-                  <a href="{{ route('arca.importar') }}" class="menu-link">
-                    <div data-i18n="Importar conceptos ARCA">Importar conceptos ARCA</div>
+                <li class="menu-item {{ request()->routeIs('arca.conceptos.*') ? 'active' : '' }}">
+                  <a href="{{ url('/arca/conceptos') }}" class="menu-link">
+                    <div data-i18n="Conceptos ARCA">Conceptos ARCA</div>
                   </a>
                 </li>
                 <li class="menu-item {{ request()->routeIs('basedat.*') ? 'active' : '' }}">
@@ -273,7 +279,13 @@
             <li class="menu-header mt-5">
               <span class="menu-header-text" data-i18n="Configuracion">Configuracion</span>
             </li>
-            <li class="menu-item {{ request()->routeIs('sicoss.actividades.*') || request()->routeIs('sicoss.condiciones.*') || request()->routeIs('sicoss.modalidades.*') || request()->routeIs('sicoss.situacion.*') || request()->routeIs('sicoss.obras.*') || request()->routeIs('sicoss.localidades.*') || request()->routeIs('sicoss.siniestros.*') ? 'active open' : '' }}">
+            <li class="menu-item {{ request()->routeIs('grupos.empresarios.*') ? 'active' : '' }}">
+              <a href="{{ url('/grupos-empresarios') }}" class="menu-link">
+                <i class="menu-icon tf-icons ri-building-2-line"></i>
+                <div data-i18n="Grupo empresario">Grupo empresario</div>
+              </a>
+            </li>
+            <li class="menu-item {{ request()->routeIs('sicoss.actividades.*') || request()->routeIs('sicoss.condiciones.*') || request()->routeIs('sicoss.modalidades.*') || request()->routeIs('sicoss.situacion.*') || request()->routeIs('sicoss.obras.*') || request()->routeIs('sicoss.localidades.*') || request()->routeIs('sicoss.siniestros.*') || request()->routeIs('sicoss.importes-detraer.*') || request()->routeIs('sicoss.topes.*') ? 'active open' : '' }}">
               <a href="javascript:void(0);" class="menu-link menu-toggle">
                 <i class="menu-icon tf-icons ri-git-commit-line"></i>
                 <div data-i18n="Sicoss">Sicoss</div>
@@ -331,6 +343,25 @@
                     </a>
                 </li>
               </ul>
+
+              <ul class="menu-sub">
+                <li class="menu-item {{ request()->routeIs('sicoss.importes-detraer.*') ? 'active' : '' }}">
+                    <a href="{{ url('/sicoss/importes-detraer') }}" class="menu-link">
+                        <div data-i18n="Importes a detraer">Importes a detraer</div>
+                    </a>
+                </li>
+                <li class="menu-item {{ request()->routeIs('sicoss.topes.*') ? 'active' : '' }}">
+                    <a href="{{ url('/sicoss/topes') }}" class="menu-link">
+                        <div data-i18n="Topes SIPA">Topes SIPA</div>
+                    </a>
+                </li>
+              </ul>
+            </li>
+            <li class="menu-item {{ request()->is('config/parametros*') ? 'active' : '' }}">
+              <a href="{{ url('/config/parametros') }}" class="menu-link">
+                <i class="menu-icon tf-icons ri-settings-3-line"></i>
+                <div data-i18n="Rangos de conceptos">Rangos de conceptos</div>
+              </a>
             </li>
           </ul>
 

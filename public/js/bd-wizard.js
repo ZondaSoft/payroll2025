@@ -5,7 +5,10 @@ $("#wizard").steps({
     bodyTag: "section",
     transitionEffect: "none",
     stepsOrientation: "vertical",
-    titleTemplate: '<span class="number">#index#</span>'
+    titleTemplate: '<span class="number">#index#</span>',
+    onFinished: function (event, currentIndex) {
+        window.location.href = '/';
+    }
 });
 
 //Form control

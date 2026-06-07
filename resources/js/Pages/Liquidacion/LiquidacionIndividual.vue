@@ -1,7 +1,9 @@
 <script setup>
 import FormHeader from '@/Components/FormHeader.vue';
-import { computed, ref, watch } from 'vue';
+import { computed, ref, watch, nextTick, onMounted } from 'vue';
 import { router } from '@inertiajs/vue3';
+import axios from 'axios';
+import { avisarAjustesTipos } from '@/utils/avisarAjustesTipos';
 
 const props = defineProps({
     empleado: {
@@ -36,7 +38,13 @@ const props = defineProps({
         type: Number,
         default: null,
     },
+    ajustesTipos: {
+        type: Array,
+        default: () => [],
+    },
 });
+
+onMounted(() => avisarAjustesTipos(props.ajustesTipos));
 
 // Fila seleccionada en la tabla de conceptos
 const selectedRowIndex = ref(props.conceptos?.length > 0 ? 0 : null);
@@ -51,6 +59,83 @@ const selectedPeriodoKey  = ref(
         ? `${props.periodo}|${props.tipoliq ?? ''}`
         : ''
 );
+
+// Búsqueda progresiva de empleados
+const tablaLimpia = ref(false);
+const busquedaEmpleado = ref('');
+const dropdownAbierto = ref(false);
+
+// Inicializar texto del input si hay empleado seleccionado
+if (props.legajoId && props.legajos.length) {
+    const leg = props.legajos.find(l => l.id === props.legajoId);
+    if (leg) busquedaEmpleado.value = `${leg.codigo} — ${leg.detalle}, ${leg.nombres}`;
+}
+
+watch(busquedaEmpleado, () => { indiceResaltado.value = -1; });
+
+const legajosFiltrados = computed(() => {
+    const q = busquedaEmpleado.value.toLowerCase().trim();
+    if (!q) return props.legajos;
+    return props.legajos.filter(leg =>
+        (leg.codigo || '').toString().toLowerCase().includes(q) ||
+        (leg.detalle || '').toLowerCase().includes(q) ||
+        (leg.nombres || '').toLowerCase().includes(q) ||
+        (leg.cuil || '').toLowerCase().includes(q)
+    );
+});
+
+const indiceResaltado = ref(-1);
+
+const seleccionarLegajo = (leg) => {
+    selectedLegajoId.value = leg.id;
+    busquedaEmpleado.value = `${leg.codigo} — ${leg.detalle}, ${leg.nombres}`;
+    dropdownAbierto.value = false;
+    indiceResaltado.value = -1;
+    tablaLimpia.value = false;
+    buscar();
+};
+
+const onFocusBusqueda = () => {
+    dropdownAbierto.value = true;
+    indiceResaltado.value = -1;
+    busquedaEmpleado.value = '';
+    selectedLegajoId.value = '';
+};
+
+const onBlurBusqueda = () => {
+    setTimeout(() => { dropdownAbierto.value = false; indiceResaltado.value = -1; }, 200);
+};
+
+const onKeydownBusqueda = (e) => {
+    if (!dropdownAbierto.value || legajosFiltrados.value.length === 0) return;
+
+    if (e.key === 'ArrowDown') {
+        e.preventDefault();
+        indiceResaltado.value = (indiceResaltado.value + 1) % legajosFiltrados.value.length;
+        scrollAlElemento();
+    } else if (e.key === 'ArrowUp') {
+        e.preventDefault();
+        indiceResaltado.value = indiceResaltado.value <= 0
+            ? legajosFiltrados.value.length - 1
+            : indiceResaltado.value - 1;
+        scrollAlElemento();
+    } else if (e.key === 'Enter') {
+        e.preventDefault();
+        if (indiceResaltado.value >= 0 && indiceResaltado.value < legajosFiltrados.value.length) {
+            seleccionarLegajo(legajosFiltrados.value[indiceResaltado.value]);
+        }
+    } else if (e.key === 'Escape') {
+        dropdownAbierto.value = false;
+        indiceResaltado.value = -1;
+    }
+};
+
+const scrollAlElemento = () => {
+    nextTick(() => {
+        const item = document.querySelector('.dropdown-legajos .item-resaltado');
+        if (item) item.scrollIntoView({ block: 'nearest' });
+    });
+};
 
 // Recarga parcial de legajos según período y estado del filtro
 const recargarLegajos = () => {
@@ -70,6 +155,7 @@ const recargarLegajos = () => {
 
 watch(selectedPeriodoKey, () => {
     recargarLegajos();
+    if (selectedLegajoId.value) buscar();
 });
 
 watch(filtrarPeriodosActivo, () => {
@@ -127,6 +213,7 @@ const TIPOS_LIQ = {
     3: '2da. Quincena',
     4: 'SAC',
     5: 'Liq. Final',
+    6: 'DIF.HAB.',
 };
 
 const formatPeriodoConTipo = (periodoObj) => {
@@ -163,6 +250,37 @@ const netoTotal = computed(() =>
     + totales.value.asignaciones
     + totales.value.no_remunerativo
 );
+
+// Modal confirmación de eliminación
+const mostrarModalEliminar = ref(false);
+const eliminando = ref(false);
+
+const abrirModalEliminar = () => {
+    if (!props.empleado || !props.periodo) return;
+    mostrarModalEliminar.value = true;
+};
+
+const confirmarEliminar = async () => {
+    eliminando.value = true;
+    try {
+        const [periodoStr, tipoliqStr] = String(selectedPeriodoKey.value || '').split('|');
+        await axios.delete(route('liquidacion.individual.eliminar'), {
+            data: {
+                legajo_codigo: props.empleado.codigo,
+                periodo: periodoStr || props.periodo,
+                tipoliq: tipoliqStr || props.tipoliq,
+            }
+        });
+        mostrarModalEliminar.value = false;
+        tablaLimpia.value = true;
+        // Recargar para reflejar los cambios
+        buscar();
+    } catch (e) {
+        alert('Error al eliminar: ' + (e.response?.data?.message || e.message));
+    } finally {
+        eliminando.value = false;
+    }
+};
 </script>
 
 <template>
@@ -183,19 +301,58 @@ const netoTotal = computed(() =>
                 <div class="card">
                     <div class="card-body py-3" style="font-size: 0.875rem;">
                         <div class="row g-3 align-items-end">
-                            <!-- Selector de empleado -->
-                            <div class="col-12 col-md-5 mt-1">
+                            <!-- Selector de empleado con búsqueda progresiva -->
+                            <div class="col-12 col-md-5 mt-1" style="position: relative;">
                                 <i class="ri-user-line ri-20px text-primary"></i>
                                 <label class="form-label mb-1">&nbsp;Empleado</label>
-                                <select class="form-select" style="font-size: 0.75rem; max-height: 39px;" v-model="selectedLegajoId">
-                                    <option value="">— Seleccionar empleado —</option>
-                                    <option v-for="leg in legajos" :key="leg.id" :value="leg.id">
-                                        {{ leg.codigo }} — {{ leg.detalle }}, {{ leg.nombres }}
-                                    </option>
-                                </select>
+                                <div style="position: relative;">
+                                    <input
+                                        type="text"
+                                        class="form-control"
+                                        style="font-size: 0.75rem; max-height: 39px; padding-right: 28px;"
+                                        v-model="busquedaEmpleado"
+                                        @focus="onFocusBusqueda"
+                                        @blur="onBlurBusqueda"
+                                        @keydown="onKeydownBusqueda"
+                                        placeholder="Buscar por legajo, apellido, nombre o CUIL..."
+                                        autocomplete="off"
+                                    >
+                                    <i
+                                        v-if="busquedaEmpleado"
+                                        class="ri-close-line"
+                                        style="position: absolute; right: 8px; top: 50%; transform: translateY(-50%); cursor: pointer; font-size: 1rem; color: #999;"
+                                        @mousedown.prevent="busquedaEmpleado = ''; selectedLegajoId = ''; dropdownAbierto = false; tablaLimpia = true;"
+                                    ></i>
+                                </div>
+                                <ul
+                                    v-if="dropdownAbierto && legajosFiltrados.length > 0"
+                                    class="list-group shadow dropdown-legajos"
+                                    style="position: absolute; z-index: 1050; width: calc(100% - 24px); max-height: 250px; overflow-y: auto; font-size: 0.75rem; background-color: #fff;"
+                                >
+                                    <li
+                                        v-for="(leg, idx) in legajosFiltrados"
+                                        :key="leg.id"
+                                        class="list-group-item list-group-item-action py-1 px-2"
+                                        :class="{ 'active item-resaltado': idx === indiceResaltado }"
+                                        style="cursor: pointer;"
+                                        @mousedown.prevent="seleccionarLegajo(leg)"
+                                    >
+                                        <strong>{{ leg.codigo }}</strong> — {{ leg.detalle }}, {{ leg.nombres }}
+                                        <span class="text-muted ms-2">{{ leg.cuil }}</span>
+                                    </li>
+                                </ul>
+                            </div>
+                            <!-- Foto del empleado -->
+                            <div class="col-auto d-flex align-items-end mt-1">
+                                <img
+                                    :src="empleado?.foto_url || '/img/avatars/1.png'"
+                                    alt="Foto empleado"
+                                    class="rounded-circle border"
+                                    style="width: 55px; height: 55px; object-fit: cover;"
+                                >
                             </div>
                             <!-- Selector de período -->
-                            <div class="col-6 col-md-3 mt-1">
+                            <div class="col-6 col-md-3 mt-1 ms-9">
                                 <label class="form-label mb-1 d-flex align-items-center gap-1">
                                     Período
                                     <button
@@ -224,12 +381,6 @@ const netoTotal = computed(() =>
                                         {{ formatPeriodoConTipo(per) }}
                                     </option>
                                 </select>
-                            </div>
-                            <!-- Botón buscar -->
-                            <div class="col-6 col-md-2 align-self-center pt-5">
-                                <button type="button" class="btn btn-primary w-100" style="font-size: 0.75rem;" @click="buscar">
-                                    <i class="ri-search-line me-1"></i> Buscar
-                                </button>
                             </div>
                         </div>
                     </div>
@@ -362,10 +513,11 @@ const netoTotal = computed(() =>
                                 </button>
                                 <button
                                     type="button"
-                                    class="btn btn-icon btn-sm"
+                                    class="btn btn-icon btn-sm btn-eliminar-liq"
                                     title="Eliminar"
                                     data-bs-toggle="tooltip"
                                     data-bs-placement="bottom"
+                                    @click="abrirModalEliminar"
                                 >
                                     <i class="ri-delete-bin-line ri-20px text-secondary"></i>
                                 </button>
@@ -428,7 +580,7 @@ const netoTotal = computed(() =>
                                             </tr>
                                         </thead>
                                         <tbody>
-                                            <template v-if="conceptos && conceptos.length > 0">
+                                            <template v-if="!tablaLimpia && conceptos && conceptos.length > 0">
                                                 <tr
                                                     v-for="(item, index) in conceptos"
                                                     :key="index"
@@ -463,7 +615,7 @@ const netoTotal = computed(() =>
                                         </tbody>
 
                                         <!-- FILA DE TOTALES -->
-                                        <tfoot class="table-secondary">
+                                        <tfoot v-if="!tablaLimpia" class="table-secondary">
                                             <tr class="fw-bold">
                                                 <td colspan="4" class="text-end pe-3">Totales</td>
                                                 <td class="text-end text-success">
@@ -513,6 +665,38 @@ const netoTotal = computed(() =>
             </div>
         </div>
 
+        <!-- Modal de confirmación de eliminación -->
+        <div v-if="mostrarModalEliminar" class="modal fade show d-block" tabindex="-1" style="background-color: rgba(0,0,0,0.5);">
+            <div class="modal-dialog modal-dialog-centered">
+                <div class="modal-content">
+                    <div class="modal-header">
+                        <h5 class="modal-title">Eliminar liquidación</h5>
+                        <button type="button" class="btn-close" @click="mostrarModalEliminar = false"></button>
+                    </div>
+                    <div class="modal-body">
+                        <div class="d-flex align-items-center gap-3">
+                            <i class="ri-error-warning-line ri-24px text-warning"></i>
+                            <div>
+                                <p class="mb-1">¿Está seguro que desea eliminar todos los conceptos de la liquidación?</p>
+                                <p class="mb-0 text-muted" style="font-size: 0.85rem;">
+                                    <strong>Empleado:</strong> {{ empleado?.codigo }} — {{ empleado?.detalle }}, {{ empleado?.nombres }}<br>
+                                    <strong>Período:</strong> {{ formatPeriodo(periodo) }}
+                                </p>
+                                <p class="mt-2 mb-0 text-danger" style="font-size: 0.85rem;">Esta acción no se puede deshacer.</p>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="modal-footer">
+                        <button type="button" class="btn btn-outline-secondary" @click="mostrarModalEliminar = false">Cancelar</button>
+                        <button type="button" class="btn btn-danger" :disabled="eliminando" @click="confirmarEliminar">
+                            <i class="ri-delete-bin-line me-1"></i>
+                            {{ eliminando ? 'Eliminando...' : 'Eliminar' }}
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+
     </div>
 </template>
 
@@ -543,5 +727,9 @@ const netoTotal = computed(() =>
 }
 tfoot tr td {
     border-top: 2px solid #dee2e6;
+}
+.btn-eliminar-liq:hover i,
+.btn-eliminar-liq:focus i {
+    color: #dc3545 !important;
 }
 </style>

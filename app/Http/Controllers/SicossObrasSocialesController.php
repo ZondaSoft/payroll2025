@@ -117,8 +117,8 @@ class SicossObrasSocialesController extends Controller
     public function store(Request $request)
     {
         $validated = $request->validate([
-            'codigo' => 'required|integer|min:0|max:999999|unique:SicossObrass,codigo',
-            'detalle' => 'required|string|max:100',
+            'codigo' => 'required|string|max:6|regex:/^\d+$/|unique:sicoss_obras,codigo',
+            'detalle' => 'required|string|max:200',
         ]);
 
         SicossObras::create($validated);

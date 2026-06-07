@@ -157,7 +157,7 @@ class PeriodosController extends Controller
 
     public function first()
     {
-        $periodo = Sue100::orderBy('id', 'asc')->first();
+        $periodo = Sue100::orderBy('periodo', 'asc')->first();
 
         if (!$periodo) {
             return redirect()->route('liquidacion.periodos.index')
@@ -169,7 +169,7 @@ class PeriodosController extends Controller
 
     public function last()
     {
-        $periodo = Sue100::orderBy('id', 'desc')->first();
+        $periodo = Sue100::orderBy('periodo', 'desc')->first();
 
         if (!$periodo) {
             return redirect()->route('liquidacion.periodos.index')
@@ -181,30 +181,34 @@ class PeriodosController extends Controller
 
     public function previous($id)
     {
-        $previousId = Sue100::where('id', '<', $id)
-            ->orderBy('id', 'desc')
-            ->first()?->id;
+        $current = Sue100::findOrFail($id);
 
-        if (!$previousId) {
-            return redirect()->route('liquidacion.periodos.index', $id)
+        $previous = Sue100::where('periodo', '<', $current->periodo)
+            ->orderBy('periodo', 'desc')
+            ->first();
+
+        if (!$previous) {
+            return redirect()->route('liquidacion.periodos.show', $id)
                 ->with('warning', 'No hay registro anterior');
         }
 
-        return redirect()->route('liquidacion.periodos.show', $previousId);
+        return redirect()->route('liquidacion.periodos.show', $previous->id);
     }
 
     public function next($id)
     {
-        $nextId = Sue100::where('id', '>', $id)
-            ->orderBy('id', 'asc')
-            ->first()?->id;
+        $current = Sue100::findOrFail($id);
 
-        if (!$nextId) {
-            return redirect()->route('liquidacion.periodos.index', $nextId)
+        $next = Sue100::where('periodo', '>', $current->periodo)
+            ->orderBy('periodo', 'asc')
+            ->first();
+
+        if (!$next) {
+            return redirect()->route('liquidacion.periodos.show', $id)
                 ->with('warning', 'No hay registro siguiente');
         }
 
-        return redirect()->route('liquidacion.periodos.show', $nextId);
+        return redirect()->route('liquidacion.periodos.show', $next->id);
     }
 
     public function search(Request $request)

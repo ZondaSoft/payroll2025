@@ -21,6 +21,7 @@ class NominasSheetImport implements ToModel, WithChunkReading
     private int $rechazados = 0; // Contador de registros importados exitosamente
     private bool $empresaValidada = false;
     private bool $errorImportando = false;
+    private ?string $codigoEmpresa = null; // grupo_emp de la empresa seleccionada (para scoping por empresa)
 
     public function __construct(
         private string $periodo,   // YYYYMM
@@ -34,10 +35,9 @@ class NominasSheetImport implements ToModel, WithChunkReading
     public function model(array $row)
     {
         if (!$this->empresaValidada) {
-            $cuit = $row[1];
-            $cuitSinGuiones = str_replace('-', '', $cuit);
-            $empresa = Sue086::where('cuit', $cuit)
-                ->orWhereRaw("REPLACE(cuit, '-', '') = ?", [$cuitSinGuiones])
+            $cuit = (string) $row[1];
+            $cuitSinGuiones = preg_replace('/\D/', '', $cuit);
+            $empresa = Sue086::whereRaw("REPLACE(cuit, '-', '') = ?", [$cuitSinGuiones])
                 ->first();
 
             if (!$empresa) {
@@ -65,10 +65,13 @@ class NominasSheetImport implements ToModel, WithChunkReading
                 $this->empresaValidada = true;
                 $this->errorImportando = true;
 
+                $empresaSeleccionada = Sue086::find($this->idEmpresa);
+                $cuitSeleccionado = $empresaSeleccionada?->cuit ?? 'N/A';
+
                 // Grabo log del registro con error
                 ImportLiquidacionErr::create([
                     'registro' => $this->count,
-                    'detalle' => "El CUIT de la empresa seleccionada no coincide con el importado: " . $cuit,
+                    'detalle' => "CUIT no coincide. Seleccionado en el sistema: " . $cuitSeleccionado . " — Importado del Excel: " . $cuit,
                 ]);
 
                 return null;
@@ -91,9 +94,18 @@ class NominasSheetImport implements ToModel, WithChunkReading
             //     return null;
             // }
 
-            // Busco el cuil enviado en la tabla de legajos (SUE001)
+            // Busco el cuil enviado en la tabla de legajos (SUE001), ACOTADO a la empresa seleccionada.
+            // En pluriempleo el mismo CUIL existe en varias empresas del grupo; sin filtrar por grupo_emp
+            // se actualizaría el legajo de OTRA empresa. La empresa ya quedó validada arriba (CUIT del Excel
+            // == empresa seleccionada); usamos su `codigo` como grupo_emp.
             $cuil = $row[0];
-            $legajoExistente = Sue001::where('cuil', $cuil)->first();
+            if ($this->codigoEmpresa === null) {
+                $this->codigoEmpresa = Sue086::find($this->idEmpresa)?->codigo;
+            }
+            $legajoExistente = Sue001::where('cuil', $cuil)
+                ->where('grupo_emp', $this->codigoEmpresa)
+                ->whereNull('baja')
+                ->first();
 
             if (!$legajoExistente) {
                 $this->count++;
@@ -104,7 +116,7 @@ class NominasSheetImport implements ToModel, WithChunkReading
                     // Grabo log del registro con error
                     ImportLiquidacionErr::create([
                         'registro' => $this->count,
-                        'detalle' => "El CUIL importado no existe en la nomina de legajos activos : " . $cuil,
+                        'detalle' => "El CUIL importado no existe en la nómina de legajos activos de esta empresa: " . $cuil,
                     ]);
                 }
 
@@ -231,9 +243,7 @@ class NominasSheetImport implements ToModel, WithChunkReading
 
                     if ($adherenteAnterior != $adherente)
                         $descripcion = $descripcion . ' - Adherentes: ' . ($adherenteAnterior ? 'Sí' : 'No') . ' -> ' . ($adherente ? 'Sí' : 'No');
-
-
-
+                    
                 } else {
                     $descripcion = 'Legajo no actualizado (Todos los datos importados coinciden)';
                 }
@@ -248,6 +258,20 @@ class NominasSheetImport implements ToModel, WithChunkReading
                     'descripcion' => $descripcion,
                     'importe' => 0,
                     'detalle' => $descripcion,
+                    'situacion_ant' => $situacionAnterior,
+                    'situacion_imp' => $situacion,
+                    'obra_social_ant' => $obraAnterior,
+                    'obra_social_imp' => $obra,
+                    'condicion_ant' => $condicionAnterior,
+                    'condicion_imp' => $condicion,
+                    'actividad_ant' => $actividadAnterior,
+                    'actividad_imp' => $actividad,
+                    'modalidad_ant' => $modalidadAnterior,
+                    'modalidad_imp' => $modalidad,
+                    'siniestro_ant' => $siniestroAnterior,
+                    'siniestro_imp' => $siniestro,
+                    'localidad_ant' => $localidadAnterior,
+                    'localidad_imp' => $localidad,
                 ]);
 
             } else {

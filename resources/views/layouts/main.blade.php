@@ -177,6 +177,13 @@
                 <i class="menu-icon tf-icons ri-git-commit-line"></i>
                 <div data-i18n="Configuracion">Configuracion</div>
               </a>
+              <ul class="menu-sub">
+                <li class="menu-item {{ $active==80?'active':' ' }}">
+                  <a href="/grupos-empresarios" class="menu-link">
+                    <div data-i18n="Grupo empresario">Grupo empresario</div>
+                  </a>
+                </li>
+              </ul>
               @can('workshop.task')
                 <ul class="menu-sub">
                     <li class="menu-item {{ $active==60?'active':' ' }}">

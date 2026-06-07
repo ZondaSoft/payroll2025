@@ -185,6 +185,9 @@
                                                 <option value="5" {{ old('tipoliq', $tipoliq) == 5 ? 'selected' : '' }}>
                                                     5-Liq. Final
                                                 </option>
+                                                <option value="6" {{ old('tipoliq', $tipoliq) == 6 ? 'selected' : '' }}>
+                                                    6-DIF.HAB.
+                                                </option>
                                             </select>
                                         </div>
 

@@ -167,14 +167,14 @@
               <ul class="menu-sub">
                 <li class="menu-item {{ $active==9?'active':' ' }}">
                   <a href="{{ route('legajos.index') }}" class="menu-link">
-                    <div data-i18n="Empleados activos">Empleados activos</div>
+                    <div data-i18n="Empleados">Empleados activos</div>
                   </a>
                 </li>
-                <li class="menu-item {{ $active==10?'active':' ' }}">
-                  <a href="{{ url('/bajas') }}" class="menu-link">
+                <!-- <li class="menu-item { { $active==10?'active':' ' }}">
+                  <a href="{ { url('/bajas') }}" class="menu-link">
                     <div data-i18n="Empleados de Baja">Empleados de Baja</div>
                   </a>
-                </li>
+                </li> -->
               </ul>
             </li>
             <!-- Forms & Tables -->

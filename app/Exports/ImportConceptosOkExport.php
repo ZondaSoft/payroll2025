@@ -33,7 +33,7 @@ class ImportConceptosOkExport implements FromCollection, WithHeadings, WithEvent
     {
         return [
             'Registro',
-            'Código AFIP',
+            'Código ARCA',
             'Descripción',
             'Código Contribuyente',
             'Descripción Contribuyente',

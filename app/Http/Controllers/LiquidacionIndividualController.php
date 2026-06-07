@@ -5,6 +5,7 @@ namespace App\Http\Controllers;
 use App\Models\Sue001;
 use App\Models\Sue086;
 use App\Models\Sue100;
+use App\Models\Sue102;
 use App\Models\Datoempr;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
@@ -14,6 +15,10 @@ class LiquidacionIndividualController extends Controller
 {
     public function index(Request $request)
     {
+        // Corrige conceptos con tipo numérico legacy según los Rangos de conceptos (sue089s)
+        // antes de armar el recibo, para que la clasificación por tipo sea correcta.
+        $ajustesTipos = Sue102::normalizarTiposNumericos();
+
         $empresa  = Datoempr::first();
         $periodos = Sue100::orderBy('periodo', 'desc')->orderBy('tipoliq', 'asc')->get(['id', 'periodo', 'tipoliq']);
         $periodoActual = $periodos->first()?->periodo;
@@ -90,6 +95,7 @@ class LiquidacionIndividualController extends Controller
                     'sue102s.detalle         as detalle',
                     'sue090s.descripcion     as descripcion',
                     'sue090s.cantidad',
+                    'sue090s.valor',
                     'sue102s.tipo',
                     'sue090s.importe',
                     'sue090s.tiporem',
@@ -132,7 +138,7 @@ class LiquidacionIndividualController extends Controller
                     'codigo'          => $row->codigo,
                     'detalle'         => $row->detalle ?? $row->descripcion ?? "Concepto {$row->codigo}",
                     'cantidad'        => $row->cantidad,
-                    'valores'         => null,
+                    'valores'         => $row->valor,
                     'haberes'         => $haberes,
                     'retenciones'     => $retenciones,
                     'asignaciones'    => $asignaciones,
@@ -166,6 +172,7 @@ class LiquidacionIndividualController extends Controller
                         'sue102s.detalle         as detalle',
                         'sue090s.descripcion     as descripcion',
                         'sue090s.cantidad',
+                        'sue090s.valor',
                         'sue102s.tipo',
                         'sue090s.importe',
                         'sue090s.tiporem',
@@ -208,7 +215,7 @@ class LiquidacionIndividualController extends Controller
                         'codigo'          => $row->codigo,
                         'detalle'         => $row->detalle ?? $row->descripcion ?? "Concepto {$row->codigo}",
                         'cantidad'        => $row->cantidad,
-                        'valores'         => null,
+                        'valores'         => $row->valor,
                         'haberes'         => $haberes,
                         'retenciones'     => $retenciones,
                         'asignaciones'    => $asignaciones,
@@ -227,6 +234,28 @@ class LiquidacionIndividualController extends Controller
             'periodos'   => $periodos,
             'legajoId'   => $legajoId ? (int) $legajoId : null,
             'tipoliq'    => $tipoliq,
+            'ajustesTipos' => $ajustesTipos,
+        ]);
+    }
+
+    public function eliminar(Request $request)
+    {
+        $request->validate([
+            'legajo_codigo' => 'required',
+            'periodo' => 'required',
+            'tipoliq' => 'required',
+        ]);
+
+        $eliminados = DB::table('sue090s')
+            ->where('legajo', $request->legajo_codigo)
+            ->where('periodo', $request->periodo)
+            ->where('tipoliq', $request->tipoliq)
+            ->delete();
+
+        return response()->json([
+            'success' => true,
+            'eliminados' => $eliminados,
+            'message' => "Se eliminaron {$eliminados} conceptos.",
         ]);
     }
 }

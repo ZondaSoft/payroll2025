@@ -4,6 +4,7 @@ namespace App\Http\Controllers;
 
 use Carbon\Carbon;
 use App\Models\Sue001;
+use Illuminate\Support\Facades\DB;
 use App\Models\Sue002;
 use App\Models\Sue019;
 use App\Models\Sue086;
@@ -14,7 +15,6 @@ use App\Models\Sue030;
 use App\Models\Sue014;
 use App\Models\Sue006;
 use App\Models\Sue054;
-use App\Models\Sue009;
 use App\Models\Sue015;
 use App\Models\Sue007;
 use App\Models\Sue107;
@@ -132,7 +132,6 @@ class LegajosController extends Controller
         $jerarquias = Sue014::orderBy('detalle')->get();
         $categorias = Sue006::orderBy('detalle')->whereNotNull('codigo')->where('codigo', '!=', "")->get();
         $cuadrillas = Sue054::orderBy('detalle')->get();
-        $obras      = Sue009::orderBy('detalle')->whereNotNull('codigo')->where('codigo', '!=', "")->get();
         $sindicatos = Sue015::orderBy('detalle')->whereNotNull('codigo')->where('codigo', '!=', "")->get();
         $convenios  = Sue007::orderBy('detalle')->get();
         $contratos = Sue107::orderBy('detalle')->get(['codigo','detalle','duracion']);
@@ -307,7 +306,6 @@ class LegajosController extends Controller
         $jerarquias = Sue014::orderBy('detalle')->get();
         $categorias = Sue006::orderBy('detalle')->whereNotNull('codigo')->where('codigo', '!=', "")->get();
         $cuadrillas = Sue054::orderBy('detalle')->get();
-        $obras      = Sue009::orderBy('detalle')->whereNotNull('codigo')->where('codigo', '!=', "")->get();
         $sindicatos = Sue015::orderBy('detalle')->whereNotNull('codigo')->where('codigo', '!=', "")->get();
         $convenios  = Sue007::orderBy('detalle')->get();
         $contratos = Sue107::orderBy('detalle')->get(['codigo','detalle','duracion']);
@@ -452,13 +450,13 @@ class LegajosController extends Controller
             'tel2'              => 'nullable|string|max:20',
             'tel3'              => 'nullable|string|max:20',
             'web'               => 'nullable|string|max:255',
-            'sicoss_activ'      => 'nullable|string|max:10',
-            'sicoss_condi'      => 'nullable|string|max:10',
-            'sicoss_modal'      => 'nullable|string|max:10',
-            'sicoss_situa'      => 'nullable|string|max:10',
-            'sicoss_ooss'       => 'nullable|string|max:10',
-            'sicoss_zona'       => 'nullable|string|max:10',
-            'sicoss_sini'       => 'nullable|string|max:10',
+            'sicoss_activ'      => 'nullable|integer|min:0',
+            'sicoss_condi'      => 'nullable|integer|min:0',
+            'sicoss_modal'      => 'nullable|integer|min:0',
+            'sicoss_situa'      => 'nullable|integer|min:0',
+            'sicoss_ooss'       => 'nullable|integer|min:0',
+            'sicoss_zona'       => 'nullable|integer|min:0',
+            'sicoss_sini'       => 'nullable|integer|min:0',
             'sicoss_conyuge'    => 'nullable|boolean',
             'sicoss_hijos'      => 'nullable|boolean',
             'sicoss_adherentes' => 'nullable|integer|min:0|max:99',
@@ -548,23 +546,35 @@ class LegajosController extends Controller
     // Búsqueda
     public function search(Request $request)
     {
-        $query = Sue001::where(function($q) {
-            $q->whereNull('baja')->orWhere('baja', '');
-        });
+        // Incluye activos Y de baja: sue001s ya contiene ambos (los de baja tienen `baja` seteada).
+        // Se agrega el nombre de la empresa (sue086s) para mostrarlo en la grilla.
+        $search = (string) $request->input('search', '');
 
-        if ($request->has('search') && $request->input('search') !== '') {
-            $search = $request->input('search');
-            $query->where(function($q) use ($search) {
-                $q->where('detalle', 'LIKE', "%{$search}%")
-                  ->orWhere('nombres', 'LIKE', "%{$search}%")
-                  ->orWhere('cuil', 'LIKE', "%{$search}%")
-                  ->orWhere('codigo', 'LIKE', "%{$search}%");
+        $query = DB::table('sue001s')
+            ->leftJoin('sue086s', 'sue086s.codigo', '=', 'sue001s.grupo_emp')
+            ->select([
+                'sue001s.id',
+                'sue001s.codigo',
+                'sue001s.detalle',
+                'sue001s.nombres',
+                'sue001s.cuil',
+                DB::raw('sue086s.detalle as empresa'),
+                'sue001s.alta',
+                'sue001s.baja',
+            ]);
+
+        if ($search !== '') {
+            $query->where(function ($w) use ($search) {
+                $w->where('sue001s.detalle', 'LIKE', "%{$search}%")
+                  ->orWhere('sue001s.nombres', 'LIKE', "%{$search}%")
+                  ->orWhere('sue001s.cuil', 'LIKE', "%{$search}%")
+                  ->orWhere('sue001s.codigo', 'LIKE', "%{$search}%");
             });
         }
 
         return Inertia::render('Empleados/Search', [
-            'legajos' => $query->orderBy('detalle')->paginate(20),
-            'filters' => $request->only('search')
+            'legajos' => $query->orderBy('sue001s.detalle')->paginate(20)->withQueryString(),
+            'filters' => $request->only('search'),
         ]);
     }
 

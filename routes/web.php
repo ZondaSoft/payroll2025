@@ -6,6 +6,7 @@ use Illuminate\Support\Facades\Route;
 use App\Http\Controllers\MainController;
 use App\Http\Controllers\LegajosController;
 use App\Http\Controllers\BajasController;
+use App\Http\Controllers\ConveniosController;
 use App\Http\Controllers\SicossActivController;
 use App\Http\Controllers\SicossCondicController;
 use App\Http\Controllers\SicossModalidadController;
@@ -17,9 +18,14 @@ use App\Http\Controllers\ArcaImportarController;
 use App\Http\Controllers\SicossLocalidadesController;
 use App\Http\Controllers\LiquidacionImportarController;
 use App\Http\Controllers\LsdController;
+use App\Http\Controllers\LsdImporteDetraerController;
+use App\Http\Controllers\LsdTopeController;
 use App\Http\Controllers\ConceptosLiquidacionController;
 use App\Http\Controllers\LiquidacionIndividualController;
 use App\Http\Controllers\PeriodosController;
+use App\Http\Controllers\GruposEmpresariosController;
+use App\Http\Controllers\ParametrosController;
+use App\Http\Controllers\ConceptosArcaController;
 use Inertia\Inertia;
 
 // Route::get('/', function () {
@@ -65,6 +71,15 @@ Route::middleware('auth')->group(function () {
     // Rutas adicionales para navegación
     Route::get('bajas/{id}/previous', [BajasController::class, 'previous'])->name('bajas.previous');
     Route::get('bajas/{id}/next', [BajasController::class, 'next'])->name('bajas.next');
+
+    // Convenios Colectivos de Trabajo (CCT) - rutas literales ANTES del resource
+    Route::get('convenios/first', [ConveniosController::class, 'first'])->name('convenios.first');
+    Route::get('convenios/last', [ConveniosController::class, 'last'])->name('convenios.last');
+    Route::get('convenios/search', [ConveniosController::class, 'search'])->name('convenios.search');
+    Route::get('convenios/{id}/previous', [ConveniosController::class, 'previous'])->name('convenios.previous');
+    Route::get('convenios/{id}/next', [ConveniosController::class, 'next'])->name('convenios.next');
+    Route::resource('convenios', ConveniosController::class)
+        ->parameters(['convenios' => 'convenio']);
 
     // Sicoss: Actividades
     Route::get('sicoss/actividades/search', [SicossActivController::class, 'search'])
@@ -299,12 +314,56 @@ Route::middleware('auth')->group(function () {
     Route::prefix('lsd')->name('lsd.')->group(function () {
         Route::get('/generar', [LsdController::class, 'generar'])->name('generar');
         Route::post('/generar-emision', [LsdController::class, 'generarEmision'])->name('generar.emision');
+        Route::post('/generar-conceptos', [LsdController::class, 'generarConceptos'])->name('generar.conceptos');
+        Route::post('/ajustar-aportes', [LsdController::class, 'ajustarAportes'])->name('ajustar.aportes');
+        Route::get('/emision/{id}/detalle', [LsdController::class, 'detalle'])->name('emision.detalle');
         Route::get('/emision/{id}/download', [LsdController::class, 'download'])->name('emision.download');
         Route::get('/emision/{id}', [LsdController::class, 'obtenerEmision'])->name('emision');
         Route::put('/emision/{id}/estado', [LsdController::class, 'actualizarEstado'])->name('emision.estado');
         Route::get('/listar', [LsdController::class, 'listar'])->name('listar');
         Route::delete('/emision/{id}', [LsdController::class, 'eliminar'])->name('emision.eliminar');
     });
+
+    //--------------------------------------------
+    // SICOSS: Importes a detraer (Ley 27.430)
+    //---------------------------------------------
+    Route::resource('sicoss/importes-detraer', LsdImporteDetraerController::class)
+        ->parameters(['importes-detraer' => 'importe'])
+        ->names('sicoss.importes-detraer')
+        ->except(['show']);
+
+    //--------------------------------------------
+    // SICOSS: Topes máximos de base imponible para aportes (BI 1/4/5)
+    //---------------------------------------------
+    Route::resource('sicoss/topes', LsdTopeController::class)
+        ->parameters(['topes' => 'tope'])
+        ->names('sicoss.topes')
+        ->except(['show']);
+
+    //--------------------------------------------
+    // Config: Parametrizaciones (rangos sue089s)
+    //---------------------------------------------
+    Route::resource('config/parametros', ParametrosController::class)
+        ->parameters(['parametros' => 'parametro'])
+        ->names('config.parametros')
+        ->except(['show']);
+
+    //--------------------------------------------
+    // ARCA: Conceptos (CRUD tabla conceptosarcas)
+    //---------------------------------------------
+    Route::get('arca/conceptos/search', [ConceptosArcaController::class, 'search'])
+        ->name('arca.conceptos.search');
+    Route::get('arca/conceptos/first', [ConceptosArcaController::class, 'first'])
+        ->name('arca.conceptos.first');
+    Route::get('arca/conceptos/last', [ConceptosArcaController::class, 'last'])
+        ->name('arca.conceptos.last');
+    Route::get('arca/conceptos/{id}/previous', [ConceptosArcaController::class, 'previous'])
+        ->name('arca.conceptos.previous');
+    Route::get('arca/conceptos/{id}/next', [ConceptosArcaController::class, 'next'])
+        ->name('arca.conceptos.next');
+    Route::resource('arca/conceptos', ConceptosArcaController::class)
+        ->parameters(['conceptos' => 'concepto'])
+        ->names('arca.conceptos');
 
     //--------------------------------------------
     // Liquidación: Períodos
@@ -397,8 +456,31 @@ Route::middleware('auth')->group(function () {
     //---------------------------------------------
     Route::get('liquidacion/individual', [LiquidacionIndividualController::class, 'index'])
         ->name('liquidacion.individual.index');
+    Route::delete('liquidacion/individual/eliminar', [LiquidacionIndividualController::class, 'eliminar'])
+        ->name('liquidacion.individual.eliminar');
 
-    
+    //--------------------------------------------
+    // Grupos Empresarios (Sue086)
+    //---------------------------------------------
+    Route::get('grupos-empresarios/search', [GruposEmpresariosController::class, 'search'])
+        ->name('grupos.empresarios.search');
+
+    Route::get('grupos-empresarios/first', [GruposEmpresariosController::class, 'first'])
+        ->name('grupos.empresarios.first');
+
+    Route::get('grupos-empresarios/last', [GruposEmpresariosController::class, 'last'])
+        ->name('grupos.empresarios.last');
+
+    Route::get('grupos-empresarios/{id}/previous', [GruposEmpresariosController::class, 'previous'])
+        ->name('grupos.empresarios.previous');
+
+    Route::get('grupos-empresarios/{id}/next', [GruposEmpresariosController::class, 'next'])
+        ->name('grupos.empresarios.next');
+
+    Route::resource('grupos-empresarios', GruposEmpresariosController::class)
+        ->parameters(['grupos-empresarios' => 'grupo'])
+        ->names('grupos.empresarios');
+
 });
 
 require __DIR__.'/auth.php';

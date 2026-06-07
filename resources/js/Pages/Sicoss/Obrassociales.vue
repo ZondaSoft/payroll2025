@@ -35,7 +35,7 @@ const user = usePage().props.legajo;
 
 const form = useForm({
     id: props.legajo?.id ?? null,
-    codigo: props.legajo?.codigo ?? 0,
+    codigo: props.legajo?.codigo ?? '',
     detalle: props.legajo?.detalle ?? '',
 });
 
@@ -201,7 +201,7 @@ watch(() => props.agregar, () => {
                                                         id="codigo"
                                                         name="codigo"
                                                         type="text"
-                                                        v-model.number="form.codigo"
+                                                        v-model="form.codigo"
                                                         ref="txtcodigo"
                                                         v-bind:disabled="!agregar"
                                                         autocomplete="off"

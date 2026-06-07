@@ -112,7 +112,9 @@ const form = useForm({
     cod_jerarq: props.legajo?.cod_jerarq ?? '',
     codsector: props.legajo?.codsector ?? '',
     cuadrilla: props.legajo?.cuadrilla ?? '',
-    obra_sijp: props.legajo?.obra_sijp ?? '',
+    obra_sijp: (props.legajo?.obra_sijp ?? '') !== ''
+        ? String(props.legajo.obra_sijp).padStart(6, '0')
+        : '',
     cod_obsoc: props.legajo?.cod_obsoc ?? '',
     cod_sindic: props.legajo?.cod_sindic ?? '',
     situacion: props.legajo?.situacion ?? '',
@@ -167,8 +169,13 @@ const determineActionRoute = () => {
 const errors = usePage().props.errors;
 
 // Opciones formateadas para el multiselect de obras sociales
+// El código de obra social es de 6 dígitos con ceros a la izquierda (varchar(6)).
+// Se normaliza con padStart por si llega como número y perdió los ceros.
 const obrasOptions = computed(() =>
-    props.obras.map(p => ({ value: p.codigo, label: `${p.codigo} - ${p.detalle}` }))
+    props.obras.map(p => {
+        const cod = String(p.codigo ?? '').padStart(6, '0');
+        return { value: cod, label: `${cod} - ${p.detalle}` };
+    })
 );
 
 const actividadesOptions = computed(() =>
@@ -307,7 +314,7 @@ watch(() => props.agregar, () => {
                     </div>
                     <!-- Si ni agregar ni edicion están activados, muestra este mensaje -->
                     <div v-if="!agregar && !edicion" class="d-flex flex-column justify-content-center">
-                        <h4 class="mb-1">Empleados activos</h4>
+                        <h4 class="mb-1">Empleados</h4>
                     </div>
 
                     <div class="d-flex flex-column justify-content-center" v-if="!agregar && !edicion && form.id">
@@ -349,7 +356,7 @@ watch(() => props.agregar, () => {
                                 <i class="ri-arrow-right-double-fill"></i>
                             </Link>
                             <a type="button" href="/legajos/search" class="btn btn-outline-secondary waves-effect" data-bs-toggle="tooltip" data-bs-placement="top" data-bs-original-title="Buscar ...">
-                                <i class="ri-checkbox-circle-line"></i>
+                                <i class="ri-search-line"></i>
                             </a>
                         </div>
                     </div>

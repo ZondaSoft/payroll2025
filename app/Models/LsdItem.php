@@ -63,11 +63,8 @@ class LsdItem extends Model
         'base_calculo' => 'decimal:2',
     ];
 
-    /**
-     * Relación con LsdEmision
-     */
     public function lsdEmision()
     {
-        return $this->belongsTo(LsdEmision::class, 'lsd_periodo_id');
+        return $this->belongsTo(LsdEmision::class, 'lsd_emision_id');
     }
 }

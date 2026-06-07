@@ -30,6 +30,8 @@ class Sue001 extends Model
 
 	protected $guarded = ['id','_token' ]; // every field to protect
 
+	protected $appends = ['foto_url'];
+
 	// protected $casts = [
 	// 	'alta'        => 'date:Y-m-d',
 	// 	'fecha_naci'  => 'date:Y-m-d',
@@ -309,12 +311,8 @@ class Sue001 extends Model
 			return "/{$relative}";
 		}
 
-		// Si no existe, mostrar imagen por sexo
-		$sexo = strtoupper((string) ($this->sue001->sexo ?? $this->sexo ?? ''));
-
-		return $sexo === 'F'
-			? "/img/personal/default_user02.png"
-			: "/img/personal/default_user01.png";
+		// Si no existe, mostrar avatar por defecto
+		return "/img/avatars/1.png";
 	}
 
     // Para que /choferes/{codigo} funcione con Route Model Binding
