@@ -66,7 +66,7 @@ const formulario = reactive({
 
 const esRectificativa = computed(() => formulario.identificador_envio === 'RE')
 
-const generarEmision = async () => {
+const generarEmision = async (opts = {}) => {
   const faltanCamposSJ = !esRectificativa.value && (!formulario.tipo_liquidacion || !formulario.fecha_pago)
   if (!formulario.id_empresa || !formulario.periodo_id || faltanCamposSJ) {
     Swal.fire({
@@ -80,7 +80,7 @@ const generarEmision = async () => {
 
   cargando.value = true
   try {
-    const response = await axios.post(route('lsd.generar.emision'), formulario)
+    const response = await axios.post(route('lsd.generar.emision'), { ...formulario, ...opts })
 
     if (response.data.success) {
       if (response.data.download_url) {
@@ -88,8 +88,19 @@ const generarEmision = async () => {
       }
       router.reload({ only: ['emisiones'] })
 
+      const excluidos = response.data.legajos_excluidos
       const advertencias = response.data.advertencias_aportes
-      if (Array.isArray(advertencias) && advertencias.length) {
+      if (Array.isArray(excluidos) && excluidos.length) {
+        // Se generó ignorando legajos con datos SICOSS incompletos: avisar cuáles quedaron afuera.
+        Swal.fire({
+          icon: 'warning',
+          title: 'Emisión generada (con legajos ignorados)',
+          html: `Se generó el archivo <b>excluyendo ${excluidos.length} legajo(s)</b> con datos SICOSS incompletos:<br><br>` +
+                `<span style="font-family:monospace;">${escapeHtml(excluidos.join(', '))}</span><br><br>` +
+                `Esos legajos <b>no se informan</b> en este LSD. Completá sus datos SICOSS y regenerá si corresponde.`,
+          confirmButtonText: 'Entendido',
+        })
+      } else if (Array.isArray(advertencias) && advertencias.length) {
         // El .txt YA se generó. Mostramos las diferencias de aportes como aviso no bloqueante.
         mostrarAdvertenciaAportes(advertencias)
       } else {
@@ -371,8 +382,8 @@ const mostrarErrorInconsistencias = (mensaje, items) => {
 
   const filas = ordenados.map(i => `
     <tr>
-      <td style="padding:4px 8px;border:1px solid #dee2e6;font-family:monospace;">${escapeHtml(i.legajo)}</td>
-      <td style="padding:4px 8px;border:1px solid #dee2e6;font-family:monospace;">${escapeHtml(i.cuil)}</td>
+      <td style="padding:4px 8px;border:1px solid #dee2e6;font-family:monospace;white-space:nowrap;min-width:72px;">${escapeHtml(i.legajo)}</td>
+      <td style="padding:4px 8px;border:1px solid #dee2e6;font-family:monospace;white-space:nowrap;">${escapeHtml(i.cuil)}</td>
       <td style="padding:4px 8px;border:1px solid #dee2e6;">${escapeHtml(i.nombre || '—')}</td>
       <td style="padding:4px 8px;border:1px solid #dee2e6;white-space:nowrap;text-align:center;">${escapeHtml(fmtFecha(i.alta))}</td>
       <td style="padding:4px 8px;border:1px solid #dee2e6;white-space:nowrap;text-align:center;">${escapeHtml(fmtFecha(i.baja))}</td>
@@ -402,8 +413,8 @@ const mostrarErrorInconsistencias = (mensaje, items) => {
         <table style="width:100%;border-collapse:collapse;font-size:12px;">
           <thead style="position:sticky;top:0;background:#f8f9fa;">
             <tr>
-              <th style="padding:6px 8px;border:1px solid #dee2e6;text-align:left;">Legajo</th>
-              <th style="padding:6px 8px;border:1px solid #dee2e6;text-align:left;">CUIL</th>
+              <th style="padding:6px 8px;border:1px solid #dee2e6;text-align:left;white-space:nowrap;min-width:72px;">Legajo</th>
+              <th style="padding:6px 8px;border:1px solid #dee2e6;text-align:left;white-space:nowrap;">CUIL</th>
               <th style="padding:6px 8px;border:1px solid #dee2e6;text-align:left;">Empleado</th>
               <th style="padding:6px 8px;border:1px solid #dee2e6;text-align:center;">Alta</th>
               <th style="padding:6px 8px;border:1px solid #dee2e6;text-align:center;">Baja</th>
@@ -420,7 +431,10 @@ const mostrarErrorInconsistencias = (mensaje, items) => {
         <button type="button" id="inc-exportar" class="btn btn-success">
           <i class="ri-file-excel-2-line me-1"></i> Exportar Excel
         </button>
-        <button type="button" id="inc-cerrar" class="btn btn-outline-secondary">Cerrar</button>
+        <div style="display:flex;gap:8px;align-items:center;">
+          <button type="button" id="inc-cerrar" class="btn btn-outline-secondary">Cerrar</button>
+          <button type="button" id="inc-ignorar" class="btn btn-primary">Ignorar y continuar</button>
+        </div>
       </div>
     </div>
   `
@@ -433,8 +447,17 @@ const mostrarErrorInconsistencias = (mensaje, items) => {
     showConfirmButton: false,
     showCancelButton: false,
     didOpen: () => {
+      // El sidebar fijo de Materialize tiene un z-index alto y tapaba el popup: lo elevamos para
+      // que el modal se muestre por encima de todo (incluido el menú lateral).
+      const cont = Swal.getContainer()
+      if (cont) cont.style.zIndex = '99999'
       document.getElementById('inc-exportar')?.addEventListener('click', () => exportarInconsistenciasXLSX(ordenados))
       document.getElementById('inc-cerrar')?.addEventListener('click', () => Swal.close())
+      document.getElementById('inc-ignorar')?.addEventListener('click', () => {
+        // Continúa la generación ignorando (excluyendo) los legajos con datos SICOSS incompletos.
+        Swal.close()
+        generarEmision({ ignorar_inconsistencias: true })
+      })
     },
   })
 }
@@ -623,6 +646,12 @@ const formatDate = (date) => {
   if (!date) return '-'
   const d = new Date(date)
   return d.toLocaleDateString('es-AR')
+}
+
+// Extrae HH:MM directo del string ISO (sin conversión de timezone, para mostrar la hora tal cual se guardó).
+const formatTime = (datetime) => {
+  if (!datetime) return ''
+  return String(datetime).slice(11, 16)
 }
 
 const formatNumber = (num) => {
@@ -899,7 +928,7 @@ const marcarRechazado = (id) => cambiarEstado(id, 'rechazado', {
                     <th>Número</th>
                     <th>Empresa</th>
                     <th>Período</th>
-                    <th>Fecha Emisión</th>
+                    <th>Fecha y Hora Emisión</th>
                     <th>Estado</th>
                     <th>Empleados</th>
                     <th>Monto Total</th>
@@ -913,7 +942,10 @@ const marcarRechazado = (id) => cambiarEstado(id, 'rechazado', {
                     <td>
                       {{ (emision.periodo) }}
                     </td>
-                    <td>{{ formatDate(emision.fecha_emision) }}</td>
+                    <td>
+                      {{ formatDate(emision.fecha_emision) }}
+                      <small class="text-muted d-block">{{ formatTime(emision.fecha_generacion) }} hs</small>
+                    </td>
                     <td>
                       <span :class="getEstadoClass(emision.estado)" class="badge">
                         {{ emision.estado }}

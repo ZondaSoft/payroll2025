@@ -60,6 +60,14 @@ const selectedPeriodoKey  = ref(
         : ''
 );
 
+// Fecha de baja del empleado formateada dd/mm/aaaa (vacío si está activo).
+const bajaEmpleado = computed(() => {
+    const b = props.empleado?.baja;
+    if (!b) return '';
+    const [y, m, d] = String(b).slice(0, 10).split('-');
+    return (y && m && d) ? `${d}/${m}/${y}` : String(b);
+});
+
 // Búsqueda progresiva de empleados
 const tablaLimpia = ref(false);
 const busquedaEmpleado = ref('');
@@ -381,6 +389,13 @@ const confirmarEliminar = async () => {
                                         {{ formatPeriodoConTipo(per) }}
                                     </option>
                                 </select>
+                            </div>
+
+                            <!-- Pastilla de baja: pegada al margen derecho, a la altura del selector de período -->
+                            <div class="col-auto ms-auto d-flex align-items-center">
+                                <span v-if="bajaEmpleado" class="badge bg-danger rounded-pill">
+                                    <i class="ri-user-unfollow-line me-1"></i> Baja el {{ bajaEmpleado }}
+                                </span>
                             </div>
                         </div>
                     </div>

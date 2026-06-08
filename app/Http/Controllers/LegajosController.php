@@ -171,6 +171,8 @@ class LegajosController extends Controller
             $familiares = new Sue002;
         }
 
+        $this->attachBajaInfo($legajo);
+
         // formulario vue via inertia
         return Inertia::render('Empleados/Index', [
             'legajo' => $legajo,
@@ -188,6 +190,8 @@ class LegajosController extends Controller
             'sindicatos' => $sindicatos,
             'convenios' => $convenios,
             'contrataciones' => $contrataciones,
+            'contratos' => $contratos,
+            'jornadas' => $jornadas,
             'situacionesLab' => $situacionesLab,
             'actividades' => $actividades,
             'condiciones' => $condiciones,
@@ -210,12 +214,14 @@ class LegajosController extends Controller
         $sectores       = Sue011::orderBy('detalle')->whereNotNull('codigo')->where('codigo', '!=', '')->get();
         $situacionesLab = Sue005::orderBy('detalle')->whereNotNull('codigo')->where('codigo', '!=', '')->get();
         $ccostos        = Sue030::orderBy('detalle')->get();
+        $jornadas       = Sue010::orderBy('detalle')->whereNotNull('id')->get();
         $jerarquias     = Sue014::orderBy('detalle')->get();
         $categorias     = Sue006::orderBy('detalle')->whereNotNull('codigo')->where('codigo', '!=', '')->get();
         $cuadrillas     = Sue054::orderBy('detalle')->get();
         $obras2         = SicossObras::orderBy('codigo')->get();
         $sindicatos     = Sue015::orderBy('detalle')->whereNotNull('codigo')->where('codigo', '!=', '')->get();
         $convenios      = Sue007::orderBy('detalle')->get();
+        $contratos      = Sue107::orderBy('detalle')->get(['codigo','detalle','duracion']);
         $contrataciones = Sicoss08::orderBy('codigo')->get();
         $condiciones    = Sicoss05::orderBy('codigo')->get();
         $actividades    = Sicoss01::orderBy('codigo')->get();
@@ -239,6 +245,8 @@ class LegajosController extends Controller
             'sindicatos'     => $sindicatos,
             'convenios'      => $convenios,
             'contrataciones' => $contrataciones,
+            'contratos'      => $contratos,
+            'jornadas'       => $jornadas,
             'situacionesLab' => $situacionesLab,
             'actividades'    => $actividades,
             'condiciones'    => $condiciones,
@@ -325,6 +333,7 @@ class LegajosController extends Controller
 
         $this->calcularAntiguedad($legajo);
         $this->calcularEdad($legajo);
+        $this->attachBajaInfo($legajo);
 
         return Inertia::render('Empleados/Index', [
             'legajo' => $legajo,
@@ -342,6 +351,8 @@ class LegajosController extends Controller
             'sindicatos' => $sindicatos,
             'convenios' => $convenios,
             'contrataciones' => $contrataciones,
+            'contratos' => $contratos,
+            'jornadas' => $jornadas,
             'situacionesLab' => $situacionesLab,
             'actividades' => $actividades,
             'condiciones' => $condiciones,
@@ -364,12 +375,14 @@ class LegajosController extends Controller
         $sectores       = Sue011::orderBy('detalle')->whereNotNull('codigo')->where('codigo', '!=', '')->get();
         $situacionesLab = Sue005::orderBy('detalle')->whereNotNull('codigo')->where('codigo', '!=', '')->get();
         $ccostos        = Sue030::orderBy('detalle')->get();
+        $jornadas       = Sue010::orderBy('detalle')->whereNotNull('id')->get();
         $jerarquias     = Sue014::orderBy('detalle')->get();
         $categorias     = Sue006::orderBy('detalle')->whereNotNull('codigo')->where('codigo', '!=', '')->get();
         $cuadrillas     = Sue054::orderBy('detalle')->get();
         $obras2         = SicossObras::orderBy('codigo')->get();
         $sindicatos     = Sue015::orderBy('detalle')->whereNotNull('codigo')->where('codigo', '!=', '')->get();
         $convenios      = Sue007::orderBy('detalle')->get();
+        $contratos      = Sue107::orderBy('detalle')->get(['codigo','detalle','duracion']);
         $contrataciones = Sicoss08::orderBy('codigo')->get();
         $condiciones    = Sicoss05::orderBy('codigo')->get();
         $actividades    = Sicoss01::orderBy('codigo')->get();
@@ -380,6 +393,7 @@ class LegajosController extends Controller
 
         $this->calcularAntiguedad($legajo);
         $this->calcularEdad($legajo);
+        $this->attachBajaInfo($legajo);
 
         return Inertia::render('Empleados/Index', [
             'legajo'         => $legajo,
@@ -396,6 +410,8 @@ class LegajosController extends Controller
             'sindicatos'     => $sindicatos,
             'convenios'      => $convenios,
             'contrataciones' => $contrataciones,
+            'contratos'      => $contratos,
+            'jornadas'       => $jornadas,
             'situacionesLab' => $situacionesLab,
             'actividades'    => $actividades,
             'condiciones'    => $condiciones,
@@ -582,6 +598,27 @@ class LegajosController extends Controller
      * Calcula la antigüedad del empleado en base al campo 'alta' y la fecha actual.
      * Agrega el atributo 'antiguedad' al modelo con formato: "X años Y meses"
      */
+    /**
+     * Para un legajo de baja (sue001s.baja seteada), adjunta el motivo (sicoss_baja) — que vive en sue070s —
+     * y completa baja_det si está vacío. Se usan como atributos dinámicos para mostrarlos en el formulario.
+     */
+    private function attachBajaInfo($legajo): void
+    {
+        if (!$legajo || empty($legajo->baja)) {
+            return;
+        }
+        $baja = DB::table('sue070s')
+            ->where('codigo', $legajo->codigo)
+            ->when(!empty($legajo->grupo_emp), fn ($q) => $q->where('grupo_emp', $legajo->grupo_emp))
+            ->orderByDesc('baja')
+            ->first(['sicoss_baja', 'baja_det']);
+
+        $legajo->sicoss_baja = $baja->sicoss_baja ?? null;
+        if (empty($legajo->baja_det)) {
+            $legajo->baja_det = $baja->baja_det ?? null;
+        }
+    }
+
     private function calcularAntiguedad(Sue001 $legajo): void
     {
         if (empty($legajo->alta)) {

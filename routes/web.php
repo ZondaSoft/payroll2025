@@ -24,6 +24,12 @@ use App\Http\Controllers\ConceptosLiquidacionController;
 use App\Http\Controllers\LiquidacionIndividualController;
 use App\Http\Controllers\PeriodosController;
 use App\Http\Controllers\GruposEmpresariosController;
+use App\Http\Controllers\CentrosCostoController;
+use App\Http\Controllers\SectoresController;
+use App\Http\Controllers\CuadrillasController;
+use App\Http\Controllers\SindicatosController;
+use App\Http\Controllers\CategoriasController;
+use App\Http\Controllers\TiposContratoController;
 use App\Http\Controllers\ParametrosController;
 use App\Http\Controllers\ConceptosArcaController;
 use Inertia\Inertia;
@@ -480,6 +486,64 @@ Route::middleware('auth')->group(function () {
     Route::resource('grupos-empresarios', GruposEmpresariosController::class)
         ->parameters(['grupos-empresarios' => 'grupo'])
         ->names('grupos.empresarios');
+
+    //---------------------------------------------
+    // Catálogos de RR.HH. (ABM bajo "Grupo empresario")
+    //---------------------------------------------
+
+    // Centros de costo (Sue030)
+    Route::get('centros-costo/search', [CentrosCostoController::class, 'search'])->name('centros.costo.search');
+    Route::get('centros-costo/first', [CentrosCostoController::class, 'first'])->name('centros.costo.first');
+    Route::get('centros-costo/last', [CentrosCostoController::class, 'last'])->name('centros.costo.last');
+    Route::get('centros-costo/{id}/previous', [CentrosCostoController::class, 'previous'])->name('centros.costo.previous');
+    Route::get('centros-costo/{id}/next', [CentrosCostoController::class, 'next'])->name('centros.costo.next');
+    Route::resource('centros-costo', CentrosCostoController::class)
+        ->parameters(['centros-costo' => 'registro'])->names('centros.costo');
+
+    // Sectores (Sue011)
+    Route::get('sectores/search', [SectoresController::class, 'search'])->name('sectores.search');
+    Route::get('sectores/first', [SectoresController::class, 'first'])->name('sectores.first');
+    Route::get('sectores/last', [SectoresController::class, 'last'])->name('sectores.last');
+    Route::get('sectores/{id}/previous', [SectoresController::class, 'previous'])->name('sectores.previous');
+    Route::get('sectores/{id}/next', [SectoresController::class, 'next'])->name('sectores.next');
+    Route::resource('sectores', SectoresController::class)
+        ->parameters(['sectores' => 'registro']);
+
+    // Cuadrillas (Sue054)
+    Route::get('cuadrillas/search', [CuadrillasController::class, 'search'])->name('cuadrillas.search');
+    Route::get('cuadrillas/first', [CuadrillasController::class, 'first'])->name('cuadrillas.first');
+    Route::get('cuadrillas/last', [CuadrillasController::class, 'last'])->name('cuadrillas.last');
+    Route::get('cuadrillas/{id}/previous', [CuadrillasController::class, 'previous'])->name('cuadrillas.previous');
+    Route::get('cuadrillas/{id}/next', [CuadrillasController::class, 'next'])->name('cuadrillas.next');
+    Route::resource('cuadrillas', CuadrillasController::class)
+        ->parameters(['cuadrillas' => 'registro']);
+
+    // Sindicatos (Sue015)
+    Route::get('sindicatos/search', [SindicatosController::class, 'search'])->name('sindicatos.search');
+    Route::get('sindicatos/first', [SindicatosController::class, 'first'])->name('sindicatos.first');
+    Route::get('sindicatos/last', [SindicatosController::class, 'last'])->name('sindicatos.last');
+    Route::get('sindicatos/{id}/previous', [SindicatosController::class, 'previous'])->name('sindicatos.previous');
+    Route::get('sindicatos/{id}/next', [SindicatosController::class, 'next'])->name('sindicatos.next');
+    Route::resource('sindicatos', SindicatosController::class)
+        ->parameters(['sindicatos' => 'registro']);
+
+    // Categorías (Sue006)
+    Route::get('categorias/search', [CategoriasController::class, 'search'])->name('categorias.search');
+    Route::get('categorias/first', [CategoriasController::class, 'first'])->name('categorias.first');
+    Route::get('categorias/last', [CategoriasController::class, 'last'])->name('categorias.last');
+    Route::get('categorias/{id}/previous', [CategoriasController::class, 'previous'])->name('categorias.previous');
+    Route::get('categorias/{id}/next', [CategoriasController::class, 'next'])->name('categorias.next');
+    Route::resource('categorias', CategoriasController::class)
+        ->parameters(['categorias' => 'registro']);
+
+    // Tipos de contrato (Sue107)
+    Route::get('tipos-contrato/search', [TiposContratoController::class, 'search'])->name('tipos.contrato.search');
+    Route::get('tipos-contrato/first', [TiposContratoController::class, 'first'])->name('tipos.contrato.first');
+    Route::get('tipos-contrato/last', [TiposContratoController::class, 'last'])->name('tipos.contrato.last');
+    Route::get('tipos-contrato/{id}/previous', [TiposContratoController::class, 'previous'])->name('tipos.contrato.previous');
+    Route::get('tipos-contrato/{id}/next', [TiposContratoController::class, 'next'])->name('tipos.contrato.next');
+    Route::resource('tipos-contrato', TiposContratoController::class)
+        ->parameters(['tipos-contrato' => 'registro'])->names('tipos.contrato');
 
 });
 

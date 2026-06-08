@@ -71,6 +71,14 @@ const props = defineProps({
         type: Array,
         required: true,
     },
+    contratos: {
+        type: Array,
+        default: () => [],
+    },
+    jornadas: {
+        type: Array,
+        default: () => [],
+    },
     actividades: {
         type: Array,
         required: true,
@@ -95,6 +103,18 @@ const props = defineProps({
 
 // Accediendo a las props pasadas desde el controlador
 const user = usePage().props.legajo;
+
+// Fecha de baja del legajo formateada dd/mm/aaaa (vacío si el empleado está activo).
+const legajoBaja = computed(() => {
+    const b = user?.baja;
+    if (!b) return '';
+    const [y, m, d] = String(b).slice(0, 10).split('-');
+    return (y && m && d) ? `${d}/${m}/${y}` : String(b);
+});
+
+// Datos de la baja (solo lectura) para mostrar en el formulario cuando el empleado está de baja.
+const sicossBaja = ref(user?.sicoss_baja != null ? String(user.sicoss_baja) : '');
+const bajaDet = ref(user?.baja_det ?? '');
 
 const form = useForm({
     // id: user.id,
@@ -391,7 +411,17 @@ watch(() => props.agregar, () => {
                         </Link>
                         <!-- <a href="/legajos/edit/{{form.id}}" class="btn btn-outline-secondary">Modificar2</a> -->
 
-                        <a type="button" class="btn btn-danger waves-effect waves-light" style="color: white"  data-bs-toggle="modal" data-bs-target="#modalDelete">Borrar</a>
+                        <a
+                            type="button"
+                            class="btn waves-effect waves-light"
+                            :class="legajoBaja ? 'btn-secondary disabled' : 'btn-danger'"
+                            style="color: white"
+                            :data-bs-toggle="legajoBaja ? null : 'modal'"
+                            :data-bs-target="legajoBaja ? null : '#modalDelete'"
+                            :aria-disabled="legajoBaja ? 'true' : null"
+                            :tabindex="legajoBaja ? -1 : null"
+                            :title="legajoBaja ? 'El empleado ya está de baja' : 'Dar de baja'"
+                        >Baja</a>
                     </div>
                 </div>
                 <!-- END HEAD Y BOTONES -->
@@ -517,6 +547,13 @@ watch(() => props.agregar, () => {
 
                                             </div>
 
+                                            <!-- Pastilla de baja: a la derecha, a la altura del CUIL -->
+                                            <div class="col-md-7 d-flex justify-content-end align-items-center">
+                                                <span v-if="legajoBaja" class="badge bg-danger rounded-pill fs-6">
+                                                    <i class="ri-user-unfollow-line me-1"></i> Baja el {{ legajoBaja }}
+                                                </span>
+                                            </div>
+
                                             <div class="row mt-6 col-md-12">
                                                 <div class="col-md-6">
                                                     <div class="form-floating form-floating-outline">
@@ -570,10 +607,11 @@ watch(() => props.agregar, () => {
                                                 <label for="alta">Fecha de alta</label>
                                                 </div>
                                             </div>
+
                                             <div class="col-md-2 select2-primary">
                                                 <div class="form-floating {{ $outline }}">
-                                                <input 
-                                                    type="text" 
+                                                <input
+                                                    type="text"
                                                     id="antiguedad"
                                                     name="antiguedad"
                                                     class="form-control bg-transparent border-0 fw-semibold" 
@@ -609,6 +647,54 @@ watch(() => props.agregar, () => {
                                                     readonly
                                                     :value="form.edad" />
                                                 <label for="edad">Edad</label>
+                                                </div>
+                                            </div>
+
+                                            <!-- Datos de la baja (solo lectura) — debajo de la fila de alta, solo si el empleado está de baja -->
+                                            <div v-if="legajoBaja" class="row mt-4 col-md-12">
+                                                <div class="col-md-6 mb-3">
+                                                    <label for="sicoss_baja" class="col-form-label">Motivo de la baja</label>
+                                                    <select class="form-control" id="sicoss_baja" name="sicoss_baja" v-model="sicossBaja" disabled>
+                                                        <option value="">(Seleccione un motivo de baja)</option>
+                                                        <option value="25">Abandono del trabajo/ Art.244 LCT</option>
+                                                        <option value="53">Baja de oficio por denuncia</option>
+                                                        <option value="2">Baja otras causales (renuncia, jubilación, etc.)</option>
+                                                        <option value="4">Baja otras causales Decreto N°796/97</option>
+                                                        <option value="7">Baja por despido</option>
+                                                        <option value="8">Baja por despido (según Decreto N°796/97)</option>
+                                                        <option value="1">Baja por fallecimiento</option>
+                                                        <option value="40">Cesantía laboral</option>
+                                                        <option value="20">Cesión del personal (Art. 229 LCT)</option>
+                                                        <option value="32">Concurso del Empleador Art.251 LCT</option>
+                                                        <option value="23">Denuncia de contrato de trabajo por el empleador/ Art.242 LCT</option>
+                                                        <option value="24">Denuncia de contrato de trabajo por el trabajador/ Art.242 LCT</option>
+                                                        <option value="19">Denuncia por transferencia de establecimiento (Art. 226 LCT)</option>
+                                                        <option value="26">Despido / ART. 245 - LCT</option>
+                                                        <option value="36">Despido con o sin justa causa / ART.64 Inc.c) Ley 22248</option>
+                                                        <option value="37">Despido por fuerza mayor-Trabajo Agrario/Art.64 Inc.d) L.22248</option>
+                                                        <option value="41">Exoneración</option>
+                                                        <option value="52">Extinción por mutuo acuerdo (Art. 241 LCT)</option>
+                                                        <option value="29">Fallecimiento del empleador/ Art.249 LCT</option>
+                                                        <option value="27">Falta o disminución del trabajo/ Art.247 LCT</option>
+                                                        <option value="38">Fin contrato de aprendizaje y pasantias / ART.1 y 2 Ley 25877; ART.2 y 19 Ley 25013</option>
+                                                        <option value="47">Fin de pago retiro voluntario (Dec. 263/2018 y otros)</option>
+                                                        <option value="28">Fuerza mayor / ART.247 - LCT</option>
+                                                        <option value="34">Incapacidad o inhabilidad del trabajador / ART.254 - LCT</option>
+                                                        <option value="46">Inicio de pago por retiro voluntario (Dec. 263/2018 y otros)</option>
+                                                        <option value="33">Jubilación/ Art.252 LCT / Art.64 Inc.e) L.22248 y otras</option>
+                                                        <option value="31">Quiebra del empleador/Art.251 LCT</option>
+                                                        <option value="21">Renuncia del trabajador (Art. 240 LCT, Art. 64 inc. a)</option>
+                                                        <option value="54">Retiro anticipado o voluntario</option>
+                                                        <option value="18">Transferencia del contrato (Art. 225 LCT)</option>
+                                                        <option value="99">Vencimiento de contrato a plazo fijo/determinado</option>
+                                                        <option value="30">Vencimiento de plazo / ART. 250 - LCT</option>
+                                                        <option value="22">Voluntad concurrente (Art. 241 LCT, acuerdo)</option>
+                                                        <option value="35">Voluntad concurrente de las partes-Trabajo Agrario/Art.64 Inc.b) L.22248</option>
+                                                    </select>
+                                                </div>
+                                                <div class="col-md-10 mb-2">
+                                                    <label for="baja_det" class="col-form-label">Comentarios de la baja</label>
+                                                    <textarea class="form-control" name="baja_det" id="baja_det" rows="3" v-model="bajaDet" disabled style="resize: vertical;"></textarea>
                                                 </div>
                                             </div>
 
@@ -1194,9 +1280,9 @@ watch(() => props.agregar, () => {
 
                                                     <option disabled value="">(Seleccione el tipo de contrato)</option>
                                                     <option
-                                                            v-for="p in contrataciones"
+                                                            v-for="p in contratos"
                                                             :key="p.codigo"
-                                                            :value="p.codigo"
+                                                            :value="String(p.codigo)"
                                                         >
                                                             {{ p.codigo }} - {{ p.detalle }}
                                                     </option>
@@ -1233,8 +1319,13 @@ watch(() => props.agregar, () => {
                                                     v-model="form.jornada_id">
 
                                                     <option disabled value="">(Seleccione el tipo de Jornada)</option>
-                                                    <option value="1" selected="">Completa</option>
-                                                    <option value="2">Media jornada</option>
+                                                    <option
+                                                            v-for="j in jornadas"
+                                                            :key="j.id"
+                                                            :value="j.id"
+                                                        >
+                                                            {{ j.detalle }}
+                                                    </option>
                                                 </select>
                                                 <label for="jornada_id">Jornada laboral</label>
                                                 </div>

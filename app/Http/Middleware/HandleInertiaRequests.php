@@ -90,6 +90,18 @@ class HandleInertiaRequests extends Middleware
             return 'layouts/legajos';
         }
 
+        // Catálogos de RR.HH. (ABM bajo "Grupo empresario")
+        if (
+            $request->is('centros-costo*') ||
+            $request->is('sectores*') ||
+            $request->is('cuadrillas*') ||
+            $request->is('sindicatos*') ||
+            $request->is('categorias*') ||
+            $request->is('tipos-contrato*')
+        ) {
+            return 'layouts/legajos';
+        }
+
         // Config / Parametrizaciones
         if ($request->is('config*')) {
             return 'layouts/legajos';

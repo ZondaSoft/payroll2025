@@ -285,6 +285,42 @@
                 <div data-i18n="Grupo empresario">Grupo empresario</div>
               </a>
             </li>
+            <li class="menu-item {{ request()->routeIs('centros.costo.*') ? 'active' : '' }}">
+              <a href="{{ url('/centros-costo') }}" class="menu-link">
+                <i class="menu-icon tf-icons ri-money-dollar-box-line"></i>
+                <div data-i18n="Centros de costo">Centros de costo</div>
+              </a>
+            </li>
+            <li class="menu-item {{ request()->routeIs('sectores.*') ? 'active' : '' }}">
+              <a href="{{ url('/sectores') }}" class="menu-link">
+                <i class="menu-icon tf-icons ri-layout-grid-line"></i>
+                <div data-i18n="Sector">Sector</div>
+              </a>
+            </li>
+            <li class="menu-item {{ request()->routeIs('cuadrillas.*') ? 'active' : '' }}">
+              <a href="{{ url('/cuadrillas') }}" class="menu-link">
+                <i class="menu-icon tf-icons ri-team-line"></i>
+                <div data-i18n="Cuadrilla">Cuadrilla</div>
+              </a>
+            </li>
+            <li class="menu-item {{ request()->routeIs('sindicatos.*') ? 'active' : '' }}">
+              <a href="{{ url('/sindicatos') }}" class="menu-link">
+                <i class="menu-icon tf-icons ri-group-2-line"></i>
+                <div data-i18n="Sindicatos">Sindicatos</div>
+              </a>
+            </li>
+            <li class="menu-item {{ request()->routeIs('categorias.*') ? 'active' : '' }}">
+              <a href="{{ url('/categorias') }}" class="menu-link">
+                <i class="menu-icon tf-icons ri-price-tag-3-line"></i>
+                <div data-i18n="Categorias">Categorias</div>
+              </a>
+            </li>
+            <li class="menu-item {{ request()->routeIs('tipos.contrato.*') ? 'active' : '' }}">
+              <a href="{{ url('/tipos-contrato') }}" class="menu-link">
+                <i class="menu-icon tf-icons ri-file-list-3-line"></i>
+                <div data-i18n="Tipos de contrato">Tipos de contrato</div>
+              </a>
+            </li>
             <li class="menu-item {{ request()->routeIs('sicoss.actividades.*') || request()->routeIs('sicoss.condiciones.*') || request()->routeIs('sicoss.modalidades.*') || request()->routeIs('sicoss.situacion.*') || request()->routeIs('sicoss.obras.*') || request()->routeIs('sicoss.localidades.*') || request()->routeIs('sicoss.siniestros.*') || request()->routeIs('sicoss.importes-detraer.*') || request()->routeIs('sicoss.topes.*') ? 'active open' : '' }}">
               <a href="javascript:void(0);" class="menu-link menu-toggle">
                 <i class="menu-icon tf-icons ri-git-commit-line"></i>

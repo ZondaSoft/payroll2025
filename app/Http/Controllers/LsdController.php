@@ -224,19 +224,30 @@ class LsdController extends Controller
 
             // Pre-check 3: inconsistencias de datos SICOSS que romperían el formato de ancho fijo del Reg 04.
             // Aplica tanto a SJ como a RE (el Reg 04 se emite en ambos modos).
+            // Si el usuario eligió "Ignorar y continuar" (ignorar_inconsistencias=true), no se bloquea:
+            // esos legajos se excluyen de la generación y el resto se emite normalmente.
             $inconsistencias = $this->detectarInconsistenciasReg04($empresa, $periodoStr, $tipoLiquidacionImportada);
+            $legajosExcluidos = [];
             if (!empty($inconsistencias)) {
-                return response()->json([
-                    'success' => false,
-                    'tipo_error' => 'datos_inconsistentes',
-                    'message' => sprintf(
-                        'Se encontraron %d inconsistencias en los datos SICOSS de los legajos. ' .
-                        'Estos valores no entran en el formato de ancho fijo del LSD (Registro 04) y ARCA rechazaría el archivo. ' .
-                        'Corregí cada legajo antes de generar.',
-                        count($inconsistencias)
-                    ),
-                    'inconsistencias' => $inconsistencias,
-                ], 422);
+                if (!$request->boolean('ignorar_inconsistencias')) {
+                    return response()->json([
+                        'success' => false,
+                        'tipo_error' => 'datos_inconsistentes',
+                        'message' => sprintf(
+                            'Se encontraron %d inconsistencias en los datos SICOSS de los legajos. ' .
+                            'Estos valores no entran en el formato de ancho fijo del LSD (Registro 04) y ARCA rechazaría el archivo. ' .
+                            'Corregí cada legajo antes de generar.',
+                            count($inconsistencias)
+                        ),
+                        'inconsistencias' => $inconsistencias,
+                    ], 422);
+                }
+
+                // Códigos de legajo a excluir de la generación (el usuario optó por ignorarlos).
+                $legajosExcluidos = array_values(array_filter(array_unique(array_map(
+                    fn($i) => (string) ($i['legajo'] ?? ''),
+                    $inconsistencias
+                )), fn($v) => $v !== ''));
             }
 
             // Número de emisión: correlativo ascendente por empresa + período.
@@ -249,7 +260,7 @@ class LsdController extends Controller
                 ->max('numero_emision') ?? 0;
             $numeroEmision = $ultimaEmision + 1;
 
-            $fileData = $this->generarTxt($empresa, $periodo, $tipoLiquidacion, $tipoLiquidacionImportada, $numeroEmision, $request->fecha_pago, $identificadorEnvio);
+            $fileData = $this->generarTxt($empresa, $periodo, $tipoLiquidacion, $tipoLiquidacionImportada, $numeroEmision, $request->fecha_pago, $identificadorEnvio, $legajosExcluidos);
 
             // Si generarTxt devolvió un error (por ejemplo 404), retornarlo y no crear la emisión
             if (!is_array($fileData) || ($fileData['status'] ?? 200) !== 200) {
@@ -308,6 +319,7 @@ class LsdController extends Controller
                 'download_url' => route('lsd.emision.download', $emision->id),
                 'emision_id' => $emision->id,
                 'advertencias_aportes' => $advertenciasAportes,
+                'legajos_excluidos' => $legajosExcluidos,
             ]);
         } catch (\DomainException $e) {
             return response()->json([
@@ -388,13 +400,27 @@ class LsdController extends Controller
                 'sue001s.sicoss_sini',
                 'sue001s.sicoss_hijos',
                 'sue001s.sicoss_adherentes',
-                'sue001s.obra_sijp'
+                'sue001s.obra_sijp',
+                'sue001s.jornada_id'
             )
             ->distinct()
             ->get();
 
         // Codigos válidos de la tabla de zonas/localidades (sue001s.sicoss_zona guarda este codigo interno).
         $zonasValidas = DB::table('sicoss_zonas')->pluck('codigo')->flip();
+
+        // Códigos válidos de obra social (sicoss_obras.codigo: strings de 6 dígitos con ceros a la izquierda).
+        $obrasValidas = DB::table('sicoss_obras')->pluck('codigo')->flip();
+
+        // Jornadas (sue010s) y modalidades de contratación "a tiempo parcial" (sicoss08s) para validar
+        // coherencia: el prorrateo del importe a detraer y la base diferencial de aportes OS del Reg 04 se
+        // disparan por la jornada (sue010s.parcial). La modalidad parcial y la jornada parcial deben coincidir.
+        $jornadasPorId = DB::table('sue010s')->get()->keyBy('id');
+        $modalidadesParciales = DB::table('sicoss08s')
+            ->where('detalle', 'like', '%tiempo parcial%')
+            ->pluck('codigo')
+            ->map(fn($c) => (int) $c)
+            ->all();
 
         // Campos numéricos del Reg 04 con su ancho fijo: si el valor (como string) supera el ancho, desborda.
         $camposAncho = [
@@ -471,6 +497,51 @@ class LsdController extends Controller
                     'valor'    => (string) $zona,
                     'esperado' => 'localidad existente en SICOSS',
                     'problema' => "La localidad/zona '{$zona}' del legajo no existe en la tabla SICOSS de zonas. Seleccioná una localidad válida.",
+                ];
+            }
+
+            // Obra social (obra_sijp): obligatoria y debe existir en el catálogo sicoss_obras
+            // (códigos de 6 dígitos con ceros a la izquierda; se normaliza antes de buscar).
+            $obra = trim((string) ($emp->obra_sijp ?? ''));
+            if ($obra === '') {
+                $inconsistencias[] = $base + [
+                    'campo'    => 'Obra social',
+                    'valor'    => '(vacío)',
+                    'esperado' => 'obra social cargada',
+                    'problema' => 'El legajo no tiene cargada la obra social (obra_sijp). Asigná una obra social válida.',
+                ];
+            } elseif (strlen($obra) <= 6 && !$obrasValidas->has(str_pad($obra, 6, '0', STR_PAD_LEFT))) {
+                $inconsistencias[] = $base + [
+                    'campo'    => 'Obra social',
+                    'valor'    => $obra,
+                    'esperado' => 'código existente en SICOSS',
+                    'problema' => "La obra social '{$obra}' del legajo no existe en la tabla SICOSS de obras sociales. Seleccioná una válida.",
+                ];
+            }
+
+            // Coherencia jornada parcial ↔ modalidad de contratación a tiempo parcial.
+            // El prorrateo del importe a detraer y la base diferencial de aportes OS del Reg 04 se disparan
+            // por la jornada (sue010s.parcial). Si la modalidad declara tiempo parcial pero la jornada no
+            // (o viceversa), ARCA rechazaría o los aportes de OS no cuadrarían.
+            $modalPresente  = !($emp->sicoss_modal === null || $emp->sicoss_modal === '' || (int) $emp->sicoss_modal === 0);
+            $modalParcial   = $modalPresente && in_array((int) $emp->sicoss_modal, $modalidadesParciales, true);
+            $jornadaRow     = $jornadasPorId[$emp->jornada_id] ?? null;
+            $jornadaParcial = $jornadaRow && (int) ($jornadaRow->parcial ?? 0) === 1;
+            $jornadaNombre  = $jornadaRow ? (string) $jornadaRow->detalle : '(sin jornada asignada)';
+
+            if ($modalParcial && !$jornadaParcial) {
+                $inconsistencias[] = $base + [
+                    'campo'    => 'Jornada vs. modalidad',
+                    'valor'    => "Modalidad tiempo parcial (cód. {$emp->sicoss_modal}) · Jornada: {$jornadaNombre}",
+                    'esperado' => 'jornada de tiempo parcial',
+                    'problema' => "La modalidad de contratación es a tiempo parcial (cód. {$emp->sicoss_modal}) pero la jornada asignada ('{$jornadaNombre}') no es de tiempo parcial. Asigná una jornada de tiempo parcial al legajo para que el LSD prorratee el importe a detraer y complete la base diferencial de aportes de obra social.",
+                ];
+            } elseif ($modalPresente && !$modalParcial && $jornadaParcial) {
+                $inconsistencias[] = $base + [
+                    'campo'    => 'Jornada vs. modalidad',
+                    'valor'    => "Jornada parcial ('{$jornadaNombre}') · Modalidad: cód. {$emp->sicoss_modal}",
+                    'esperado' => 'modalidad de contratación a tiempo parcial',
+                    'problema' => "La jornada asignada ('{$jornadaNombre}') es de tiempo parcial pero la modalidad de contratación (cód. {$emp->sicoss_modal}) no es a tiempo parcial. Hacé coincidir la modalidad con la jornada para que el importe a detraer y los aportes de obra social del LSD se calculen correctamente.",
                 ];
             }
 
@@ -683,7 +754,7 @@ class LsdController extends Controller
         ]);
     }
 
-    public function generarTxt($empresa, $periodo, $tipoLiquidacion, $tipoLiquidacionImportada, $numero_emision, $fechaPagoOverride = null, $identificadorEnvio = 'SJ')
+    public function generarTxt($empresa, $periodo, $tipoLiquidacion, $tipoLiquidacionImportada, $numero_emision, $fechaPagoOverride = null, $identificadorEnvio = 'SJ', array $legajosExcluidos = [])
     {
         $empresaId = $empresa->id;
         $empresaName = $empresa->detalle ?? '';
@@ -756,6 +827,11 @@ class LsdController extends Controller
             $query->where('sue001s.grupo_emp', $codEmpresa);
         }
 
+        // Legajos excluidos manualmente ("Ignorar y continuar" en el modal de inconsistencias SICOSS).
+        if (!empty($legajosExcluidos)) {
+            $query->whereNotIn('sue001s.codigo', $legajosExcluidos);
+        }
+
         $datos = $query->select(
             'sue090s.*',
             'sue001s.cuil as cuil',
@@ -776,6 +852,7 @@ class LsdController extends Controller
             'sue001s.cbu as cbu',
             'sue001s.alta as alta',
             'sue001s.baja as baja',
+            'sue001s.jornada_id as jornada_id',
             'sue007s.porc_tarea_dif as porc_tarea_dif',
             'sue102s.concepto_arca as concepto_arca'
         )->get();
@@ -1029,6 +1106,12 @@ class LsdController extends Controller
             return $flag !== null && (float) $flag > 0;
         };
 
+        // Jornadas (sue010s): para detectar media jornada (parcial) y sus horas semanales.
+        // En jornada parcial: (1) el importe a detraer se prorratea por horas_semana/48, y
+        // (2) se completa la "base diferencial de aportes OS" (la OS se descuenta sobre un mínimo > base real).
+        $jornadasPorId = DB::table('sue010s')->get()->keyBy('id');
+        $HORAS_JORNADA_COMPLETA = 48; // jornada completa de referencia
+
         foreach ($datos->unique('cuil') as $registro) {
             // remuneracionBruta: suma de importes H y NR de todos los conceptos del legajo según rangos de sue089s
             $remuneracionBrutaCalculada = $datos->where('cuil', $registro->cuil)->reduce(function (float $carry, $row) use ($rangosSue089) {
@@ -1055,6 +1138,22 @@ class LsdController extends Controller
                 }
                 return $carry;
             }, 0.0);
+
+            // Jornada parcial (media jornada): sue001s.jornada_id → sue010s.parcial.
+            // factorParcial = horas_semana / 48 (jornada completa). En jornada completa = 1 (sin efecto).
+            $jornada = $jornadasPorId[$registro->jornada_id] ?? null;
+            $esJornadaParcial = $jornada && (int) ($jornada->parcial ?? 0) === 1;
+            $horasSemanaJornada = (float) ($jornada->horas_semana ?? 0);
+            $factorParcial = ($esJornadaParcial && $horasSemanaJornada > 0)
+                ? min(1.0, $horasSemanaJornada / $HORAS_JORNADA_COMPLETA)
+                : 1.0;
+            // OS efectivamente descontada (concepto ARCA 810002) del legajo: sirve para derivar la base
+            // mínima sobre la que se aportó OS en parcial (aporte / 3%) y completar la base diferencial.
+            $osDeducidaCalc = $esJornadaParcial
+                ? $datos->where('cuil', $registro->cuil)->reduce(function (float $carry, $row) {
+                    return $carry + (((string) ($row->concepto_arca ?? '') === '810002') ? abs((float) ($row->importe ?? 0)) : 0.0);
+                }, 0.0)
+                : 0.0;
 
             // BI 9 (LRT): así la determina ARCA a partir de las liquidaciones (Reg 03) + la parametrización:
             //   - TODOS los conceptos remunerativos (H), y
@@ -1118,10 +1217,24 @@ class LsdController extends Controller
 
             $adherentes = str_pad($registro->sicoss_adherentes ?? '00', 2, '0', STR_PAD_LEFT);  // Se registra el número de aquellos que no integran el grupo familiar. Ese dato es tenido en cuenta para el incremento del porcentaje a considerar para el cálculo de aportes de Obra Social.
             $aporteAdicionalOS = str_pad($registro->aporteAdicionalOS ?? '0', 15, '0', STR_PAD_LEFT); // Se consignarán los aportes del trabajador, emergentes de la diferencia entre la remuneración efectivamente percibida por este y el mínimo fijado por ANSES, a los efectos de acceder a una cobertura médico asistencial (Dec. 492/95, art. 8) Formato: 13 dígitos enteros y 2 decimales
-            $contribAdicionalOS = str_pad($registro->aporteAdicionalOS ?? '0', 15, '0', STR_PAD_LEFT); // Se consignarán las contribuciones del empleador, emergentes de la diferencia entre la remuneración efectivamente percibida por el trabajador y el mínimo fijado por ANSES, a los efectos de permitirle a este acceder a una cobertura médico asistencial (Dec. 492/95, art. 8) Formato: 13 dígitos enteros y 2 decimales. 
-            $baseCalculoDiferencialAportes = str_pad($registro->baseCalculoDiferencialAportes ?? '0', 15, '0', STR_PAD_LEFT); // Para informar diferenciales que sumen a la base imponible 4 (aportes de obra social y FSR) en los casos de trabajadores a tiempo parcial que aportan como tiempo completo (Ley, 26.474 art 1, inc. 4) Formato: 13 dígitos enteros y 2 decimales. 
-            $baseCalculoDiferencialOS = str_pad($registro->baseCalculoDiferencialOs ?? '0', 15, '0', STR_PAD_LEFT); // Para informar diferenciales que sumen a la base imponible 8 (contribuciones de obra social y FSR) en los casos de trabajadores a tiempo parcial que contribuyen como tiempo completo (Ley, 26.474 art 1, inc. 4) Formato: 13 dígitos enteros y 2 decimales. 
-            $baseCalculoDiferencialLRT = str_pad($registro->baseCalculoDiferencialLRT ?? '0', 15, '0', STR_PAD_LEFT); // Para informar diferenciales que sumen a la base imponible 9 (contribuciones LRT) . Formato: 13 dígitos enteros y 2 decimales. 
+            $contribAdicionalOS = str_pad($registro->aporteAdicionalOS ?? '0', 15, '0', STR_PAD_LEFT); // Se consignarán las contribuciones del empleador, emergentes de la diferencia entre la remuneración efectivamente percibida por el trabajador y el mínimo fijado por ANSES, a los efectos de permitirle a este acceder a una cobertura médico asistencial (Dec. 492/95, art. 8) Formato: 13 dígitos enteros y 2 decimales.
+            // Jornada parcial: la OS se aporta sobre la base implícita en lo descontado (OS / 3%), topeada.
+            // ARCA exige que el BI4 informado (campo pos 221-235) == "determinada" = haberes remunerativos +
+            // Base diferencial OS (pos 101-115). Por eso hay que cargar AMBOS: el BI4 con la base completa de OS
+            // Y el diferencial = base − haberes (así los dos lados dan la misma base y cuadra).
+            $baseOSAportes = ($esJornadaParcial && $osDeducidaCalc > 0)
+                ? (($topeAportesNumerico > 0) ? min($osDeducidaCalc / 0.03, $topeAportesNumerico) : $osDeducidaCalc / 0.03)
+                : null; // full-time: el BI4 se resuelve más abajo con $baseAportes
+            // Base diferencial de aportes OS+FSR (pos 101-115) = base OS − haberes remunerativos (en parcial).
+            $baseDifAportesOSNum = ($baseOSAportes !== null)
+                ? max(0.0, $baseOSAportes - max(0.0, $totalHaberesCalculado))
+                : (float) ($registro->baseCalculoDiferencialAportes ?? 0);
+            $baseCalculoDiferencialAportes = str_pad((string) (int) round($baseDifAportesOSNum * 100), 15, '0', STR_PAD_LEFT); // BI 4: diferencial aportes OS+FSR (jornada parcial, Ley 26.474).
+            // Base diferencial CONTRIBUCIONES OS+FSR (pos 116-130): mismo criterio que aportes (Art. 92 ter LCT:
+            // las contribuciones de OS del parcial son las de un trabajador a tiempo completo de la categoría).
+            $baseDifContribOSNum = ($baseOSAportes !== null) ? $baseDifAportesOSNum : (float) ($registro->baseCalculoDiferencialOs ?? 0);
+            $baseCalculoDiferencialOS = str_pad((string) (int) round($baseDifContribOSNum * 100), 15, '0', STR_PAD_LEFT); // BI 8: diferencial contribuciones OS+FSR (jornada parcial, Ley 26.474 art 1 inc 4).
+            $baseCalculoDiferencialLRT = str_pad($registro->baseCalculoDiferencialLRT ?? '0', 15, '0', STR_PAD_LEFT); // Para informar diferenciales que sumen a la base imponible 9 (contribuciones LRT) . Formato: 13 dígitos enteros y 2 decimales.
             // Remuneración Maternidad (pos 146-160): para empleadas en licencia por maternidad (situación de revista
             // 5 = maternidad, 10 = excedencia, 11 = maternidad Down) se informa la remuneración bruta que le hubiera
             // correspondido percibir (la usa ANSeS para la asignación). Se calcula como la suma de los haberes
@@ -1162,11 +1275,18 @@ class LsdController extends Controller
             $baseImponible1 = $baseAportesStr; // Aportes SIPA (topeada).
             $baseImponible2 = $totalHaberes; // Contribuciones SIPA e INSSJyP (sin tope).
             $baseImponible3 = $totalHaberes; // Contribuciones FNE / asignaciones familiares / RENATRE (sin tope).
-            $baseImponible4 = $baseAportesStr; // Aportes Obra Social y FSR (topeada).
+            // Aportes Obra Social y FSR (topeada). En jornada parcial el BI4 lleva la base completa de OS
+            // ($baseOSAportes, calculada arriba); full-time usa la base de aportes normal. SIPA (BI1) y PAMI (BI5)
+            // siguen sobre los haberes reales.
+            $baseImponible4 = str_pad((string) (int) round(($baseOSAportes ?? $baseAportes) * 100), 15, '0', STR_PAD_LEFT);
             $baseImponible5 = $baseAportesStr; // Aportes INSSJyP (topeada).
             $baseImponible6 = str_pad($registro->baseImponible6 ?? '0', 15, '0', STR_PAD_LEFT); // Aportes diferenciales.
             $baseImponible7 = str_pad($registro->baseImponible7 ?? '0', 15, '0', STR_PAD_LEFT); // Aportes regímenes especiales.
-            $baseImponible8 = $totalHaberes; // Contribuciones Obra Social y FSR.
+            // Contribuciones Obra Social y FSR. En parcial = base completa de OS (igual que BI4); el incremento
+            // sobre los haberes va en la base diferencial de contribuciones OS (pos 116-130). Art. 92 ter LCT.
+            $baseImponible8 = ($baseOSAportes !== null)
+                ? str_pad((string) (int) round($baseOSAportes * 100), 15, '0', STR_PAD_LEFT)
+                : $totalHaberes;
             // BI 9 (LRT) = H + NR-con-marca-LRT (ver cálculo de $baseImponible9Calculada arriba).
             // Coincide con la base que ARCA determina a partir de las liquidaciones + parametrización.
             $baseImponible9 = str_pad((string) (int) round($baseImponible9Calculada * 100), 15, '0', STR_PAD_LEFT);
@@ -1177,6 +1297,8 @@ class LsdController extends Controller
             // Así, cuando la base es 0 (ej. licencia por maternidad con haberes neteados, o meses sin haberes),
             // el importe a detraer informado es 0 y BI 10 = 0, consistente con lo que ARCA determina.
             $baseBI10 = max(0.0, $totalHaberesCalculado);
+            // Jornada parcial: la detracción se prorratea por horas (factorParcial = horas_semana/48).
+            $detraccionEmpleado = round($importeDetraerNumerico * $factorParcial, 2);
             // Modalidades que no admiten la detracción (Guía N°17 ARCA): no aportan a SIPA → no hay
             // base. ARCA exige importe a detraer = 0 Y BI 10 = 0. Para el resto: BI 10 = base − detracción
             // (detracción topeada a la base, no genera base negativa).
@@ -1184,7 +1306,7 @@ class LsdController extends Controller
                 $detraerAplicado = 0.0;
                 $bi10Calc = 0.0;
             } else {
-                $detraerAplicado = min($importeDetraerNumerico, $baseBI10);
+                $detraerAplicado = min($detraccionEmpleado, $baseBI10);
                 $bi10Calc = $baseBI10 - $detraerAplicado;
             }
             $baseImponible10 = str_pad((string) (int) round($bi10Calc * 100), 15, '0', STR_PAD_LEFT);
@@ -1290,7 +1412,8 @@ class LsdController extends Controller
             $adherentes = "00";  // Se registra el número de aquellos que no integran el grupo familiar. Ese dato es tenido en cuenta para el incremento del porcentaje a considerar para el cálculo de aportes de Obra Social.
             $aporteAdicionalOS = str_pad($registro->aporteAdicionalOS ?? '0', 15, '0', STR_PAD_LEFT); // Se consignarán los aportes del trabajador, emergentes de la diferencia entre la remuneración efectivamente percibida por este y el mínimo fijado por ANSES, a los efectos de acceder a una cobertura médico asistencial (Dec. 492/95, art. 8) Formato: 13 dígitos enteros y 2 decimales
             $contribAdicionalOS = str_pad($registro->aporteAdicionalOS ?? '0', 15, '0', STR_PAD_LEFT); // Se consignarán las contribuciones del empleador, emergentes de la diferencia entre la remuneración efectivamente percibida por el trabajador y el mínimo fijado por ANSES, a los efectos de permitirle a este acceder a una cobertura médico asistencial (Dec. 492/95, art. 8) Formato: 13 dígitos enteros y 2 decimales. 
-            $baseCalculoDiferencialAportes = str_pad($registro->baseCalculoDiferencialAportes ?? '0', 15, '0', STR_PAD_LEFT); // Para informar diferenciales que sumen a la base imponible 4 (aportes de obra social y FSR) en los casos de trabajadores a tiempo parcial que aportan como tiempo completo (Ley, 26.474 art 1, inc. 4) Formato: 13 dígitos enteros y 2 decimales. 
+            // $baseDifAportesOS05 / $baseCalculoDiferencialAportes se calculan más abajo, una vez definidas
+            // las variables de jornada parcial ($esJornadaParcial05, $osDeducida05) y $totalHaberesCalc05.
             $baseCalculoDiferencialOS = str_pad($registro->baseCalculoDiferencialOs ?? '0', 15, '0', STR_PAD_LEFT); // Para informar diferenciales que sumen a la base imponible 8 (contribuciones de obra social y FSR) en los casos de trabajadores a tiempo parcial que contribuyen como tiempo completo (Ley, 26.474 art 1, inc. 4) Formato: 13 dígitos enteros y 2 decimales. 
             $baseCalculoDiferencialLRT = str_pad($registro->baseCalculoDiferencialLRT ?? '0', 15, '0', STR_PAD_LEFT); // Para informar diferenciales que sumen a la base imponible 9 (contribuciones LRT) . Formato: 13 dígitos enteros y 2 decimales. 
             $remuneracionMaternidad = str_pad($registro->remuneracionMaternidad ?? '0', 15, '0', STR_PAD_LEFT); // Informará el monto de la remuneración bruta que le hubiera correspondido percibir a la trabajadora si hubiera cumplido sus servicios normalmente.  Formato: 13 dígitos enteros y 2 decimales. 
@@ -1319,6 +1442,33 @@ class LsdController extends Controller
                 }
                 return $carry;
             }, 0.0);
+            // Jornada parcial (igual que en Reg 04): factor de prorrateo del detraer y OS descontada para la base diferencial.
+            $jornada05 = $jornadasPorId[$registro->jornada_id] ?? null;
+            $esJornadaParcial05 = $jornada05 && (int) ($jornada05->parcial ?? 0) === 1;
+            $horasSemana05 = (float) ($jornada05->horas_semana ?? 0);
+            $factorParcial05 = ($esJornadaParcial05 && $horasSemana05 > 0)
+                ? min(1.0, $horasSemana05 / $HORAS_JORNADA_COMPLETA)
+                : 1.0;
+            $osDeducida05 = $esJornadaParcial05
+                ? $datos->where('cuil', $registro->cuil)->reduce(function (float $carry, $row) {
+                    return $carry + (((string) ($row->concepto_arca ?? '') === '810002') ? abs((float) ($row->importe ?? 0)) : 0.0);
+                }, 0.0)
+                : 0.0;
+            // Jornada parcial (igual criterio que Reg 04): el BI4 lleva la base completa de OS (OS/3%, topeada) Y
+            // el diferencial (pos 101-115) = base − haberes, porque ARCA determina BI4 = haberes + diferencial y
+            // exige que coincida con el BI4 informado.
+            $baseOSAportes05 = ($esJornadaParcial05 && $osDeducida05 > 0)
+                ? (($topeAportesNumerico > 0) ? min($osDeducida05 / 0.03, $topeAportesNumerico) : $osDeducida05 / 0.03)
+                : null;
+            $baseDifAportesOS05 = ($baseOSAportes05 !== null)
+                ? max(0.0, $baseOSAportes05 - max(0.0, $totalHaberesCalc05))
+                : (float) ($registro->baseCalculoDiferencialAportes ?? 0);
+            $baseCalculoDiferencialAportes = str_pad((string) (int) round($baseDifAportesOS05 * 100), 15, '0', STR_PAD_LEFT); // BI 4: diferencial aportes OS+FSR (jornada parcial, Ley 26.474).
+            // Diferencial CONTRIBUCIONES OS+FSR (pos 116-130): mismo criterio que aportes (Art. 92 ter LCT). Sobrescribe
+            // el default de arriba para parcial.
+            if ($baseOSAportes05 !== null) {
+                $baseCalculoDiferencialOS = str_pad((string) (int) round($baseDifAportesOS05 * 100), 15, '0', STR_PAD_LEFT);
+            }
             $remuneracionBruta = str_pad((string) (int) round($remuneracionBrutaCalc05 * 100), 15, '0', STR_PAD_LEFT);
             // Reg 05 (eventuales): BI 1-8 usan $totalHaberes (solo H); BI 9 (LRT) = H + NR-con-marca-LRT.
             $totalHaberes05Str = str_pad((string) (int) round($totalHaberesCalc05 * 100), 15, '0', STR_PAD_LEFT);
@@ -1342,23 +1492,28 @@ class LsdController extends Controller
             $baseImponible1 = $baseAportes05Str;
             $baseImponible2 = $totalHaberes05Str;
             $baseImponible3 = $totalHaberes05Str;
-            $baseImponible4 = $baseAportes05Str;
+            // BI4 (aportes OS): en parcial = base completa de OS ($baseOSAportes05, calculada arriba); resto $baseAportes05.
+            $baseImponible4 = str_pad((string) (int) round(($baseOSAportes05 ?? $baseAportes05) * 100), 15, '0', STR_PAD_LEFT);
             $baseImponible5 = $baseAportes05Str;
             $baseImponible6 = str_pad($registro->baseImponible6 ?? '0', 15, '0', STR_PAD_LEFT);
             $baseImponible7 = str_pad($registro->baseImponible7 ?? '0', 15, '0', STR_PAD_LEFT);
-            $baseImponible8 = $totalHaberes05Str;
+            // Contribuciones OS y FSR. En parcial = base completa de OS (igual que BI4); Art. 92 ter LCT.
+            $baseImponible8 = ($baseOSAportes05 !== null)
+                ? str_pad((string) (int) round($baseOSAportes05 * 100), 15, '0', STR_PAD_LEFT)
+                : $totalHaberes05Str;
             $baseImponible9 = str_pad((string) (int) round(max(0.0, $baseImponible9Calc05) * 100), 15, '0', STR_PAD_LEFT);
             $baseCalculoDiferencialAportesSS = str_pad($registro->baseCalculoDiferencialAportesSS ?? '0', 15, '0', STR_PAD_LEFT); // Para informar diferenciales que sumen a la base imponible 1 Formato: 13 dígitos enteros y 2 decimales. 
             $baseCalculoDiferencialContribSS = str_pad($registro->baseCalculoDiferencialContribSS ?? '0', 15, '0', STR_PAD_LEFT); // Para informar diferenciales que sumen a la base imponible 2 Formato: 13 dígitos enteros y 2 decimales. 
             // BI 10 (Ley 27.430) = base de conceptos H − importe a detraer, con detracción topeada a la base
             // (no supera la base; ver comentario equivalente en Reg 04).
             $baseBI10_05 = max(0.0, $totalHaberesCalc05);
+            $detraccionEmpleado05 = round($importeDetraerNumerico * $factorParcial05, 2); // prorrateo por jornada parcial
             // Modalidades sin detracción (ver Reg 04): importe a detraer = 0 Y BI 10 = 0.
             if ($this->modalidadSinDetraccion($registro->sicoss_modal ?? 0)) {
                 $detraerAplicado05 = 0.0;
                 $bi10Calc05 = 0.0;
             } else {
-                $detraerAplicado05 = min($importeDetraerNumerico, $baseBI10_05);
+                $detraerAplicado05 = min($detraccionEmpleado05, $baseBI10_05);
                 $bi10Calc05 = $baseBI10_05 - $detraerAplicado05;
             }
             $baseImponible10 = str_pad((string) (int) round($bi10Calc05 * 100), 15, '0', STR_PAD_LEFT);
@@ -1491,11 +1646,133 @@ class LsdController extends Controller
             ->get();
         $empresa = Sue086::find($emision->id_empresa);
 
+        // Rangos de tipo de concepto (H=Remunerativo, NR=No Remunerativo, D=Descuento) por código.
+        $rangos = DB::table('sue089s')->get();
+        $tipoDe = function ($concepto) use ($rangos): ?string {
+            foreach ($rangos as $r) {
+                if ($concepto >= $r->desde && $concepto <= $r->hasta) {
+                    return strtoupper(trim((string) $r->tiporem));
+                }
+            }
+            return null;
+        };
+
+        // Descripción de conceptos y nombres de empleados (apellido = detalle, nombre = nombres).
+        $descConcepto = DB::table('sue102s')->pluck('detalle', 'codigo');
+        $codEmpresa = $empresa->codigo ?? null;
+        $empleados = DB::table('sue001s')
+            ->when($codEmpresa, fn($q) => $q->where('grupo_emp', $codEmpresa))
+            ->get(['codigo', 'cuil', 'detalle', 'nombres', 'convenio'])
+            ->keyBy('cuil');
+
+        // Convenios (sue007s) y tipo de liquidación (de la emisión).
+        $convenios = DB::table('sue007s')->pluck('detalle', 'codigo');
+        $tiposLiq = [1 => 'Normal', 2 => '1er. Quincena', 3 => '2da. Quincena', 4 => 'SAC', 5 => 'Liq. Final', 6 => 'DIF.HAB.'];
+        $tipoLiqNombre = $tiposLiq[(int) $emision->tipo_liquidacion] ?? ('Tipo ' . $emision->tipo_liquidacion);
+
+        // Bases imponibles y cálculos del Reg 04 (parseados del TXT generado, por CUIL).
+        $basesPorCuil = $this->parsearReg04($emision->archivo_txt);
+
+        // Resumen por empleado (totalizador) + detalle completo para el modal.
+        $resumen = [];
+        $detallePorCuil = [];
+        foreach ($items->groupBy('cuil') as $cuil => $grupo) {
+            $rem = 0.0; $norem = 0.0; $desc = 0.0;
+            $conceptos = [];
+            foreach ($grupo as $it) {
+                $tipo = $tipoDe((int) $it->codigo_concepto);
+                $imp = (float) $it->importe;
+                if ($tipo === 'H') {
+                    $rem += $imp;
+                } elseif ($tipo === 'NR') {
+                    $norem += $imp;
+                } elseif ($tipo === 'D') {
+                    $desc += $imp;
+                }
+                $conceptos[] = [
+                    'concepto' => $it->codigo_concepto,
+                    'descripcion' => $descConcepto[$it->codigo_concepto] ?? '',
+                    'tipo' => $tipo,
+                    'cantidad' => $it->cantidad,
+                    'importe' => $imp,
+                    'debito_credito' => $it->debito_credito,
+                ];
+            }
+            $emp = $empleados[$cuil] ?? null;
+            $resumen[] = [
+                'tipo_liq' => $tipoLiqNombre,
+                'convenio' => $emp ? ($convenios[$emp->convenio] ?? (string) ($emp->convenio ?? '')) : '',
+                'cuil' => (string) $cuil,
+                'nombre' => $emp ? trim(((string) ($emp->detalle ?? '')) . ' ' . ((string) ($emp->nombres ?? ''))) : '',
+                'legajo' => $grupo->first()->legajo,
+                'remunerativos' => round($rem, 2),
+                'no_remunerativos' => round($norem, 2),
+                'descuentos' => round($desc, 2),
+            ];
+            $detallePorCuil[(string) $cuil] = [
+                'conceptos' => $conceptos,
+                'bases' => $basesPorCuil[$cuil] ?? null,
+            ];
+        }
+
         return Inertia::render('Lsd/Detalle', [
             'emision' => $emision,
-            'items' => $items,
             'empresa' => $empresa,
+            'resumen' => $resumen,
+            'detallePorCuil' => $detallePorCuil,
         ]);
+    }
+
+    /**
+     * Parsea los registros tipo 04 del TXT generado y devuelve, por CUIL, las bases imponibles y
+     * códigos SICOSS (los cálculos que el LSD efectivamente informó). Numéricos: 2 decimales implícitos.
+     */
+    private function parsearReg04(?string $path): array
+    {
+        if (empty($path) || !is_file($path)) {
+            return [];
+        }
+        $fh = @fopen($path, 'r');
+        if (!$fh) {
+            return [];
+        }
+        $num = fn(string $l, int $desde, int $largo): float => round(((int) substr($l, $desde - 1, $largo)) / 100, 2);
+        $mapa = [];
+        while (($linea = fgets($fh)) !== false) {
+            $linea = rtrim($linea, "\r\n");
+            if (substr($linea, 0, 2) !== '04') {
+                continue;
+            }
+            $cuil = substr($linea, 2, 11);
+            $mapa[$cuil] = [
+                'situacion' => substr($linea, 21, 2),
+                'condicion' => substr($linea, 23, 2),
+                'actividad' => substr($linea, 25, 3),
+                'modalidad' => substr($linea, 28, 3),
+                'siniestro' => substr($linea, 31, 2),
+                'localidad' => substr($linea, 33, 2),
+                'dif_aportes_os' => $num($linea, 101, 15),
+                'dif_contrib_os' => $num($linea, 116, 15),
+                'dif_lrt' => $num($linea, 131, 15),
+                'rem_maternidad' => $num($linea, 146, 15),
+                'rem_bruta' => $num($linea, 161, 15),
+                'bi1' => $num($linea, 176, 15),
+                'bi2' => $num($linea, 191, 15),
+                'bi3' => $num($linea, 206, 15),
+                'bi4' => $num($linea, 221, 15),
+                'bi5' => $num($linea, 236, 15),
+                'bi6' => $num($linea, 251, 15),
+                'bi7' => $num($linea, 266, 15),
+                'bi8' => $num($linea, 281, 15),
+                'bi9' => $num($linea, 296, 15),
+                'dif_aporte_ss' => $num($linea, 311, 15),
+                'dif_contrib_ss' => $num($linea, 326, 15),
+                'bi10' => $num($linea, 341, 15),
+                'importe_detraer' => $num($linea, 356, 15),
+            ];
+        }
+        fclose($fh);
+        return $mapa;
     }
 
     /**
