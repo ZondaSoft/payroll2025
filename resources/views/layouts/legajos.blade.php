@@ -47,6 +47,19 @@
     <link rel="stylesheet" href="{{ asset('css/rtl/theme-default.css') }}" class="template-customizer-theme-css" />
     <link rel="stylesheet" href="{{ asset('css/demo.css') }}" />
 
+    <!-- Override del menú lateral:
+         1) Padre del submenú abierto en #d6e9f3 (en vez del gris por defecto).
+         2) Ítem activo (hoja seleccionada) con degradado violeta→azul en vez del morado sólido. -->
+    <style>
+      .light-style .menu-vertical .menu-item.open > .menu-toggle {
+        background-color: #d6e9f3 !important;
+      }
+      .bg-menu-theme .menu-item.active > .menu-link:not(.menu-toggle) {
+        background: linear-gradient(90deg, #8b5cf6 0%, #3b82f6 100%) !important;
+        color: #fff !important;
+      }
+    </style>
+
     <!-- Vendors CSS -->
     <link rel="stylesheet" href="{{ asset('/libs/perfect-scrollbar/perfect-scrollbar.css') }}" />
     <link rel="stylesheet" href="{{ asset('/libs/typeahead-js/typeahead.css') }}" />
@@ -211,6 +224,11 @@
                 <li class="menu-item {{ request()->is('liquidacion/ganancias*') ? 'active' : '' }}">
                   <a href="#" class="menu-link">
                     <div data-i18n="Liquidación de ganancias">Liquidación de ganancias</div>
+                  </a>
+                </li>
+                <li class="menu-item {{ request()->routeIs('liquidacion.correcciones.*') ? 'active' : '' }}">
+                  <a href="{{ route('liquidacion.correcciones.index') }}" class="menu-link">
+                    <div data-i18n="Correcciones y ajustes">Correcciones y ajustes</div>
                   </a>
                 </li>
               </ul>

@@ -8,6 +8,7 @@ import FloatMultiselect from '@/Components/FloatMultiselect.vue';
 import { Link, useForm, usePage } from '@inertiajs/vue3';
 import { reactive, ref, onMounted, watch, computed } from 'vue';
 import { PAISES } from '@/Data/paises';
+import Swal from 'sweetalert2';
 
 // Recibir la prop agregar desde Laravel
 const props = defineProps({
@@ -78,6 +79,10 @@ const props = defineProps({
     jornadas: {
         type: Array,
         default: () => [],
+    },
+    sicossOrigen: {
+        type: Object,
+        default: null,
     },
     actividades: {
         type: Array,
@@ -173,6 +178,94 @@ const form = useForm({
     cod_categ:   props.legajo?.cod_categ   ?? '',
     activo:      props.legajo?.activo      ?? false,
 });
+
+// ---- Importar datos SICOSS desde otro legajo del mismo CUIL (baja anterior o pluriempleo) ----
+const sicossDefs = [
+    { key: 'sicoss_situa', label: 'Situación de revista', zeroBlank: true },
+    { key: 'sicoss_condi', label: 'Condición de contratación', zeroBlank: true },
+    { key: 'sicoss_activ', label: 'Actividad', zeroBlank: true },
+    { key: 'sicoss_modal', label: 'Modalidad de contratación', zeroBlank: true },
+    { key: 'obra_sijp',    label: 'Obra social', zeroBlank: true },
+    { key: 'sicoss_sini',  label: 'Código de siniestrado', zeroBlank: false }, // 0 = "no siniestrado" es válido
+    { key: 'sicoss_zona',  label: 'Localidad', zeroBlank: true },
+];
+
+const esBlankSicoss = (v, zeroBlank) => {
+    if (v === null || v === undefined || String(v).trim() === '') return true;
+    if (zeroBlank && Number(v) === 0) return true;
+    return false;
+};
+
+const camposSicossEnBlanco = computed(() =>
+    sicossDefs.filter(d => esBlankSicoss(form[d.key], d.zeroBlank))
+);
+
+const puedeImportarSicoss = computed(() =>
+    props.edicion && !!props.sicossOrigen && camposSicossEnBlanco.value.length > 0
+);
+
+const aplicarImportSicoss = (soloEnBlanco) => {
+    const o = props.sicossOrigen;
+    if (!o) return;
+    const keys = soloEnBlanco ? camposSicossEnBlanco.value.map(d => d.key) : sicossDefs.map(d => d.key);
+    keys.forEach(key => {
+        if (key === 'obra_sijp') {
+            form.obra_sijp = (o.obra_sijp ?? '') !== '' ? String(o.obra_sijp).padStart(6, '0') : '';
+            if (o.cod_obsoc !== null && o.cod_obsoc !== undefined) form.cod_obsoc = o.cod_obsoc;
+        } else {
+            form[key] = o[key] ?? '';
+        }
+    });
+};
+
+const abrirImportarSicoss = () => {
+    const o = props.sicossOrigen;
+    if (!o) return;
+    const fmtFecha = (d) => {
+        if (!d) return '—';
+        const [y, m, dd] = String(d).slice(0, 10).split('-');
+        return (y && m && dd) ? `${dd}/${m}/${y}` : String(d);
+    };
+    const enBlanco = camposSicossEnBlanco.value.length;
+    Swal.fire({
+        title: 'Importar datos SICOSS',
+        html: `
+            <div style="text-align:left;font-size:14px;">
+              <p class="mb-2">Se tomarán los datos SICOSS del legajo de origen:</p>
+              <table style="width:100%;border-collapse:collapse;font-size:13px;">
+                <tr><td style="padding:3px 6px;color:#6c757d;">Legajo</td><td style="padding:3px 6px;"><strong>${o.legajo}</strong></td></tr>
+                <tr><td style="padding:3px 6px;color:#6c757d;">Apellido y Nombre</td><td style="padding:3px 6px;"><strong>${o.nombre || '—'}</strong></td></tr>
+                <tr><td style="padding:3px 6px;color:#6c757d;">Empresa</td><td style="padding:3px 6px;"><strong>${o.empresa || '—'}</strong></td></tr>
+                <tr><td style="padding:3px 6px;color:#6c757d;">Fecha de alta</td><td style="padding:3px 6px;">${fmtFecha(o.alta)}</td></tr>
+                <tr><td style="padding:3px 6px;color:#6c757d;">Fecha de baja</td><td style="padding:3px 6px;">${fmtFecha(o.baja)}</td></tr>
+              </table>
+              <p class="mt-3 mb-0">¿Importás <strong>todos</strong> los datos SICOSS o <strong>solo los ${enBlanco} campo(s) en blanco</strong>?</p>
+            </div>`,
+        width: 640,
+        showCancelButton: true,
+        showDenyButton: true,
+        confirmButtonText: 'Importar todos',
+        denyButtonText: 'Solo los campos en blanco',
+        cancelButtonText: 'Cancelar',
+        reverseButtons: true,
+        confirmButtonColor: '#696cff',
+        denyButtonColor: '#03c3ec',
+        focusConfirm: false,
+        didOpen: () => {
+            const cont = Swal.getContainer();
+            if (cont) cont.style.zIndex = '99999';
+            [Swal.getConfirmButton(), Swal.getDenyButton(), Swal.getCancelButton()].forEach(b => {
+                if (b) b.style.fontSize = '0.85rem';
+            });
+        },
+    }).then(result => {
+        if (result.isConfirmed) {
+            aplicarImportSicoss(false);
+        } else if (result.isDenied) {
+            aplicarImportSicoss(true);
+        }
+    });
+};
 
 // Función para determinar la ruta del formulario
 const determineActionRoute = () => {
@@ -307,6 +400,16 @@ const setFocus = () => {
 // Establecer el foco al montar el componente (solo campo MODIFICAR????)
 onMounted(() => {
     setFocus();
+    // Si se entró desde el modal de inconsistencias del LSD (link con #sicoss), abrir directamente la
+    // pestaña SICOSS. En la edición normal (sin hash) se respeta la pestaña por defecto (Personal).
+    if (window.location.hash === '#sicoss') {
+        setTimeout(() => {
+            const btn = document.querySelector('[data-bs-target="#form-tabs-sicoss"]');
+            if (btn && window.bootstrap?.Tab) {
+                window.bootstrap.Tab.getOrCreateInstance(btn).show();
+            }
+        }, 0);
+    }
 });
 
 // Opcional: Observar cambios en la prop agregar (si la prop puede cambiar después de la carga) - (solo campo AGREGAR????)
@@ -1474,6 +1577,17 @@ watch(() => props.agregar, () => {
                                                     :disabled="!edicion"
                                                     :error="form.errors.sicoss_situa"
                                                 />
+                                            </div>
+
+                                            <div class="col-md-6 d-flex align-items-center" v-if="puedeImportarSicoss">
+                                                <button
+                                                    type="button"
+                                                    class="btn btn-outline-primary"
+                                                    @click="abrirImportarSicoss"
+                                                >
+                                                    <i class="ri-download-2-line me-1"></i>
+                                                    Importar datos SICOSS desde legajo {{ sicossOrigen.legajo }}
+                                                </button>
                                             </div>
 
                                             <div class="row"></div>

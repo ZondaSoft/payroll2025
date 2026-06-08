@@ -391,7 +391,7 @@ const mostrarErrorInconsistencias = (mensaje, items) => {
       <td style="padding:4px 8px;border:1px solid #dee2e6;text-align:center;font-family:monospace;color:#dc3545;font-weight:600;">${escapeHtml(i.valor)}</td>
       <td style="padding:4px 8px;border:1px solid #dee2e6;">${escapeHtml(i.esperado)}</td>
       <td style="padding:4px 8px;border:1px solid #dee2e6;text-align:center;">
-        <a href="/legajos/${encodeURIComponent(i.id)}/edit"
+        <a href="/legajos/${encodeURIComponent(i.id)}/edit#sicoss"
            class="lupa-concepto"
            target="_blank"
            rel="noopener"
@@ -432,7 +432,10 @@ const mostrarErrorInconsistencias = (mensaje, items) => {
           <i class="ri-file-excel-2-line me-1"></i> Exportar Excel
         </button>
         <div style="display:flex;gap:8px;align-items:center;">
-          <button type="button" id="inc-cerrar" class="btn btn-outline-secondary">Cerrar</button>
+          <button type="button" id="inc-cerrar" class="btn btn-outline-secondary">Cancelar</button>
+          <button type="button" id="inc-reintentar" class="btn btn-warning">
+            <i class="ri-refresh-line me-1"></i> Reintentar
+          </button>
           <button type="button" id="inc-ignorar" class="btn btn-primary">Ignorar y continuar</button>
         </div>
       </div>
@@ -453,6 +456,12 @@ const mostrarErrorInconsistencias = (mensaje, items) => {
       if (cont) cont.style.zIndex = '99999'
       document.getElementById('inc-exportar')?.addEventListener('click', () => exportarInconsistenciasXLSX(ordenados))
       document.getElementById('inc-cerrar')?.addEventListener('click', () => Swal.close())
+      document.getElementById('inc-reintentar')?.addEventListener('click', () => {
+        // Vuelve a leer los datos de los empleados y re-valida. Si persisten inconsistencias, este mismo
+        // modal se reabre (ciclo de reintento); si ya están corregidos, continúa la generación.
+        Swal.close()
+        generarEmision()
+      })
       document.getElementById('inc-ignorar')?.addEventListener('click', () => {
         // Continúa la generación ignorando (excluyendo) los legajos con datos SICOSS incompletos.
         Swal.close()

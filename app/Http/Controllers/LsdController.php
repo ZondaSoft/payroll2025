@@ -6,6 +6,7 @@ use App\Models\LsdEmision;
 use App\Models\LsdImporteDetraer;
 use App\Models\LsdTope;
 use App\Models\LsdItem;
+use App\Models\LiquidacionCorreccion;
 use App\Models\Sue086;
 use App\Models\Sue100;
 use App\Models\Sue102;
@@ -228,6 +229,7 @@ class LsdController extends Controller
             // esos legajos se excluyen de la generación y el resto se emite normalmente.
             $inconsistencias = $this->detectarInconsistenciasReg04($empresa, $periodoStr, $tipoLiquidacionImportada);
             $legajosExcluidos = [];
+            $legajosIgnorados = [];
             if (!empty($inconsistencias)) {
                 if (!$request->boolean('ignorar_inconsistencias')) {
                     return response()->json([
@@ -248,6 +250,25 @@ class LsdController extends Controller
                     fn($i) => (string) ($i['legajo'] ?? ''),
                     $inconsistencias
                 )), fn($v) => $v !== ''));
+
+                // Detalle de los legajos ignorados (agrupado por legajo con sus motivos) para persistir
+                // en la emisión y mostrarlo luego en el detalle.
+                $legajosIgnorados = collect($inconsistencias)
+                    ->groupBy('legajo')
+                    ->map(function ($grupo) {
+                        $primero = $grupo->first();
+                        return [
+                            'legajo' => (string) ($primero['legajo'] ?? ''),
+                            'cuil' => (string) ($primero['cuil'] ?? ''),
+                            'nombre' => (string) ($primero['nombre'] ?? ''),
+                            'motivos' => collect($grupo)->map(fn($i) => [
+                                'campo' => (string) ($i['campo'] ?? ''),
+                                'detalle' => (string) ($i['problema'] ?? ''),
+                            ])->values()->all(),
+                        ];
+                    })
+                    ->values()
+                    ->all();
             }
 
             // Número de emisión: correlativo ascendente por empresa + período.
@@ -277,6 +298,7 @@ class LsdController extends Controller
                 'fecha_emision' => now()->toDateString(),
                 'periodo' => $periodoStr,
                 'cantidad_empleados' => $fileData['cantidad_empleados'] ?? 0,
+                'legajos_ignorados' => $legajosIgnorados,
                 'monto_total' => $fileData['monto_total'] ?? 0,
                 'estado' => 'borrador',
                 'usuario_id' => auth()->id(),
@@ -732,10 +754,11 @@ class LsdController extends Controller
                     ->where('sue090s.periodo', $periodoStr)
                     ->where('sue090s.tipoliq', $tipoLiquidacionImportada)
                     ->where('sue102s.concepto_arca', $dif['arca'])
-                    ->select('sue090s.id', 'sue090s.importe')
+                    ->select('sue090s.id', 'sue090s.importe', 'sue090s.concepto')
                     ->orderBy('sue090s.id')
                     ->get();
 
+                $primeraFila = $filas->first();
                 $primera = true;
                 foreach ($filas as $fila) {
                     $signo = ((float) $fila->importe < 0) ? -1 : 1;
@@ -743,6 +766,22 @@ class LsdController extends Controller
                     DB::table('sue090s')->where('id', $fila->id)->update(['importe' => $nuevo]);
                     $primera = false;
                 }
+
+                // Asentar la corrección en el histórico (antes/después a nivel del aporte).
+                LiquidacionCorreccion::registrar([
+                    'periodo'          => $periodoStr,
+                    'tipoliq'          => $tipoLiquidacionImportada,
+                    'legajo'           => (string) $dif['legajo'],
+                    'cuil'             => $dif['cuil'] ?? null,
+                    'concepto'         => $primeraFila->concepto ?? null,
+                    'concepto_arca'    => $dif['arca'] ?? null,
+                    'sue090_id'        => $primeraFila->id ?? null,
+                    'importe_anterior' => $dif['informado'],
+                    'importe_nuevo'    => $dif['esperado'],
+                    'motivo'           => "Ajuste de aporte {$dif['aporte']}: " . number_format($dif['informado'], 2, ',', '.') . ' → ' . number_format($dif['esperado'], 2, ',', '.') . ' (base ' . number_format($dif['base'], 2, ',', '.') . ' × ' . rtrim(rtrim(number_format($dif['alicuota'] * 100, 2), '0'), ',') . '%, tope SIPA)',
+                    'origen'           => 'ajuste_aportes_lsd',
+                ]);
+
                 $ajustados++;
             }
         });
@@ -1708,6 +1747,7 @@ class LsdController extends Controller
                 'remunerativos' => round($rem, 2),
                 'no_remunerativos' => round($norem, 2),
                 'descuentos' => round($desc, 2),
+                'neto' => round($rem - $desc + $norem, 2),
             ];
             $detallePorCuil[(string) $cuil] = [
                 'conceptos' => $conceptos,
@@ -1715,12 +1755,71 @@ class LsdController extends Controller
             ];
         }
 
+        // ---- Resumen de liquidación (totales por concepto + contadores de registros) ----
+        // Importe con signo: crédito (+) suma, débito (−) resta. Período actual vs ajuste de otros períodos.
+        $conceptosTot = [];
+        foreach ($items as $it) {
+            $cod = (string) $it->codigo_concepto;
+            $monto = (($it->debito_credito === 'C') ? 1 : -1) * abs((float) $it->importe);
+            $esOtroPeriodo = trim((string) ($it->periodo_ajuste ?? '')) !== '';
+            if (!isset($conceptosTot[$cod])) {
+                $conceptosTot[$cod] = ['codigo' => $cod, 'descripcion' => $descConcepto[$it->codigo_concepto] ?? '', 'total' => 0.0, 'actual' => 0.0, 'otros' => 0.0];
+            }
+            $conceptosTot[$cod]['total'] += $monto;
+            $conceptosTot[$cod][$esOtroPeriodo ? 'otros' : 'actual'] += $monto;
+        }
+        uksort($conceptosTot, fn($a, $b) => strcmp($a, $b)); // orden por código como string (1, 102, 11, 17, ...)
+
+        $regs = $this->contarRegistros($emision->archivo_txt);
+        $resumenLiq = [
+            'cuit' => $emision->cuit_empresa,
+            'razon_social' => $empresa->detalle ?? '',
+            'periodo' => $emision->periodo,
+            'liquidacion' => ($regs['letra'] !== '' ? $regs['letra'] : '?') . '-' . $emision->numero_emision,
+            'cant_trabajadores' => $items->pluck('cuil')->unique()->count(),
+            'cant_eventuales' => $regs['counts']['05'],
+            'cant_conceptos' => count($conceptosTot),
+            'reg01' => $regs['counts']['01'],
+            'reg02' => $regs['counts']['02'],
+            'reg03' => $regs['counts']['03'],
+            'reg04' => $regs['counts']['04'],
+            'reg05' => $regs['counts']['05'],
+            'conceptos' => array_values($conceptosTot),
+        ];
+
         return Inertia::render('Lsd/Detalle', [
             'emision' => $emision,
             'empresa' => $empresa,
             'resumen' => $resumen,
             'detallePorCuil' => $detallePorCuil,
+            'resumenLiq' => $resumenLiq,
         ]);
+    }
+
+    /**
+     * Cuenta los registros del TXT por tipo (01-05) y devuelve la letra de tipo de liquidación del Reg 01.
+     */
+    private function contarRegistros(?string $path): array
+    {
+        $res = ['counts' => ['01' => 0, '02' => 0, '03' => 0, '04' => 0, '05' => 0], 'letra' => ''];
+        if (empty($path) || !is_file($path)) {
+            return $res;
+        }
+        $fh = @fopen($path, 'r');
+        if (!$fh) {
+            return $res;
+        }
+        while (($l = fgets($fh)) !== false) {
+            $t = substr($l, 0, 2);
+            if (isset($res['counts'][$t])) {
+                $res['counts'][$t]++;
+            }
+            if ($t === '01' && $res['letra'] === '') {
+                $res['letra'] = trim(substr($l, 21, 1));
+            }
+        }
+        fclose($fh);
+        return $res;
     }
 
     /**

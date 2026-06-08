@@ -98,13 +98,16 @@ class NominasSheetImport implements ToModel, WithChunkReading
             // En pluriempleo el mismo CUIL existe en varias empresas del grupo; sin filtrar por grupo_emp
             // se actualizaría el legajo de OTRA empresa. La empresa ya quedó validada arriba (CUIT del Excel
             // == empresa seleccionada); usamos su `codigo` como grupo_emp.
+            // Se importan también los legajos de baja: si el CUIL tiene en la misma empresa un legajo activo
+            // y uno de baja, se prioriza el ACTIVO (baja IS NULL primero); si solo existe de baja, se usa ese.
             $cuil = $row[0];
             if ($this->codigoEmpresa === null) {
                 $this->codigoEmpresa = Sue086::find($this->idEmpresa)?->codigo;
             }
             $legajoExistente = Sue001::where('cuil', $cuil)
                 ->where('grupo_emp', $this->codigoEmpresa)
-                ->whereNull('baja')
+                ->orderByRaw('baja IS NULL DESC')
+                ->orderBy('codigo')
                 ->first();
 
             if (!$legajoExistente) {
@@ -116,7 +119,7 @@ class NominasSheetImport implements ToModel, WithChunkReading
                     // Grabo log del registro con error
                     ImportLiquidacionErr::create([
                         'registro' => $this->count,
-                        'detalle' => "El CUIL importado no existe en la nómina de legajos activos de esta empresa: " . $cuil,
+                        'detalle' => "El CUIL importado no existe en la nómina de esta empresa: " . $cuil,
                     ]);
                 }
 

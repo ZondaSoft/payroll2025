@@ -22,6 +22,7 @@ use App\Http\Controllers\LsdImporteDetraerController;
 use App\Http\Controllers\LsdTopeController;
 use App\Http\Controllers\ConceptosLiquidacionController;
 use App\Http\Controllers\LiquidacionIndividualController;
+use App\Http\Controllers\LiquidacionCorreccionesController;
 use App\Http\Controllers\PeriodosController;
 use App\Http\Controllers\GruposEmpresariosController;
 use App\Http\Controllers\CentrosCostoController;
@@ -54,6 +55,10 @@ Route::get('/', function () {
 Route::middleware('auth')->group(function () {
     Route::get('/dashboard', [MainController::class, 'index'])->name('dashboard');
     Route::get('/', [MainController::class, 'index'])->name('main.index');
+
+    // Devuelve el token CSRF vigente y refresca la cookie XSRF-TOKEN. Lo usa el reintento automático
+    // de axios ante un 419 (CSRF token mismatch) para recuperar la sesión sin recargar la página.
+    Route::get('/csrf-token', fn () => response()->json(['token' => csrf_token()]))->name('csrf.token');
 
     // Profile Routes
     Route::get('/profile', [ProfileController::class, 'edit'])->name('profile.edit');
@@ -464,6 +469,10 @@ Route::middleware('auth')->group(function () {
         ->name('liquidacion.individual.index');
     Route::delete('liquidacion/individual/eliminar', [LiquidacionIndividualController::class, 'eliminar'])
         ->name('liquidacion.individual.eliminar');
+
+    // Visor de correcciones / ajustes automáticos sobre la liquidación
+    Route::get('liquidacion/correcciones', [LiquidacionCorreccionesController::class, 'index'])
+        ->name('liquidacion.correcciones.index');
 
     //--------------------------------------------
     // Grupos Empresarios (Sue086)

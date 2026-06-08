@@ -394,6 +394,7 @@ class LegajosController extends Controller
         $this->calcularAntiguedad($legajo);
         $this->calcularEdad($legajo);
         $this->attachBajaInfo($legajo);
+        $sicossOrigen = $this->buscarSicossOrigen($legajo);
 
         return Inertia::render('Empleados/Index', [
             'legajo'         => $legajo,
@@ -418,7 +419,75 @@ class LegajosController extends Controller
             'zonas'          => $zonas,
             'situaciones'    => $situaciones,
             'sinie'          => $sinie,
+            'sicossOrigen'   => $sicossOrigen,
         ]);
+    }
+
+    /**
+     * Busca otro legajo con el mismo CUIL (baja anterior o pluriempleo) que tenga cargados los datos
+     * SICOSS, para ofrecer importarlos al legajo en edición. Devuelve el candidato más completo o null.
+     */
+    private function buscarSicossOrigen($legajo): ?array
+    {
+        if (!$legajo || empty($legajo->cuil) || empty($legajo->id)) {
+            return null;
+        }
+
+        $candidatos = Sue001::where('cuil', $legajo->cuil)
+            ->where('id', '!=', $legajo->id)
+            ->get([
+                'id', 'codigo', 'grupo_emp', 'detalle', 'nombres', 'alta', 'baja',
+                'sicoss_situa', 'sicoss_condi', 'sicoss_activ', 'sicoss_modal',
+                'obra_sijp', 'cod_obsoc', 'sicoss_sini', 'sicoss_zona',
+            ]);
+
+        // Puntúa cuántos de los 7 campos SICOSS tiene cargados (siniestrado 0 es válido).
+        $score = function ($e): int {
+            $c = 0;
+            foreach (['sicoss_situa', 'sicoss_condi', 'sicoss_activ', 'sicoss_modal', 'sicoss_zona'] as $f) {
+                if ($e->$f !== null && $e->$f !== '' && (int) $e->$f !== 0) {
+                    $c++;
+                }
+            }
+            if ($e->sicoss_sini !== null && $e->sicoss_sini !== '') {
+                $c++;
+            }
+            if (trim((string) ($e->obra_sijp ?? '')) !== '' && (int) $e->obra_sijp !== 0) {
+                $c++;
+            }
+            return $c;
+        };
+
+        $mejor = null;
+        $mejorScore = 0;
+        foreach ($candidatos as $cand) {
+            $s = $score($cand);
+            if ($s > $mejorScore) {
+                $mejorScore = $s;
+                $mejor = $cand;
+            }
+        }
+
+        if (!$mejor || $mejorScore === 0) {
+            return null;
+        }
+
+        return [
+            'id' => $mejor->id,
+            'legajo' => $mejor->codigo,
+            'nombre' => trim(((string) ($mejor->detalle ?? '')) . ' ' . ((string) ($mejor->nombres ?? ''))),
+            'empresa' => Sue086::where('codigo', $mejor->grupo_emp)->value('detalle') ?? (string) ($mejor->grupo_emp ?? ''),
+            'alta' => $mejor->alta,
+            'baja' => $mejor->baja,
+            'sicoss_situa' => $mejor->sicoss_situa,
+            'sicoss_condi' => $mejor->sicoss_condi,
+            'sicoss_activ' => $mejor->sicoss_activ,
+            'sicoss_modal' => $mejor->sicoss_modal,
+            'obra_sijp' => $mejor->obra_sijp,
+            'cod_obsoc' => $mejor->cod_obsoc,
+            'sicoss_sini' => $mejor->sicoss_sini,
+            'sicoss_zona' => $mejor->sicoss_zona,
+        ];
     }
 
     /**

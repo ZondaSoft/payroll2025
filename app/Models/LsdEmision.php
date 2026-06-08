@@ -21,6 +21,7 @@ class LsdEmision extends Model
         'periodo_desde',
         'periodo_hasta',
         'cantidad_empleados',
+        'legajos_ignorados',
         'monto_total',
         'estado',
         'observaciones',
@@ -46,6 +47,7 @@ class LsdEmision extends Model
         'fecha_envio' => 'datetime',
         'monto_total' => 'decimal:2',
         'tipo_liquidacion' => 'integer',
+        'legajos_ignorados' => 'array',
     ];
 
     // Relaciones
