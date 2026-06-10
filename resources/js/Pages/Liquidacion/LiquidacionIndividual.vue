@@ -3,6 +3,7 @@ import FormHeader from '@/Components/FormHeader.vue';
 import { computed, ref, watch, nextTick, onMounted } from 'vue';
 import { router } from '@inertiajs/vue3';
 import axios from 'axios';
+import Swal from 'sweetalert2';
 import { avisarAjustesTipos } from '@/utils/avisarAjustesTipos';
 
 const props = defineProps({
@@ -42,12 +43,123 @@ const props = defineProps({
         type: Array,
         default: () => [],
     },
+    historial: {
+        type: Array,
+        default: () => [],
+    },
 });
 
 onMounted(() => avisarAjustesTipos(props.ajustesTipos));
 
+// Copia reactiva de los conceptos (para edición inline + totales). Se resincroniza con la prop
+// cada vez que cambia (recarga por legajo/período o tras guardar una edición).
+const conceptosLocal = ref([]);
+watch(() => props.conceptos, (nuevos) => {
+    conceptosLocal.value = (nuevos || []).map(c => ({ ...c }));
+}, { immediate: true, deep: true });
+
 // Fila seleccionada en la tabla de conceptos
 const selectedRowIndex = ref(props.conceptos?.length > 0 ? 0 : null);
+
+// ---- Edición inline de celdas (doble-click), estilo Excel ----
+const editando = ref({ index: null, campo: null });
+const valorEdit = ref('');
+const guardandoCelda = ref(false);
+
+// Columna de monto editable según el tipo del concepto.
+const campoMontoPorTipo = (tipo) => {
+    if (tipo === 'H') return 'haberes';
+    if (tipo === 'D') return 'retenciones';
+    if (tipo === 'AS') return 'asignaciones';
+    return 'no_remunerativo';
+};
+
+// Mapea la celda visual al campo real de sue090s.
+const campoBackend = (campo) => {
+    if (campo === 'cantidad') return 'cantidad';
+    if (campo === 'valores') return 'valor';
+    return 'importe'; // cualquier columna de monto
+};
+
+const esCeldaEditable = (item, campo) => {
+    if (campo === 'cantidad' || campo === 'valores') return true;
+    return campo === campoMontoPorTipo(item.tipo); // solo la columna de monto que corresponde al tipo
+};
+
+const valorCrudo = (item, campo) => {
+    if (campo === 'cantidad') return item.cantidad ?? '';
+    if (campo === 'valores') return item.valores ?? '';
+    return item[campoMontoPorTipo(item.tipo)] ?? item.importe ?? '';
+};
+
+const iniciarEdicion = (index, campo, item) => {
+    if (!props.empleado || !props.periodo) return;
+    if (!esCeldaEditable(item, campo)) return;
+    editando.value = { index, campo };
+    valorEdit.value = String(valorCrudo(item, campo));
+    nextTick(() => {
+        const el = document.querySelector('.celda-edit-input');
+        if (el) { el.focus(); el.select(); }
+    });
+};
+
+const cancelarEdicion = () => {
+    editando.value = { index: null, campo: null };
+    valorEdit.value = '';
+};
+
+const estaEditando = (index, campo) => editando.value.index === index && editando.value.campo === campo;
+
+const guardarCelda = async (item) => {
+    const campo = editando.value.campo;
+    if (campo === null || guardandoCelda.value) return;
+    const nuevo = parseFloat(String(valorEdit.value).replace(',', '.'));
+    if (Number.isNaN(nuevo)) { cancelarEdicion(); return; }
+
+    const original = Number(valorCrudo(item, campo) ?? 0);
+    if (nuevo === original) { cancelarEdicion(); return; } // sin cambios
+
+    const [periodoStr, tipoliqStr] = String(selectedPeriodoKey.value || '').split('|');
+    guardandoCelda.value = true;
+    try {
+        await axios.post(route('liquidacion.individual.actualizarConcepto'), {
+            legajo_codigo: props.empleado.codigo,
+            periodo: periodoStr || props.periodo,
+            tipoliq: tipoliqStr || props.tipoliq,
+            concepto: item.codigo,
+            campo: campoBackend(campo),
+            valor: nuevo,
+        });
+        cancelarEdicion();
+        Swal.fire({ icon: 'success', title: 'Guardado', timer: 1200, showConfirmButton: false, toast: true, position: 'top-end' });
+        // Refresca conceptos (valores/totales) e historial.
+        router.reload({ only: ['conceptos', 'historial'], preserveScroll: true, preserveState: true });
+    } catch (e) {
+        Swal.fire({ icon: 'error', title: 'No se pudo guardar', text: e.response?.data?.message || e.message });
+        cancelarEdicion();
+    } finally {
+        guardandoCelda.value = false;
+    }
+};
+
+// ---- Menú contextual (click derecho) sobre Código / Descripción ----
+const menuContextual = ref({ visible: false, x: 0, y: 0, item: null });
+
+const abrirMenuContextual = (e, item) => {
+    menuContextual.value = { visible: true, x: e.clientX, y: e.clientY, item };
+};
+
+const cerrarMenuContextual = () => {
+    menuContextual.value = { visible: false, x: 0, y: 0, item: null };
+};
+
+const verConcepto = () => {
+    const item = menuContextual.value.item;
+    cerrarMenuContextual();
+    if (item?.concepto_id) {
+        window.open(route('liquidacion.conceptos.show', item.concepto_id), '_blank', 'noopener');
+    }
+};
 
 // Estado del botón de filtro de períodos (true = activo, false = inactivo)
 const filtrarPeriodosActivo = ref(true);
@@ -215,6 +327,21 @@ const formatPeriodo = (value) => {
     return periodo;
 };
 
+// Fecha+hora del historial (dd/mm/aaaa HH:mm) sin parsear con Date (evita corrimiento de timezone).
+const formatFechaHora = (f) => {
+    if (!f) return '—';
+    const [fecha, hora] = String(f).split(' ');
+    const [y, m, d] = (fecha || '').split('-');
+    return (y && m && d) ? `${d}/${m}/${y}${hora ? ' ' + hora.substring(0, 5) : ''}` : String(f);
+};
+
+const origenLabel = (o) => ({
+    ajuste_aportes_lsd: 'Ajuste de aportes (LSD)',
+    liquidacion_individual: 'Liquidación individual',
+    liquidacion_global: 'Liquidación global',
+    generador_txt: 'Generador LSD',
+}[o] || (o || '—'));
+
 const TIPOS_LIQ = {
     1: 'Normal',
     2: '1er. Quincena',
@@ -232,7 +359,7 @@ const formatPeriodoConTipo = (periodoObj) => {
 
 // Totales calculados
 const totales = computed(() => {
-    return props.conceptos.reduce(
+    return conceptosLocal.value.reduce(
         (acc, item) => {
             acc.haberes         += Number(item.haberes         ?? 0);
             acc.retenciones     += Number(item.retenciones     ?? 0);
@@ -505,6 +632,21 @@ const confirmarEliminar = async () => {
                                     <span class="d-none d-sm-block">Impuesto a las Ganancias</span>
                                 </button>
                             </li>
+                            <li class="nav-item" role="presentation">
+                                <button
+                                    class="nav-link"
+                                    data-bs-toggle="tab"
+                                    data-bs-target="#form-tabs-historial"
+                                    role="tab"
+                                    aria-selected="false"
+                                >
+                                    <span class="ri-history-line ri-20px d-sm-none"></span>
+                                    <span class="d-none d-sm-block">
+                                        Historial de cambios
+                                        <span v-if="historial.length" class="badge bg-label-secondary ms-1">{{ historial.length }}</span>
+                                    </span>
+                                </button>
+                            </li>
 
                             <!-- Botones de acción alineados a la derecha -->
                             <li class="nav-item ms-auto d-flex align-items-center gap-1 pe-1">
@@ -595,29 +737,51 @@ const confirmarEliminar = async () => {
                                             </tr>
                                         </thead>
                                         <tbody>
-                                            <template v-if="!tablaLimpia && conceptos && conceptos.length > 0">
+                                            <template v-if="!tablaLimpia && conceptosLocal && conceptosLocal.length > 0">
                                                 <tr
-                                                    v-for="(item, index) in conceptos"
-                                                    :key="index"
+                                                    v-for="(item, index) in conceptosLocal"
+                                                    :key="item.id ?? index"
                                                     :class="{ 'table-primary': selectedRowIndex === index }"
                                                     style="cursor: pointer;"
                                                     @click="selectedRowIndex = index"
                                                 >
-                                                    <td class="text-center fw-semibold">{{ item.codigo }}</td>
-                                                    <td>{{ item.detalle ?? item.descripcion }}</td>
-                                                    <td class="text-end">{{ item.cantidad != null ? formatCurrency(item.cantidad) : '' }}</td>
-                                                    <td class="text-end">{{ item.valores != null ? formatCurrency(item.valores) : '' }}</td>
-                                                    <td class="text-end text-success">
-                                                        <span v-if="item.haberes">{{ formatCurrency(item.haberes) }}</span>
+                                                    <td class="text-center fw-semibold" @contextmenu.prevent="abrirMenuContextual($event, item)">{{ item.codigo }}</td>
+                                                    <td @contextmenu.prevent="abrirMenuContextual($event, item)">{{ item.detalle ?? item.descripcion }}</td>
+                                                    <!-- Cantidad (editable) -->
+                                                    <td class="text-end celda-editable" @dblclick.stop="iniciarEdicion(index, 'cantidad', item)" title="Doble-click para editar">
+                                                        <input v-if="estaEditando(index, 'cantidad')" class="celda-edit-input form-control form-control-sm text-end py-0" v-model="valorEdit"
+                                                               @click.stop @keydown.enter.prevent="guardarCelda(item)" @keydown.esc.prevent="cancelarEdicion" @blur="guardarCelda(item)" :disabled="guardandoCelda">
+                                                        <span v-else>{{ item.cantidad != null ? formatCurrency(item.cantidad) : '' }}</span>
                                                     </td>
-                                                    <td class="text-end text-danger">
-                                                        <span v-if="item.retenciones">{{ formatCurrency(item.retenciones) }}</span>
+                                                    <!-- Valores (editable) -->
+                                                    <td class="text-end celda-editable" @dblclick.stop="iniciarEdicion(index, 'valores', item)" title="Doble-click para editar">
+                                                        <input v-if="estaEditando(index, 'valores')" class="celda-edit-input form-control form-control-sm text-end py-0" v-model="valorEdit"
+                                                               @click.stop @keydown.enter.prevent="guardarCelda(item)" @keydown.esc.prevent="cancelarEdicion" @blur="guardarCelda(item)" :disabled="guardandoCelda">
+                                                        <span v-else>{{ item.valores != null ? formatCurrency(item.valores) : '' }}</span>
                                                     </td>
-                                                    <td class="text-end text-info">
-                                                        <span v-if="item.asignaciones">{{ formatCurrency(item.asignaciones) }}</span>
+                                                    <!-- Haberes (editable solo si tipo H) -->
+                                                    <td class="text-end text-success" :class="{ 'celda-editable': esCeldaEditable(item, 'haberes') }" @dblclick.stop="iniciarEdicion(index, 'haberes', item)" :title="esCeldaEditable(item, 'haberes') ? 'Doble-click para editar' : ''">
+                                                        <input v-if="estaEditando(index, 'haberes')" class="celda-edit-input form-control form-control-sm text-end py-0" v-model="valorEdit"
+                                                               @click.stop @keydown.enter.prevent="guardarCelda(item)" @keydown.esc.prevent="cancelarEdicion" @blur="guardarCelda(item)" :disabled="guardandoCelda">
+                                                        <span v-else-if="item.haberes">{{ formatCurrency(item.haberes) }}</span>
                                                     </td>
-                                                    <td class="text-end text-warning">
-                                                        <span v-if="item.no_remunerativo">{{ formatCurrency(item.no_remunerativo) }}</span>
+                                                    <!-- Retenciones (editable solo si tipo D) -->
+                                                    <td class="text-end text-danger" :class="{ 'celda-editable': esCeldaEditable(item, 'retenciones') }" @dblclick.stop="iniciarEdicion(index, 'retenciones', item)" :title="esCeldaEditable(item, 'retenciones') ? 'Doble-click para editar' : ''">
+                                                        <input v-if="estaEditando(index, 'retenciones')" class="celda-edit-input form-control form-control-sm text-end py-0" v-model="valorEdit"
+                                                               @click.stop @keydown.enter.prevent="guardarCelda(item)" @keydown.esc.prevent="cancelarEdicion" @blur="guardarCelda(item)" :disabled="guardandoCelda">
+                                                        <span v-else-if="item.retenciones">{{ formatCurrency(item.retenciones) }}</span>
+                                                    </td>
+                                                    <!-- Asignaciones (editable solo si tipo AS) -->
+                                                    <td class="text-end text-info" :class="{ 'celda-editable': esCeldaEditable(item, 'asignaciones') }" @dblclick.stop="iniciarEdicion(index, 'asignaciones', item)" :title="esCeldaEditable(item, 'asignaciones') ? 'Doble-click para editar' : ''">
+                                                        <input v-if="estaEditando(index, 'asignaciones')" class="celda-edit-input form-control form-control-sm text-end py-0" v-model="valorEdit"
+                                                               @click.stop @keydown.enter.prevent="guardarCelda(item)" @keydown.esc.prevent="cancelarEdicion" @blur="guardarCelda(item)" :disabled="guardandoCelda">
+                                                        <span v-else-if="item.asignaciones">{{ formatCurrency(item.asignaciones) }}</span>
+                                                    </td>
+                                                    <!-- No Remunerativo (editable si no es H/D/AS) -->
+                                                    <td class="text-end text-warning" :class="{ 'celda-editable': esCeldaEditable(item, 'no_remunerativo') }" @dblclick.stop="iniciarEdicion(index, 'no_remunerativo', item)" :title="esCeldaEditable(item, 'no_remunerativo') ? 'Doble-click para editar' : ''">
+                                                        <input v-if="estaEditando(index, 'no_remunerativo')" class="celda-edit-input form-control form-control-sm text-end py-0" v-model="valorEdit"
+                                                               @click.stop @keydown.enter.prevent="guardarCelda(item)" @keydown.esc.prevent="cancelarEdicion" @blur="guardarCelda(item)" :disabled="guardandoCelda">
+                                                        <span v-else-if="item.no_remunerativo">{{ formatCurrency(item.no_remunerativo) }}</span>
                                                     </td>
                                                 </tr>
                                             </template>
@@ -675,6 +839,44 @@ const confirmarEliminar = async () => {
                                 Sin datos para mostrar.
                             </div>
                         </div>
+                        <div class="tab-pane fade pt-0" id="form-tabs-historial" role="tabpanel">
+                            <div class="card-body p-0" style="font-size: 0.875rem;">
+                                <div class="table-responsive" style="margin-left: 35.78px; width: calc(100% - 35.78px);">
+                                    <table class="table table-hover table-bordered mb-0 align-middle tabla-conceptos-compacta">
+                                        <thead class="table-light">
+                                            <tr>
+                                                <th class="text-nowrap">Fecha y hora</th>
+                                                <th class="text-center">Concepto</th>
+                                                <th class="text-end">Importe anterior</th>
+                                                <th class="text-end">Importe nuevo</th>
+                                                <th class="text-end">Diferencia</th>
+                                                <th>Motivo</th>
+                                                <th>Origen</th>
+                                                <th>Usuario</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody>
+                                            <tr v-for="h in historial" :key="h.id">
+                                                <td class="text-nowrap">{{ formatFechaHora(h.fecha) }}</td>
+                                                <td class="text-center">{{ h.concepto }}<span v-if="h.concepto_arca" class="text-muted"> ({{ h.concepto_arca }})</span></td>
+                                                <td class="text-end">{{ formatCurrency(h.importe_anterior) }}</td>
+                                                <td class="text-end">{{ formatCurrency(h.importe_nuevo) }}</td>
+                                                <td class="text-end" :class="h.diferencia < 0 ? 'text-danger' : 'text-success'">{{ formatCurrency(h.diferencia) }}</td>
+                                                <td>{{ h.motivo }}</td>
+                                                <td><span class="badge bg-label-info">{{ origenLabel(h.origen) }}</span></td>
+                                                <td>{{ h.usuario || '—' }}</td>
+                                            </tr>
+                                            <tr v-if="!historial.length">
+                                                <td colspan="8" class="text-center text-muted py-4">
+                                                    <i class="ri-history-line ri-24px me-2"></i>
+                                                    Sin modificaciones registradas para este período.
+                                                </td>
+                                            </tr>
+                                        </tbody>
+                                    </table>
+                                </div>
+                            </div>
+                        </div>
                     </div>
                 </div>
             </div>
@@ -712,6 +914,19 @@ const confirmarEliminar = async () => {
             </div>
         </div>
 
+        <!-- Menú contextual (click derecho sobre Código / Descripción) -->
+        <template v-if="menuContextual.visible">
+            <div class="menu-contextual-backdrop" @click="cerrarMenuContextual" @contextmenu.prevent="cerrarMenuContextual"></div>
+            <ul class="menu-contextual" :style="{ top: menuContextual.y + 'px', left: menuContextual.x + 'px' }">
+                <li
+                    :class="{ 'menu-contextual-disabled': !menuContextual.item?.concepto_id }"
+                    @click="verConcepto"
+                >
+                    <i class="ri-eye-line me-2"></i> Ver concepto
+                </li>
+            </ul>
+        </template>
+
     </div>
 </template>
 
@@ -746,5 +961,65 @@ tfoot tr td {
 .btn-eliminar-liq:hover i,
 .btn-eliminar-liq:focus i {
     color: #dc3545 !important;
+}
+/* Subrayado azul de la pestaña activa por CSS (el slider JS del template no sigue los clicks
+   de las tabs de Bootstrap/Inertia, así que la pestaña recién activada se quedaba sin la raya). */
+.nav-tabs .nav-link.active {
+    color: var(--bs-primary, #696cff);
+    border-bottom: 2px solid var(--bs-primary, #696cff) !important;
+}
+.tab-slider {
+    display: none;
+}
+
+/* Menú contextual (click derecho) */
+.menu-contextual-backdrop {
+    position: fixed;
+    inset: 0;
+    z-index: 1090;
+}
+.menu-contextual {
+    position: fixed;
+    z-index: 1091;
+    min-width: 180px;
+    margin: 0;
+    padding: 4px 0;
+    list-style: none;
+    background: #fff;
+    border: 1px solid #e0e0e0;
+    border-radius: 6px;
+    box-shadow: 0 6px 20px rgba(0, 0, 0, 0.18);
+}
+.menu-contextual li {
+    padding: 8px 16px;
+    font-size: 0.875rem;
+    cursor: pointer;
+    white-space: nowrap;
+    display: flex;
+    align-items: center;
+}
+.menu-contextual li:hover {
+    background: var(--bs-primary, #696cff);
+    color: #fff;
+}
+.menu-contextual li.menu-contextual-disabled {
+    color: #adb5bd;
+    cursor: not-allowed;
+    pointer-events: none;
+}
+
+/* Celdas editables (estilo Excel) */
+.celda-editable {
+    cursor: cell;
+}
+.celda-editable:hover {
+    background-color: rgba(105, 108, 255, 0.08);
+    outline: 1px dashed rgba(105, 108, 255, 0.45);
+    outline-offset: -1px;
+}
+.celda-edit-input {
+    height: 28px;
+    min-width: 70px;
+    display: inline-block;
 }
 </style>

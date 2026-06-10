@@ -469,6 +469,8 @@ Route::middleware('auth')->group(function () {
         ->name('liquidacion.individual.index');
     Route::delete('liquidacion/individual/eliminar', [LiquidacionIndividualController::class, 'eliminar'])
         ->name('liquidacion.individual.eliminar');
+    Route::post('liquidacion/individual/actualizar-concepto', [LiquidacionIndividualController::class, 'actualizarConcepto'])
+        ->name('liquidacion.individual.actualizarConcepto');
 
     // Visor de correcciones / ajustes automáticos sobre la liquidación
     Route::get('liquidacion/correcciones', [LiquidacionCorreccionesController::class, 'index'])
