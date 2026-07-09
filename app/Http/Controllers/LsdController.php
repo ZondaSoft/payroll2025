@@ -640,6 +640,8 @@ class LsdController extends Controller
         $codEmpresa = $empresa->codigo ?? $empresa->id ?? null;
         $rangosSue089 = DB::table('sue089s')->get();
         $tope = (float) (LsdTope::vigenteParaPeriodo($periodoStr)?->tope_aportes ?? 0);
+        // Jornadas indexadas por id: para detectar jornada parcial y omitir el control de OS en esos legajos.
+        $jornadasPorId = DB::table('sue010s')->get()->keyBy('id');
 
         $tiporemPorConcepto = function ($concepto) use ($rangosSue089): ?string {
             foreach ($rangosSue089 as $r) {
@@ -662,7 +664,9 @@ class LsdController extends Controller
         $rows = $query->get([
             'sue001s.codigo as legajo',
             'sue001s.cuil as cuil',
-            'sue001s.nombres as nombre',
+            'sue001s.detalle as apellido',
+            'sue001s.nombres as nombres',
+            'sue001s.jornada_id as jornada_id',
             'sue090s.concepto',
             'sue090s.importe',
             'sue102s.concepto_arca',
@@ -673,7 +677,9 @@ class LsdController extends Controller
         foreach ($rows as $row) {
             $leg = (string) $row->legajo;
             if (!isset($porLegajo[$leg])) {
-                $porLegajo[$leg] = ['cuil' => $row->cuil, 'nombre' => $row->nombre, 'bruto' => 0.0, 'aportes' => []];
+                // Empleado = apellido (detalle) + nombres.
+                $nombreCompleto = trim(((string) ($row->apellido ?? '')) . ' ' . ((string) ($row->nombres ?? '')));
+                $porLegajo[$leg] = ['cuil' => $row->cuil, 'nombre' => $nombreCompleto, 'jornada_id' => $row->jornada_id, 'bruto' => 0.0, 'aportes' => []];
             }
             if ($tiporemPorConcepto($row->concepto) === 'H') {
                 $porLegajo[$leg]['bruto'] += (float) ($row->importe ?? 0);
@@ -688,7 +694,18 @@ class LsdController extends Controller
         foreach ($porLegajo as $leg => $data) {
             $bruto = $data['bruto'];
             $base = ($tope > 0) ? min($bruto, $tope) : $bruto;
+
+            // Jornada parcial (modalidad 01/21): la base de OBRA SOCIAL no es el bruto real (la determina el
+            // liquidador según la categoría, equivalencia a jornada completa + piso). No es reconstruible desde
+            // el bruto, así que NO se controla la OS de estos legajos (evita falso positivo). SIPA/PAMI sí.
+            $jornada = $jornadasPorId[$data['jornada_id']] ?? null;
+            $esJornadaParcial = $jornada && (int) ($jornada->parcial ?? 0) === 1;
+
             foreach (self::APORTES_CONTROL as $ap) {
+                // Obra Social (810002) en jornada parcial: no controlable desde el bruto → se omite.
+                if ($esJornadaParcial && $ap['arca'] === '810002') {
+                    continue;
+                }
                 $informado = (float) ($data['aportes'][$ap['arca']] ?? 0);
                 // Si no hay concepto de ese aporte descontado, no controlamos (el empleado puede no tributarlo).
                 if ($informado <= 0) {
