@@ -391,7 +391,7 @@ const mostrarErrorInconsistencias = (mensaje, items) => {
       <td style="padding:4px 8px;border:1px solid #dee2e6;text-align:center;font-family:monospace;color:#dc3545;font-weight:600;">${escapeHtml(i.valor)}</td>
       <td style="padding:4px 8px;border:1px solid #dee2e6;">${escapeHtml(i.esperado)}</td>
       <td style="padding:4px 8px;border:1px solid #dee2e6;text-align:center;">
-        <a href="/legajos/${encodeURIComponent(i.id)}/edit#sicoss"
+        <a href="${route('legajos.edit', i.id)}#sicoss"
            class="lupa-concepto"
            target="_blank"
            rel="noopener"
@@ -486,7 +486,7 @@ const mostrarErrorSinArca = (mensaje, conceptos) => {
       <td style="padding:4px 8px;border:1px solid #dee2e6;text-align:right;">${h.legajos}</td>
       <td style="padding:4px 8px;border:1px solid #dee2e6;text-align:right;">${escapeHtml(formatMoney(h.total))}</td>
       <td style="padding:4px 8px;border:1px solid #dee2e6;text-align:center;">
-        <a href="/liquidacion/conceptos/${encodeURIComponent(h.id)}/edit"
+        <a href="${route('liquidacion.conceptos.edit', h.id)}"
            class="lupa-concepto"
            target="_blank"
            rel="noopener"
@@ -556,7 +556,7 @@ const mostrarErrorHuerfanos = (mensaje, huerfanos) => {
       <td style="padding:4px 8px;border:1px solid #dee2e6;text-align:right;">${h.legajos}</td>
       <td style="padding:4px 8px;border:1px solid #dee2e6;text-align:right;">${escapeHtml(formatMoney(h.total))}</td>
       <td style="padding:4px 8px;border:1px solid #dee2e6;text-align:center;">
-        <a href="/liquidacion/conceptos/create?codigo=${encodeURIComponent(h.concepto)}"
+        <a href="${route('liquidacion.conceptos.create', { codigo: h.concepto })}"
            class="lupa-concepto"
            target="_blank"
            rel="noopener"

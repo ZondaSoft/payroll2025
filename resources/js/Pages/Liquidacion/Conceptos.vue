@@ -202,7 +202,7 @@ const buscarProximoCodigo = async () => {
     errorCodigo.value = '';
 
     try {
-        const response = await fetch(`/liquidacion/conceptos/proximoCodigo?tipo=${form.tipo}`, {
+        const response = await fetch(route('liquidacion.conceptos.proximoCodigo', { tipo: form.tipo }), {
             method: 'GET',
             headers: {
                 'Content-Type': 'application/json',
@@ -235,7 +235,7 @@ const validarCodigoEnRango = async () => {
     }
 
     try {
-        const response = await fetch(`/liquidacion/conceptos/proximoCodigo?tipo=${form.tipo}`, {
+        const response = await fetch(route('liquidacion.conceptos.proximoCodigo', { tipo: form.tipo }), {
             method: 'GET',
             headers: {
                 'Content-Type': 'application/json',

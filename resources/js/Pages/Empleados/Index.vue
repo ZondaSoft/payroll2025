@@ -478,7 +478,7 @@ watch(() => props.agregar, () => {
                                 >
                                 <i class="ri-arrow-right-double-fill"></i>
                             </Link>
-                            <a type="button" href="/legajos/search" class="btn btn-outline-secondary waves-effect" data-bs-toggle="tooltip" data-bs-placement="top" data-bs-original-title="Buscar ...">
+                            <a type="button" :href="route('legajos.search')" class="btn btn-outline-secondary waves-effect" data-bs-toggle="tooltip" data-bs-placement="top" data-bs-original-title="Buscar ...">
                                 <i class="ri-search-line"></i>
                             </a>
                         </div>

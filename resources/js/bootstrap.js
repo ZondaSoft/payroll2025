@@ -23,7 +23,7 @@ window.axios.interceptors.response.use(
         if (error.response && error.response.status === 419 && cfg && !cfg._csrfRetried) {
             cfg._csrfRetried = true;
             try {
-                await window.axios.get('/csrf-token');
+                await window.axios.get(route('csrf.token'));
             } catch (e) {
                 // Si el refresh falla (p. ej. sesión realmente expirada), se rechaza el error más abajo.
             }
