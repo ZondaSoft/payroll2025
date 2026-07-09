@@ -387,23 +387,28 @@ class ConceptosLiquidacionController extends Controller
     {
         $search = $request->input('search', '');
 
-        $query = \App\Models\SicossConceptosArca::query();
+        // Catálogo real de conceptos ARCA: tabla `conceptosarcas` (Conceptosarca).
+        // `sicoss_conceptos_arcas` quedó sin uso/vacía; usarla dejaba el autocomplete sin opciones.
+        $query = \App\Models\Conceptosarca::query()->whereNotNull('codigo_afip');
 
         if (!empty($search)) {
             $query->where(function ($q) use ($search) {
-                $q->where('codigo', 'like', "%{$search}%")
+                $q->where('codigo_afip', 'like', "%{$search}%")
                   ->orWhere('descripcion', 'like', "%{$search}%");
             });
         }
 
         $conceptos = $query
-            ->orderBy('codigo')
-            ->limit(100)
-            ->get()
+            ->orderBy('codigo_afip')
+            ->get(['codigo_afip', 'descripcion'])
+            ->unique('codigo_afip')   // el catálogo se repite por empresa: dedup por código ARCA
+            ->take(100)
             ->map(function ($concepto) {
+                // id como string (6 dígitos) para que matchee con sue102s.concepto_arca (varchar)
+                $codigo = str_pad((string) $concepto->codigo_afip, 6, '0', STR_PAD_LEFT);
                 return [
-                    'id' => $concepto->codigo,
-                    'text' => "{$concepto->codigo} - {$concepto->descripcion}"
+                    'id' => $codigo,
+                    'text' => "{$codigo} - {$concepto->descripcion}",
                 ];
             })
             ->values();
