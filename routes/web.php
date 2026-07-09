@@ -48,10 +48,6 @@ use Inertia\Inertia;
 //     return Inertia::render('Dashboard');
 // })->middleware(['auth', 'verified'])->name('dashboard');
 
-Route::get('/', function () {
-    return redirect()->route('login'); // o dashboard, o main.index
-})->name('home');
-
 Route::middleware('auth')->group(function () {
     Route::get('/dashboard', [MainController::class, 'index'])->name('dashboard');
     Route::get('/', [MainController::class, 'index'])->name('main.index');
