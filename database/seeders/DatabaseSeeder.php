@@ -22,14 +22,16 @@ class DatabaseSeeder extends Seeder
         //     'email' => 'test@example.com',
         // ]);
 
+        // Catálogos de referencia SICOSS. Todos idempotentes (updateOrInsert/upsert/
+        // updateOrCreate) → seguros de correr en cada deploy sin duplicar ni borrar.
         $this->call([
-            // Sicoss01Seeder::class,
-            // Sicoss05Seeder::class,
-            // Sicoss08Seeder::class,
-            // Sicoss12Seeder::class,
-            // SicossObrasSeeder::class,
-            // SicossSinieSeeder::class,
-            // SicossZonasSeeder::class,
+            Sicoss01Seeder::class,     // Actividades
+            Sicoss05Seeder::class,     // Condiciones
+            Sicoss08Seeder::class,     // Modalidades
+            Sicoss12Seeder::class,     // Situaciones de revista
+            SicossObrasSeeder::class,  // Obras sociales
+            SicossSinieSeeder::class,  // Códigos de siniestro
+            SicossZonasSeeder::class,  // Zonas / localidades
             Sue103Seeder::class,
         ]);
     }
