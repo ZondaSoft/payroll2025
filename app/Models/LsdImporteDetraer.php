@@ -11,6 +11,7 @@ class LsdImporteDetraer extends Model
     protected $fillable = [
         'periodo_desde',
         'importe',
+        'importe_sac',
         'normativa',
         'observaciones',
         'usuario_id',
@@ -18,6 +19,7 @@ class LsdImporteDetraer extends Model
 
     protected $casts = [
         'importe' => 'decimal:2',
+        'importe_sac' => 'decimal:2',
     ];
 
     public function usuario()

@@ -77,6 +77,7 @@ class LsdImporteDetraerController extends Controller
                 'unique:lsd_importes_detraer,periodo_desde' . ($ignorarId ? ",{$ignorarId}" : ''),
             ],
             'importe' => 'required|numeric|min:0',
+            'importe_sac' => 'nullable|numeric|min:0',
             'normativa' => 'nullable|string|max:255',
             'observaciones' => 'nullable|string',
         ];

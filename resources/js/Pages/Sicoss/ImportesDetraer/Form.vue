@@ -1,5 +1,5 @@
 <script setup>
-import { reactive, computed } from 'vue'
+import { ref, computed } from 'vue'
 import { Link, useForm } from '@inertiajs/vue3'
 import Swal from 'sweetalert2'
 
@@ -12,9 +12,24 @@ const esEdicion = computed(() => !!props.importe?.id)
 const form = useForm({
   periodo_desde: props.importe?.periodo_desde || '',
   importe: props.importe?.importe || '',
+  importe_sac: props.importe?.importe_sac ?? '',
   normativa: props.importe?.normativa || '',
   observaciones: props.importe?.observaciones || '',
 })
+
+// El importe de mes con SAC es ×1,5 del mensual. Se autocompleta mientras no se edite a mano.
+const sacManual = ref(!!props.importe?.importe_sac)
+const onImporteInput = () => {
+  if (!sacManual.value) {
+    const n = parseFloat(form.importe)
+    form.importe_sac = isNaN(n) ? '' : (Math.round(n * 1.5 * 100) / 100).toFixed(2)
+  }
+}
+const sugerirSac = () => {
+  const n = parseFloat(form.importe)
+  form.importe_sac = isNaN(n) ? '' : (Math.round(n * 1.5 * 100) / 100).toFixed(2)
+  sacManual.value = false
+}
 
 const submit = () => {
   const onError = (errores) => {
@@ -68,10 +83,11 @@ const submit = () => {
             </div>
 
             <div class="col-md-4">
-              <label for="importe" class="form-label">Importe (pesos) *</label>
+              <label for="importe" class="form-label">Importe mensual (pesos) *</label>
               <input
                 id="importe"
                 v-model="form.importe"
+                @input="onImporteInput"
                 type="number"
                 step="0.01"
                 min="0"
@@ -82,6 +98,26 @@ const submit = () => {
               />
               <div v-if="form.errors.importe" class="invalid-feedback">{{ form.errors.importe }}</div>
               <small class="text-muted">Sin separador de miles. Coma decimal con punto.</small>
+            </div>
+
+            <div class="col-md-4">
+              <label for="importe_sac" class="form-label">Importe mes con SAC (pesos)</label>
+              <div class="input-group">
+                <input
+                  id="importe_sac"
+                  v-model="form.importe_sac"
+                  @input="sacManual = true"
+                  type="number"
+                  step="0.01"
+                  min="0"
+                  placeholder="Ej: 10505.52"
+                  class="form-control"
+                  :class="{ 'is-invalid': form.errors.importe_sac }"
+                />
+                <button type="button" class="btn btn-outline-secondary" @click="sugerirSac" title="Sugerir ×1,5 del mensual">×1,5</button>
+                <div v-if="form.errors.importe_sac" class="invalid-feedback">{{ form.errors.importe_sac }}</div>
+              </div>
+              <small class="text-muted">Meses con aguinaldo (jun/dic): ×1,5 del mensual. Editable.</small>
             </div>
 
             <div class="col-md-12">

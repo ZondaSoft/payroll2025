@@ -69,7 +69,8 @@ const eliminar = async (id, periodo) => {
             <thead>
               <tr>
                 <th>Vigente desde</th>
-                <th class="text-end">Importe</th>
+                <th class="text-end">Importe mensual</th>
+                <th class="text-end">Mes con SAC</th>
                 <th>Normativa</th>
                 <th>Observaciones</th>
                 <th>Cargado por</th>
@@ -79,11 +80,12 @@ const eliminar = async (id, periodo) => {
             </thead>
             <tbody>
               <tr v-if="importes.data.length === 0">
-                <td colspan="7" class="text-center text-muted py-4">No hay importes cargados.</td>
+                <td colspan="8" class="text-center text-muted py-4">No hay importes cargados.</td>
               </tr>
               <tr v-for="imp in importes.data" :key="imp.id">
                 <td><strong>{{ formatPeriodo(imp.periodo_desde) }}</strong></td>
                 <td class="text-end">{{ formatImporte(imp.importe) }}</td>
+                <td class="text-end">{{ imp.importe_sac != null ? formatImporte(imp.importe_sac) : '-' }}</td>
                 <td>{{ imp.normativa || '-' }}</td>
                 <td>
                   <span v-if="imp.observaciones" :title="imp.observaciones">

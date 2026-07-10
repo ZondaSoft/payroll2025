@@ -836,9 +836,16 @@ class LsdController extends Controller
 
         // Importe a detraer (Ley 27.430) — preferimos el valor cargado en sue100s.importe_detraer;
         // si está en 0/null, fallback al maestro lsd_importes_detraer vigente para el período.
+        $importeDetraerRow = LsdImporteDetraer::vigenteParaPeriodo($periodoStr);
         $importeDetraerNumerico = (float) ($periodo->importe_detraer ?? 0);
         if ($importeDetraerNumerico <= 0) {
-            $importeDetraerNumerico = (float) (LsdImporteDetraer::vigenteParaPeriodo($periodoStr)?->importe ?? 0);
+            $importeDetraerNumerico = (float) ($importeDetraerRow?->importe ?? 0);
+        }
+        // Importe para MESES CON SAC (×1,5). Se usa por empleado cuando tiene SAC liquidado (concepto ARCA 12xxxx).
+        // Si el maestro no lo tiene cargado, se deriva como 1,5 × el mensual.
+        $importeDetraerSacNumerico = (float) ($importeDetraerRow?->importe_sac ?? 0);
+        if ($importeDetraerSacNumerico <= 0) {
+            $importeDetraerSacNumerico = round($importeDetraerNumerico * 1.5, 2);
         }
         $importeDetraerStr = str_pad((string) (int) round($importeDetraerNumerico * 100), 15, '0', STR_PAD_LEFT);
 
@@ -1353,8 +1360,14 @@ class LsdController extends Controller
             // Así, cuando la base es 0 (ej. licencia por maternidad con haberes neteados, o meses sin haberes),
             // el importe a detraer informado es 0 y BI 10 = 0, consistente con lo que ARCA determina.
             $baseBI10 = max(0.0, $totalHaberesCalculado);
+            // Mes con SAC: si el empleado tiene concepto de SAC liquidado (concepto ARCA 12xxxx),
+            // la detracción es la ×1,5 (importe_sac); si no, la mensual.
+            $tieneSac = $datos->where('cuil', $registro->cuil)->contains(
+                fn ($row) => str_starts_with((string) ($row->concepto_arca ?? ''), '12')
+            );
+            $detraccionMensual = $tieneSac ? $importeDetraerSacNumerico : $importeDetraerNumerico;
             // Jornada parcial: la detracción se prorratea por horas (factorParcial = horas_semana/48).
-            $detraccionEmpleado = round($importeDetraerNumerico * $factorParcial, 2);
+            $detraccionEmpleado = round($detraccionMensual * $factorParcial, 2);
             // Modalidades que no admiten la detracción (Guía N°17 ARCA): no aportan a SIPA → no hay
             // base. ARCA exige importe a detraer = 0 Y BI 10 = 0. Para el resto: BI 10 = base − detracción
             // (detracción topeada a la base, no genera base negativa).
@@ -1563,7 +1576,12 @@ class LsdController extends Controller
             // BI 10 (Ley 27.430) = base de conceptos H − importe a detraer, con detracción topeada a la base
             // (no supera la base; ver comentario equivalente en Reg 04).
             $baseBI10_05 = max(0.0, $totalHaberesCalc05);
-            $detraccionEmpleado05 = round($importeDetraerNumerico * $factorParcial05, 2); // prorrateo por jornada parcial
+            // Mes con SAC (ver Reg 04): ×1,5 si el empleado tiene concepto de SAC (ARCA 12xxxx).
+            $tieneSac05 = $datos->where('cuil', $registro->cuil)->contains(
+                fn ($row) => str_starts_with((string) ($row->concepto_arca ?? ''), '12')
+            );
+            $detraccionMensual05 = $tieneSac05 ? $importeDetraerSacNumerico : $importeDetraerNumerico;
+            $detraccionEmpleado05 = round($detraccionMensual05 * $factorParcial05, 2); // prorrateo por jornada parcial
             // Modalidades sin detracción (ver Reg 04): importe a detraer = 0 Y BI 10 = 0.
             if ($this->modalidadSinDetraccion($registro->sicoss_modal ?? 0)) {
                 $detraerAplicado05 = 0.0;
