@@ -13,7 +13,7 @@ return new class extends Migration {
     {
         $jornadas = [
             ['detalle' => 'Jornada completa',               'horas_semana' => 48,   'parcial' => false],
-            ['detalle' => 'Tiempo parcial',                 'horas_semana' => null, 'parcial' => true],
+            ['detalle' => 'Tiempo parcial',                 'horas_semana' => 24,   'parcial' => true],  // media jornada (24/48). Necesario para prorratear la detracción del LSD.
             ['detalle' => 'Jornada reducida (insalubre)',   'horas_semana' => 36,   'parcial' => false],
             ['detalle' => 'Jornada nocturna',               'horas_semana' => 42,   'parcial' => false],
             ['detalle' => 'Jornada mixta',                  'horas_semana' => null, 'parcial' => false],

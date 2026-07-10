@@ -1372,6 +1372,12 @@ class LsdController extends Controller
             $detraccionMensual = $tieneSac ? $importeDetraerSacNumerico : $importeDetraerNumerico;
             // Jornada parcial: la detracción se prorratea por horas (factorParcial = horas_semana/48).
             $detraccionEmpleado = round($detraccionMensual * $factorParcial, 2);
+            // Tope estructural de ARCA para tiempo parcial: la detracción no puede superar el 67% del valor
+            // (Art. 92 ter: el parcial trabaja < 2/3 de la jornada habitual). Red de seguridad por si un dato
+            // de jornada mal cargado diera un factor > 0,67. Ej. mensual 7.003,68 → tope 4.692,47.
+            if ($esJornadaParcial) {
+                $detraccionEmpleado = min($detraccionEmpleado, round($detraccionMensual * 0.67, 2));
+            }
             // Modalidades que no admiten la detracción (Guía N°17 ARCA): no aportan a SIPA → no hay
             // base. ARCA exige importe a detraer = 0 Y BI 10 = 0. Para el resto: BI 10 = base − detracción
             // (detracción topeada a la base, no genera base negativa).
@@ -1588,6 +1594,10 @@ class LsdController extends Controller
             );
             $detraccionMensual05 = $tieneSac05 ? $importeDetraerSacNumerico : $importeDetraerNumerico;
             $detraccionEmpleado05 = round($detraccionMensual05 * $factorParcial05, 2); // prorrateo por jornada parcial
+            // Tope estructural ARCA para parcial: máx. 67% del valor (ver Reg 04).
+            if ($esJornadaParcial05) {
+                $detraccionEmpleado05 = min($detraccionEmpleado05, round($detraccionMensual05 * 0.67, 2));
+            }
             // Modalidades sin detracción (ver Reg 04): importe a detraer = 0 Y BI 10 = 0.
             if ($this->modalidadSinDetraccion($registro->sicoss_modal ?? 0)) {
                 $detraerAplicado05 = 0.0;
