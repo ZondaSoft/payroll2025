@@ -1276,7 +1276,11 @@ class LsdController extends Controller
                 ? $porcTareaDifConvenio
                 : ($condicionDiferencial ? 2.00 : 0.0);
             $contribucionTareDif = str_pad((string) (int) round($porcTareaDif * 100), 5, '0', STR_PAD_LEFT);
-            $codObraSocial = str_pad($registro->obra_sijp ?? '      ', 6, ' ', STR_PAD_LEFT); // Código de obra social. Valor optativo, puede informarse en blanco.
+            // Código de obra social: 6 dígitos con CEROS a la izquierda si hay código (ej. "2501" → "002501");
+            // blanco (optativo) solo si el legajo no tiene obra social. Rellenar con espacios rompía códigos
+            // guardados sin padear (ARCA rechaza "  2501" por inválido).
+            $osRaw = trim((string) ($registro->obra_sijp ?? ''));
+            $codObraSocial = $osRaw !== '' ? str_pad($osRaw, 6, '0', STR_PAD_LEFT) : str_repeat(' ', 6);
 
             $adherentes = str_pad($registro->sicoss_adherentes ?? '00', 2, '0', STR_PAD_LEFT);  // Se registra el número de aquellos que no integran el grupo familiar. Ese dato es tenido en cuenta para el incremento del porcentaje a considerar para el cálculo de aportes de Obra Social.
             $aporteAdicionalOS = str_pad($registro->aporteAdicionalOS ?? '0', 15, '0', STR_PAD_LEFT); // Se consignarán los aportes del trabajador, emergentes de la diferencia entre la remuneración efectivamente percibida por este y el mínimo fijado por ANSES, a los efectos de acceder a una cobertura médico asistencial (Dec. 492/95, art. 8) Formato: 13 dígitos enteros y 2 decimales
@@ -1477,7 +1481,9 @@ class LsdController extends Controller
                 ? $porcTareaDifConvenio
                 : ($condicionDiferencial ? 2.00 : 0.0);
             $contribucionTareDif = str_pad((string) (int) round($porcTareaDif * 100), 5, '0', STR_PAD_LEFT);
-            $codObraSocial = str_pad($registro->codigoObraSocial ?? '', 6, ' ', STR_PAD_LEFT); // Código de obra social. Valor optativo, puede informarse en blanco.
+            // Código de obra social (ídem Reg 04): obra_sijp con ceros a la izquierda, o blanco si no tiene.
+            $osRaw05 = trim((string) ($registro->obra_sijp ?? ''));
+            $codObraSocial = $osRaw05 !== '' ? str_pad($osRaw05, 6, '0', STR_PAD_LEFT) : str_repeat(' ', 6);
             $adherentes = "00";  // Se registra el número de aquellos que no integran el grupo familiar. Ese dato es tenido en cuenta para el incremento del porcentaje a considerar para el cálculo de aportes de Obra Social.
             $aporteAdicionalOS = str_pad($registro->aporteAdicionalOS ?? '0', 15, '0', STR_PAD_LEFT); // Se consignarán los aportes del trabajador, emergentes de la diferencia entre la remuneración efectivamente percibida por este y el mínimo fijado por ANSES, a los efectos de acceder a una cobertura médico asistencial (Dec. 492/95, art. 8) Formato: 13 dígitos enteros y 2 decimales
             $contribAdicionalOS = str_pad($registro->aporteAdicionalOS ?? '0', 15, '0', STR_PAD_LEFT); // Se consignarán las contribuciones del empleador, emergentes de la diferencia entre la remuneración efectivamente percibida por el trabajador y el mínimo fijado por ANSES, a los efectos de permitirle a este acceder a una cobertura médico asistencial (Dec. 492/95, art. 8) Formato: 13 dígitos enteros y 2 decimales. 
