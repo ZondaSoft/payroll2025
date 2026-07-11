@@ -90,11 +90,16 @@ class LsdController extends Controller
         $periodos = Sue100::select('periodo')->distinct()->orderBy('periodo', 'desc')->get();
         $emisiones = LsdEmision::orderBy('created_at', 'desc')->limit(10)->get();
 
+        // Períodos (YYYYMM) que tienen algún tope SIPA cargado. El front avisa si el período
+        // seleccionado no tiene un tope vigente (ningún periodo_desde <= período).
+        $topesPeriodos = LsdTope::orderBy('periodo_desde')->pluck('periodo_desde');
+
         return Inertia::render('Lsd/Generar', [
             'empresas' => $empresas,
             'periodos' => $periodos,
             'emisiones' => $emisiones,
             'ajustesTipos' => $ajustesTipos,
+            'topesPeriodos' => $topesPeriodos,
         ]);
     }
 

@@ -11,6 +11,8 @@ const props = defineProps({
   periodos: Array,
   emisiones: Array,
   ajustesTipos: { type: Array, default: () => [] },
+  // Períodos (YYYYMM) que tienen un tope SIPA cargado en lsd_topes.
+  topesPeriodos: { type: Array, default: () => [] },
 })
 
 onMounted(() => avisarAjustesTipos(props.ajustesTipos))
@@ -82,6 +84,16 @@ const formulario = reactive({
 })
 
 const esRectificativa = computed(() => formulario.identificador_envio === 'RE')
+
+// Avisamos si NO hay un tope SIPA cargado para el propio período seleccionado (coincidencia
+// exacta de periodo_desde). Aunque el backend haga fallback al tope de un mes anterior
+// (LsdTope::vigenteParaPeriodo usa el más reciente <= período), ese valor puede estar
+// desactualizado — por eso el aviso salta cuando falta el tope del mes en curso.
+const topeSipaVigente = computed(() => {
+  const periodo = String(formulario.periodo_id ?? '')
+  if (!periodo) return true // sin período no mostramos el aviso
+  return (props.topesPeriodos ?? []).some(p => String(p) === periodo)
+})
 
 const generarEmision = async (opts = {}) => {
   const faltanCamposSJ = !esRectificativa.value && (!formulario.tipo_liquidacion || !formulario.fecha_pago)
@@ -824,6 +836,19 @@ const marcarRechazado = (id) => cambiarEstado(id, 'rechazado', {
             </div> -->
             <div class="card-body">
               <form @submit.prevent="generarEmision" class="row g-3">
+                <div v-if="!topeSipaVigente" class="col-12">
+                  <div class="alert alert-warning mb-0 d-flex align-items-center" role="alert">
+                    <i class="ri-error-warning-line me-2" style="font-size: 1.25rem;"></i>
+                    <span>Cuidado: Los topes de los importes SIPA tal vez se encuentran desactualizados</span>
+                    <a :href="route('sicoss.topes.index')"
+                       target="_blank"
+                       rel="noopener noreferrer"
+                       class="btn btn-sm rounded-pill btn-outline-warning waves-effect ms-3">
+                      Actualizar topes SIPA
+                    </a>
+                  </div>
+                </div>
+
                 <div class="col-md-6">
                   <label for="empresa" class="form-label">Empresa</label>
                   <select
