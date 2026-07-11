@@ -715,12 +715,17 @@ class LsdController extends Controller
             if (!isset($porLegajo[$leg])) {
                 // Empleado = apellido (detalle) + nombres.
                 $nombreCompleto = trim(((string) ($row->apellido ?? '')) . ' ' . ((string) ($row->nombres ?? '')));
-                $porLegajo[$leg] = ['cuil' => $row->cuil, 'nombre' => $nombreCompleto, 'jornada_id' => $row->jornada_id, 'bruto' => 0.0, 'aportes' => []];
-            }
-            if ($tiporemPorConcepto($row->concepto) === 'H') {
-                $porLegajo[$leg]['bruto'] += (float) ($row->importe ?? 0);
+                $porLegajo[$leg] = ['cuil' => $row->cuil, 'nombre' => $nombreCompleto, 'jornada_id' => $row->jornada_id, 'bruto' => 0.0, 'brutoSac' => 0.0, 'aportes' => []];
             }
             $arca = (string) ($row->concepto_arca ?? '');
+            if ($tiporemPorConcepto($row->concepto) === 'H') {
+                $imp = (float) ($row->importe ?? 0);
+                $porLegajo[$leg]['bruto'] += $imp;
+                // El SAC (concepto ARCA 12xxxx) se topea contra medio tope, aparte del mensual.
+                if (str_starts_with($arca, '12')) {
+                    $porLegajo[$leg]['brutoSac'] += $imp;
+                }
+            }
             if ($arca !== '') {
                 $porLegajo[$leg]['aportes'][$arca] = ($porLegajo[$leg]['aportes'][$arca] ?? 0.0) + abs((float) ($row->importe ?? 0));
             }
@@ -729,7 +734,13 @@ class LsdController extends Controller
         $diferencias = [];
         foreach ($porLegajo as $leg => $data) {
             $bruto = $data['bruto'];
-            $base = ($tope > 0) ? min($bruto, $tope) : $bruto;
+            // Tope por COMPONENTE en meses con SAC: cada tramo contra su propio techo, sin compensación
+            // (min(mensual, tope) + min(SAC, tope/2)). En meses sin SAC, brutoSac=0 → equivale a min(bruto, tope).
+            $brutoSac = $data['brutoSac'] ?? 0.0;
+            $brutoMensual = max(0.0, $bruto - $brutoSac);
+            $base = ($tope > 0)
+                ? min($brutoMensual, $tope) + min($brutoSac, $tope / 2)
+                : $bruto;
 
             // Jornada parcial (modalidad 01/21): la base de OBRA SOCIAL no es el bruto real (la determina el
             // liquidador según la categoría, equivalencia a jornada completa + piso). No es reconstruible desde
@@ -748,7 +759,12 @@ class LsdController extends Controller
                     continue;
                 }
                 $esperado = round($base * $ap['alicuota'], 2);
-                if (abs($esperado - $informado) > 0.01) {
+                // Tolerancia de 1 centavo: la diferencia de ±$0,01 es ruido de redondeo (round half-up
+                // de PHP vs. truncamiento/half-even del liquidador de origen), no un error real. Se redondea
+                // la resta para evitar además el ruido de coma flotante (0,0100000001 > 0,01). Solo se
+                // reportan diferencias > $0,01 (topes desactualizados, parametrización, etc.).
+                $diferencia = round($esperado - $informado, 2);
+                if (abs($diferencia) > 0.01) {
                     $diferencias[] = [
                         'legajo'     => $leg,
                         'cuil'       => (string) $data['cuil'],
@@ -760,7 +776,7 @@ class LsdController extends Controller
                         'base'       => round($base, 2),
                         'esperado'   => $esperado,
                         'informado'  => round($informado, 2),
-                        'diferencia' => round($esperado - $informado, 2),
+                        'diferencia' => $diferencia,
                     ];
                 }
             }
