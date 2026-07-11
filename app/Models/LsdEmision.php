@@ -36,6 +36,7 @@ class LsdEmision extends Model
         'tipo_liquidacion',
         'fecha_pago',
         'identificador_envio',
+        'tipoliq_filtro',
     ];
 
     protected $casts = [

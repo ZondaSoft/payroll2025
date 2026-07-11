@@ -22,6 +22,15 @@ const tiposLiquidacion = [
   { id: 4, nombre: 'Horas' },
 ]
 
+// Filtro de liquidaciones a incluir en el TXT (sue090s.tipoliq) — distinto de
+// tiposLiquidacion, que es el código M/Q/D/H del Reg 01. '(Todas)' = TXT global del mes.
+const tiposLiqFiltro = [
+  { value: 'todas', nombre: '(Todas)' },
+  { value: '1', nombre: 'Normal' },
+  { value: '4', nombre: 'SAC' },
+  { value: '5', nombre: 'Liq. Final' },
+]
+
 const getTipoLiquidacionNombre = (tipoliq) => {
   const tipos = {
     1: 'Normal',
@@ -32,6 +41,13 @@ const getTipoLiquidacionNombre = (tipoliq) => {
     6: 'DIF.HAB.',
   }
   return tipos[tipoliq] || 'Desconocido'
+}
+
+// Nombre del filtro de tipoliq persistido en la emisión ('todas', '1', '4', '5';
+// null en emisiones previas al filtro).
+const getTipoLiqFiltroNombre = (valor) => {
+  if (valor === null || valor === undefined || valor === '') return '—'
+  return valor === 'todas' ? 'Todas' : getTipoLiquidacionNombre(Number(valor))
 }
 
 const formatPeriodo = (periodo) => {
@@ -59,6 +75,7 @@ const formulario = reactive({
   // Período más nuevo (periodos llega ordenado desc desde el backend)
   periodo_id: props.periodos?.[0]?.periodo ?? '',
   identificador_envio: 'SJ',          // SJ — Liquidación de Sueldos + DJ F931 (normal)
+  tipos_liq: 'todas',                 // filtro de tipoliq: (Todas) = TXT global del mes
   tipo_liquidacion: 1,                // 1 - Mes
   fecha_pago: hoyISO(),               // fecha de hoy
   observaciones: '',
@@ -284,6 +301,7 @@ const ajustarAportes = async (items) => {
     const response = await axios.post(route('lsd.ajustar.aportes'), {
       id_empresa: formulario.id_empresa,
       periodo_id: formulario.periodo_id,
+      tipos_liq: formulario.tipos_liq,
     })
     const ajustados = response.data?.ajustados ?? 0
     await Swal.fire({
@@ -825,7 +843,7 @@ const marcarRechazado = (id) => cambiarEstado(id, 'rechazado', {
                   </select>
                 </div>
 
-                <div class="col-md-6">
+                <div class="col-md-3">
                   <label for="periodo" class="form-label">Período</label>
                   <select
                     id="periodo"
@@ -842,6 +860,24 @@ const marcarRechazado = (id) => cambiarEstado(id, 'rechazado', {
                       {{ formatPeriodo(periodo.periodo) }}
                     </option>
                   </select>
+                </div>
+
+                <div class="col-md-3">
+                  <label for="tipos_liq" class="form-label">Tipo de liquidación</label>
+                  <select
+                    id="tipos_liq"
+                    v-model="formulario.tipos_liq"
+                    class="form-select"
+                  >
+                    <option
+                      v-for="tipo in tiposLiqFiltro"
+                      :key="tipo.value"
+                      :value="tipo.value"
+                    >
+                      {{ tipo.nombre }}
+                    </option>
+                  </select>
+                  <small class="text-muted">(Todas) genera el TXT global del mes</small>
                 </div>
 
                 <div class="col-md-12">
@@ -861,7 +897,7 @@ const marcarRechazado = (id) => cambiarEstado(id, 'rechazado', {
                 </div>
 
                 <div class="col-md-6" v-if="!esRectificativa">
-                  <label for="tipo_liquidacion" class="form-label">Tipo de Liquidación</label>
+                  <label for="tipo_liquidacion" class="form-label">Tipo de Liquidación (Reg. 01)</label>
                   <select
                     id="tipo_liquidacion"
                     v-model="formulario.tipo_liquidacion"
@@ -937,6 +973,7 @@ const marcarRechazado = (id) => cambiarEstado(id, 'rechazado', {
                     <th>Número</th>
                     <th>Empresa</th>
                     <th>Período</th>
+                    <th>Tipo liq.</th>
                     <th>Fecha y Hora Emisión</th>
                     <th>Estado</th>
                     <th>Empleados</th>
@@ -951,6 +988,7 @@ const marcarRechazado = (id) => cambiarEstado(id, 'rechazado', {
                     <td>
                       {{ (emision.periodo) }}
                     </td>
+                    <td>{{ getTipoLiqFiltroNombre(emision.tipoliq_filtro) }}</td>
                     <td>
                       {{ formatDate(emision.fecha_emision) }}
                       <small class="text-muted d-block">{{ formatTime(emision.fecha_generacion) }} hs</small>

@@ -54,6 +54,27 @@ class LsdController extends Controller
     }
 
     /**
+     * Primer día del período (YYYY/MM → 'YYYY-MM-01'), para comparar contra sue001s.baja.
+     */
+    private function inicioPeriodo(string $periodoStr): string
+    {
+        $partes = explode('/', $periodoStr);
+        $anio = (int) ($partes[0] ?? date('Y'));
+        $mes = (int) ($partes[1] ?? date('m'));
+        return sprintf('%04d-%02d-01', $anio, $mes);
+    }
+
+    /**
+     * Normaliza el filtro de tipo de liquidación del request ('1'/'4'/'5'/'todas') a un
+     * array de tipoliq para whereIn, o null cuando no hay que filtrar (Todas = TXT global).
+     * No confundir con tipo_liquidacion (código M/Q/D/H del Reg 01).
+     */
+    private function normalizarTiposLiq(?string $valor): ?array
+    {
+        return ($valor === null || $valor === '' || $valor === 'todas') ? null : [(int) $valor];
+    }
+
+    /**
      * Mostrar la página para generar LSD
      */
     public function generar()
@@ -86,17 +107,26 @@ class LsdController extends Controller
             'identificador_envio' => 'required|in:SJ,RE',
             'tipo_liquidacion' => 'required_if:identificador_envio,SJ|nullable|in:1,2,3,4',
             'fecha_pago' => 'required_if:identificador_envio,SJ|nullable|date',
+            'tipos_liq' => 'nullable|in:1,4,5,todas',
         ], [
             'identificador_envio.required' => 'Seleccione el tipo de envío (SJ o RE).',
             'identificador_envio.in' => 'Tipo de envío inválido. Debe ser SJ o RE.',
             'tipo_liquidacion.required_if' => 'El tipo de liquidación es obligatorio para envíos SJ.',
             'fecha_pago.required_if' => 'La fecha de pago es obligatoria para envíos SJ.',
+            'tipos_liq.in' => 'Tipo de liquidación inválido. Valores permitidos: Normal, SAC, Liq. Final o Todas.',
         ]);
 
         try {
             $identificadorEnvio = $request->identificador_envio;
             $empresa = Sue086::find($request->id_empresa);
-            $periodo = Sue100::where('periodo', $request->periodo_id)->first();
+            // Filtro de tipoliq elegido por el usuario (null = Todas, TXT global del mes).
+            $tiposLiq = $this->normalizarTiposLiq($request->input('tipos_liq', 'todas'));
+            // sue100s tiene una fila por (periodo, tipoliq): se prefiere la del tipo pedido para
+            // que periodo_id de la emisión apunte al Sue100 correcto; si no existe, la primera.
+            $periodo = Sue100::where('periodo', $request->periodo_id)
+                ->when($tiposLiq, fn ($q) => $q->whereIn('tipoliq', $tiposLiq))
+                ->first()
+                ?? Sue100::where('periodo', $request->periodo_id)->first();
             $tipoLiquidacion = $request->tipo_liquidacion;
 
             if (!$empresa || !$periodo) {
@@ -106,7 +136,6 @@ class LsdController extends Controller
             $cuit = str_replace('-', '', $empresa->cuit ?? '');
 
             $periodoStr = $periodo->periodo;
-            $tipoLiquidacionImportada = $periodo->tipoliq;
 
             // Pre-check: conceptos huérfanos en sue090s que no existen en sue102s.
             // En modo 'RE' no se emiten Reg 02/03 (no aplica el chequeo).
@@ -116,8 +145,8 @@ class LsdController extends Controller
                     ->join('sue001s', 'sue090s.legajo', '=', 'sue001s.codigo')
                     ->leftJoin('sue102s', 'sue090s.concepto', '=', 'sue102s.codigo')
                     ->where('sue090s.periodo', $periodoStr)
-                    ->where('sue090s.tipoliq', $tipoLiquidacionImportada)
-                    ->whereNull('sue001s.baja')
+                    ->when($tiposLiq, fn ($q) => $q->whereIn('sue090s.tipoliq', $tiposLiq))
+                    ->where(fn ($q) => $q->whereNull('sue001s.baja')->orWhere('sue001s.baja', '>=', $this->inicioPeriodo($periodoStr)))
                     ->whereNull('sue102s.codigo');
 
                 if ($codEmpresa !== null && $codEmpresa !== '') {
@@ -162,8 +191,8 @@ class LsdController extends Controller
                     ->join('sue001s', 'sue090s.legajo', '=', 'sue001s.codigo')
                     ->join('sue102s', 'sue090s.concepto', '=', 'sue102s.codigo')
                     ->where('sue090s.periodo', $periodoStr)
-                    ->where('sue090s.tipoliq', $tipoLiquidacionImportada)
-                    ->whereNull('sue001s.baja')
+                    ->when($tiposLiq, fn ($q) => $q->whereIn('sue090s.tipoliq', $tiposLiq))
+                    ->where(fn ($q) => $q->whereNull('sue001s.baja')->orWhere('sue001s.baja', '>=', $this->inicioPeriodo($periodoStr)))
                     ->where(function ($q) {
                         $q->whereNull('sue102s.concepto_arca')
                           ->orWhere('sue102s.concepto_arca', '=', '');
@@ -227,7 +256,7 @@ class LsdController extends Controller
             // Aplica tanto a SJ como a RE (el Reg 04 se emite en ambos modos).
             // Si el usuario eligió "Ignorar y continuar" (ignorar_inconsistencias=true), no se bloquea:
             // esos legajos se excluyen de la generación y el resto se emite normalmente.
-            $inconsistencias = $this->detectarInconsistenciasReg04($empresa, $periodoStr, $tipoLiquidacionImportada);
+            $inconsistencias = $this->detectarInconsistenciasReg04($empresa, $periodoStr, $tiposLiq);
             $legajosExcluidos = [];
             $legajosIgnorados = [];
             if (!empty($inconsistencias)) {
@@ -275,13 +304,15 @@ class LsdController extends Controller
             // Solo contamos las emisiones que efectivamente llegaron a ARCA (enviado/confirmado/rechazado).
             // Las que están en borrador/generado son tentativas locales — ARCA no las conoce, no cuentan,
             // por eso el número NO avanza mientras la presentación siga en borrador.
+            // El correlativo es por empresa+período sin distinguir tipoliq_filtro: para ARCA la mensual
+            // y el SAC del mismo mes son liquidaciones distintas con números consecutivos dentro del período.
             $ultimaEmision = LsdEmision::where('id_empresa', $request->id_empresa)
                 ->where('periodo', $periodoStr)
                 ->whereIn('estado', ['enviado', 'confirmado', 'rechazado'])
                 ->max('numero_emision') ?? 0;
             $numeroEmision = $ultimaEmision + 1;
 
-            $fileData = $this->generarTxt($empresa, $periodo, $tipoLiquidacion, $tipoLiquidacionImportada, $numeroEmision, $request->fecha_pago, $identificadorEnvio, $legajosExcluidos);
+            $fileData = $this->generarTxt($empresa, $periodo, $tipoLiquidacion, $tiposLiq, $numeroEmision, $request->fecha_pago, $identificadorEnvio, $legajosExcluidos);
 
             // Si generarTxt devolvió un error (por ejemplo 404), retornarlo y no crear la emisión
             if (!is_array($fileData) || ($fileData['status'] ?? 200) !== 200) {
@@ -310,6 +341,7 @@ class LsdController extends Controller
                 'tipo_liquidacion' => $request->tipo_liquidacion,
                 'fecha_pago' => $request->fecha_pago,
                 'identificador_envio' => $identificadorEnvio,
+                'tipoliq_filtro' => $request->input('tipos_liq', 'todas'),
             ]);
 
             // Registrar items en lsd_items
@@ -333,7 +365,7 @@ class LsdController extends Controller
 
             // Control NO bloqueante de aportes (Jubilación/PAMI/OS) vs base × alícuota. El .txt ya se generó;
             // estas diferencias suelen venir de un tope desactualizado en el liquidador de origen.
-            $advertenciasAportes = $this->detectarDiferenciasAportes($empresa, $periodoStr, $tipoLiquidacionImportada);
+            $advertenciasAportes = $this->detectarDiferenciasAportes($empresa, $periodoStr, $tiposLiq);
 
             return response()->json([
                 'success' => true,
@@ -391,15 +423,15 @@ class LsdController extends Controller
      * no entran en el formato de ancho fijo del Registro 04 (o que no resuelven a un código válido).
      * Devuelve una fila por (legajo, campo) con problema, lista para mostrar en el modal del frontend.
      */
-    private function detectarInconsistenciasReg04($empresa, string $periodoStr, $tipoLiquidacionImportada): array
+    private function detectarInconsistenciasReg04($empresa, string $periodoStr, ?array $tiposLiq): array
     {
         $codEmpresa = $empresa->codigo ?? $empresa->id ?? null;
 
         $query = DB::table('sue090s')
             ->join('sue001s', 'sue090s.legajo', '=', 'sue001s.codigo')
             ->where('sue090s.periodo', $periodoStr)
-            ->where('sue090s.tipoliq', $tipoLiquidacionImportada)
-            ->whereNull('sue001s.baja');
+            ->when($tiposLiq, fn ($q) => $q->whereIn('sue090s.tipoliq', $tiposLiq))
+            ->where(fn ($q) => $q->whereNull('sue001s.baja')->orWhere('sue001s.baja', '>=', $this->inicioPeriodo($periodoStr)));
 
         if ($codEmpresa !== null && $codEmpresa !== '') {
             $query->where('sue001s.grupo_emp', $codEmpresa);
@@ -635,7 +667,7 @@ class LsdController extends Controller
      * contra el esperado = min(bruto, tope vigente) × alícuota. Sirve para detectar liquidaciones de origen
      * calculadas con un tope desactualizado. Devuelve una fila por (legajo, aporte) con diferencia.
      */
-    private function detectarDiferenciasAportes($empresa, string $periodoStr, $tipoLiquidacionImportada): array
+    private function detectarDiferenciasAportes($empresa, string $periodoStr, ?array $tiposLiq): array
     {
         $codEmpresa = $empresa->codigo ?? $empresa->id ?? null;
         $rangosSue089 = DB::table('sue089s')->get();
@@ -656,8 +688,8 @@ class LsdController extends Controller
             ->join('sue001s', 'sue090s.legajo', '=', 'sue001s.codigo')
             ->leftJoin('sue102s', 'sue090s.concepto', '=', 'sue102s.codigo')
             ->where('sue090s.periodo', $periodoStr)
-            ->where('sue090s.tipoliq', $tipoLiquidacionImportada)
-            ->whereNull('sue001s.baja');
+            ->when($tiposLiq, fn ($q) => $q->whereIn('sue090s.tipoliq', $tiposLiq))
+            ->where(fn ($q) => $q->whereNull('sue001s.baja')->orWhere('sue001s.baja', '>=', $this->inicioPeriodo($periodoStr)));
         if ($codEmpresa !== null && $codEmpresa !== '') {
             $query->where('sue001s.grupo_emp', $codEmpresa);
         }
@@ -745,6 +777,9 @@ class LsdController extends Controller
         $request->validate([
             'id_empresa' => 'required|exists:sue086s,id',
             'periodo_id' => 'required|exists:sue100s,periodo',
+            'tipos_liq' => 'nullable|in:1,4,5,todas',
+        ], [
+            'tipos_liq.in' => 'Tipo de liquidación inválido. Valores permitidos: Normal, SAC, Liq. Final o Todas.',
         ]);
 
         $empresa = Sue086::find($request->id_empresa);
@@ -753,15 +788,16 @@ class LsdController extends Controller
             return response()->json(['success' => false, 'message' => 'Empresa o período no encontrados'], 404);
         }
         $periodoStr = $periodo->periodo;
-        $tipoLiquidacionImportada = $periodo->tipoliq;
+        // Mismo filtro de tipoliq que usó la generación (null = Todas).
+        $tiposLiq = $this->normalizarTiposLiq($request->input('tipos_liq', 'todas'));
 
-        $diferencias = $this->detectarDiferenciasAportes($empresa, $periodoStr, $tipoLiquidacionImportada);
+        $diferencias = $this->detectarDiferenciasAportes($empresa, $periodoStr, $tiposLiq);
         if (empty($diferencias)) {
             return response()->json(['success' => true, 'ajustados' => 0, 'message' => 'No había diferencias para ajustar.']);
         }
 
         $ajustados = 0;
-        DB::transaction(function () use ($diferencias, $periodoStr, $tipoLiquidacionImportada, &$ajustados) {
+        DB::transaction(function () use ($diferencias, $periodoStr, $tiposLiq, &$ajustados) {
             foreach ($diferencias as $dif) {
                 // Filas del aporte (puede haber más de una con el mismo código ARCA): se ajusta la primera
                 // y las demás se ponen en 0, para que la suma del aporte = esperado.
@@ -769,9 +805,9 @@ class LsdController extends Controller
                     ->join('sue102s', 'sue090s.concepto', '=', 'sue102s.codigo')
                     ->where('sue090s.legajo', $dif['legajo'])
                     ->where('sue090s.periodo', $periodoStr)
-                    ->where('sue090s.tipoliq', $tipoLiquidacionImportada)
+                    ->when($tiposLiq, fn ($q) => $q->whereIn('sue090s.tipoliq', $tiposLiq))
                     ->where('sue102s.concepto_arca', $dif['arca'])
-                    ->select('sue090s.id', 'sue090s.importe', 'sue090s.concepto')
+                    ->select('sue090s.id', 'sue090s.importe', 'sue090s.concepto', 'sue090s.tipoliq')
                     ->orderBy('sue090s.id')
                     ->get();
 
@@ -787,7 +823,8 @@ class LsdController extends Controller
                 // Asentar la corrección en el histórico (antes/después a nivel del aporte).
                 LiquidacionCorreccion::registrar([
                     'periodo'          => $periodoStr,
-                    'tipoliq'          => $tipoLiquidacionImportada,
+                    // Con "Todas" se asienta el tipoliq real de la fila ajustada.
+                    'tipoliq'          => $primeraFila->tipoliq ?? null,
                     'legajo'           => (string) $dif['legajo'],
                     'cuil'             => $dif['cuil'] ?? null,
                     'concepto'         => $primeraFila->concepto ?? null,
@@ -810,7 +847,7 @@ class LsdController extends Controller
         ]);
     }
 
-    public function generarTxt($empresa, $periodo, $tipoLiquidacion, $tipoLiquidacionImportada, $numero_emision, $fechaPagoOverride = null, $identificadorEnvio = 'SJ', array $legajosExcluidos = [])
+    public function generarTxt($empresa, $periodo, $tipoLiquidacion, ?array $tiposLiq, $numero_emision, $fechaPagoOverride = null, $identificadorEnvio = 'SJ', array $legajosExcluidos = [])
     {
         $empresaId = $empresa->id;
         $empresaName = $empresa->detalle ?? '';
@@ -881,8 +918,8 @@ class LsdController extends Controller
             ->leftJoin('sue102s', 'sue090s.concepto', '=', 'sue102s.codigo')
             ->leftJoin('sue007s', 'sue001s.convenio', '=', 'sue007s.codigo')
             ->where('sue090s.periodo', $periodoStr)
-            ->where('sue090s.tipoliq', $tipoLiquidacionImportada)
-            ->whereNull('sue001s.baja');
+            ->when($tiposLiq, fn ($q) => $q->whereIn('sue090s.tipoliq', $tiposLiq))
+            ->where(fn ($q) => $q->whereNull('sue001s.baja')->orWhere('sue001s.baja', '>=', $this->inicioPeriodo($periodoStr)));
 
         // ->where('sue090s.legajo', 7009)
 
@@ -930,7 +967,9 @@ class LsdController extends Controller
         }
 
         if ($datos->isEmpty()) {
-            return response()->json(['message' => 'No se encontraron datos'], 404);
+            // Contrato de error de generarTxt: array con status/message (ver generarEmision).
+            // Un JsonResponse acá terminaba mostrándose como 500 "Error generando archivo".
+            return ['status' => 404, 'message' => 'No se encontraron datos para el período y tipo de liquidación seleccionados.'];
         }
 
         // -------------------------------------------------------------------
@@ -975,6 +1014,20 @@ class LsdController extends Controller
 
         $contenido = $line01 . "\r\n";
 
+        // Mapeo de sue001s.formap → forma de pago ARCA (Reg 02 pos 115):
+        //   'E' efectivo          → '1' efectivo (ARCA)
+        //   'D' depósito bancario → '3' acreditación (ARCA)
+        //   null/otro             → '1' default efectivo
+        // (ARCA también admite '2' cheque, pero no se usa en este sistema)
+        // Definido fuera del bloque SJ porque también lo usan los lsd_items, que se arman siempre
+        // (en modo RE el bloque Reg 02/03 se saltea y el closure quedaba sin definir → error 500).
+        $mapearFormaPago = function ($formap): string {
+            return match (strtoupper(trim((string) $formap))) {
+                'D' => '3',
+                default => '1',
+            };
+        };
+
         // En modo 'RE' (rectificativa) ARCA exige que el TXT NO lleve Reg 02 ni Reg 03 ni Reg 05.
         // Solo Reg 01 y Reg 04. Por eso saltamos esos bloques.
         if (!$esRectificativa) {
@@ -988,18 +1041,6 @@ class LsdController extends Controller
 
         //$fechaPago = $fechaPago ?? '20260101'; // Fecha de pago en formato YYYYMMDD
         $fechaRubrica = '        ';  // No se completa por el momento
-
-        // Mapeo de sue001s.formap → forma de pago ARCA (Reg 02 pos 115):
-        //   'E' efectivo          → '1' efectivo (ARCA)
-        //   'D' depósito bancario → '3' acreditación (ARCA)
-        //   null/otro             → '1' default efectivo
-        // (ARCA también admite '2' cheque, pero no se usa en este sistema)
-        $mapearFormaPago = function ($formap): string {
-            return match (strtoupper(trim((string) $formap))) {
-                'D' => '3',
-                default => '1',
-            };
-        };
 
         // Datos (ajusta los campos según tu tabla sue090s)
         // Agrupar por cuil y tomar solo un registro por cuil para este bloque
@@ -1365,7 +1406,9 @@ class LsdController extends Controller
             // el importe a detraer informado es 0 y BI 10 = 0, consistente con lo que ARCA determina.
             $baseBI10 = max(0.0, $totalHaberesCalculado);
             // Mes con SAC: si el empleado tiene concepto de SAC liquidado (concepto ARCA 12xxxx),
-            // la detracción es la ×1,5 (importe_sac); si no, la mensual.
+            // la detracción es la ×1,5 (importe_sac); si no, la mensual. Se evalúa sobre las filas
+            // que entraron al TXT según el filtro de tipoliq: con "SAC" solo, también aplica la ×1,5
+            // completa (no la mitad) — comportamiento aceptado, pensado para el TXT global (Todas).
             $tieneSac = $datos->where('cuil', $registro->cuil)->contains(
                 fn ($row) => str_starts_with((string) ($row->concepto_arca ?? ''), '12')
             );
@@ -1758,7 +1801,16 @@ class LsdController extends Controller
         // Convenios (sue007s) y tipo de liquidación (de la emisión).
         $convenios = DB::table('sue007s')->pluck('detalle', 'codigo');
         $tiposLiq = [1 => 'Normal', 2 => '1er. Quincena', 3 => '2da. Quincena', 4 => 'SAC', 5 => 'Liq. Final', 6 => 'DIF.HAB.'];
-        $tipoLiqNombre = $tiposLiq[(int) $emision->tipo_liquidacion] ?? ('Tipo ' . $emision->tipo_liquidacion);
+        if ($emision->tipoliq_filtro !== null && $emision->tipoliq_filtro !== '') {
+            // Emisiones nuevas: el filtro elegido al generar ('todas' o un tipoliq del Mapa A).
+            $tipoLiqNombre = $emision->tipoliq_filtro === 'todas'
+                ? 'Todas'
+                : ($tiposLiq[(int) $emision->tipoliq_filtro] ?? ('Tipo ' . $emision->tipoliq_filtro));
+        } else {
+            // Fallback legacy (emisiones previas al filtro): usa tipo_liquidacion (M/Q/D/H),
+            // que no es el Mapa A — se mantiene solo por compatibilidad histórica.
+            $tipoLiqNombre = $tiposLiq[(int) $emision->tipo_liquidacion] ?? ('Tipo ' . $emision->tipo_liquidacion);
+        }
 
         // Bases imponibles y cálculos del Reg 04 (parseados del TXT generado, por CUIL).
         $basesPorCuil = $this->parsearReg04($emision->archivo_txt);
