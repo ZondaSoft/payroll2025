@@ -54,14 +54,18 @@ class LsdController extends Controller
     }
 
     /**
-     * Primer día del período (YYYY/MM → 'YYYY-MM-01'), para comparar contra sue001s.baja.
+     * Primer día del período como 'YYYY-MM-01', para comparar contra sue001s.baja.
+     * sue100s.periodo viene como 'YYYYMM' (ej. '202606'); también se tolera 'YYYY/MM'.
      */
     private function inicioPeriodo(string $periodoStr): string
     {
-        $partes = explode('/', $periodoStr);
-        $anio = (int) ($partes[0] ?? date('Y'));
-        $mes = (int) ($partes[1] ?? date('m'));
-        return sprintf('%04d-%02d-01', $anio, $mes);
+        $limpio = preg_replace('/\D/', '', trim($periodoStr)); // deja solo dígitos → 'YYYYMM'
+        $anio = (int) substr($limpio, 0, 4);
+        $mes = (int) substr($limpio, 4, 2);
+        if ($mes < 1 || $mes > 12) {
+            $mes = 1;
+        }
+        return sprintf('%04d-%02d-01', $anio ?: (int) date('Y'), $mes);
     }
 
     /**
