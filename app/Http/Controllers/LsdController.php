@@ -1719,7 +1719,13 @@ class LsdController extends Controller
             mkdir($dir, 0755, true);
         }
 
-        $filename = "LSD_{$empresaName}_liq_{$numero_emision}_periodo_{$periodoId}_" . date('Ymd_His') . ".txt";
+        // Tipo de liquidación emitida en el nombre del archivo (sin espacios ni puntos).
+        $nombresTipoLiq = [1 => 'Normal', 4 => 'SAC', 5 => 'LiqFinal'];
+        $tipoLiqArchivo = $tiposLiq === null
+            ? 'Todas'
+            : ($nombresTipoLiq[$tiposLiq[0]] ?? ('Tipo' . $tiposLiq[0]));
+
+        $filename = "LSD_{$empresaName}_liq_{$numero_emision}_periodo_{$periodoId}_{$tipoLiqArchivo}_" . date('Ymd_His') . ".txt";
         $fullPath = $dir . DIRECTORY_SEPARATOR . $filename;
 
         $contentToWrite = rtrim($contenido, "\r\n");
