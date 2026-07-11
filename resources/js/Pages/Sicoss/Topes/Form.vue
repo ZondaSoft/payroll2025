@@ -166,7 +166,30 @@ const submit = () => {
             </div>
           </div>
         </div>
+
+        <div class="mt-4">
+          <a href="https://www.argentina.gob.ar/trabajo/seguridadsocial/imss"
+             target="_blank"
+             rel="noopener noreferrer"
+             class="btn btn-topes-ss">
+            <i class="ri-earth-line me-1"></i> Topes de la Seguridad Social
+          </a>
+        </div>
       </form>
     </div>
   </div>
 </template>
+
+<style scoped>
+.btn-topes-ss {
+  background-color: #7e3ff2;
+  border-color: #7e3ff2;
+  color: #fff;
+}
+.btn-topes-ss:hover,
+.btn-topes-ss:focus {
+  background-color: #6a2fd6;
+  border-color: #6a2fd6;
+  color: #fff;
+}
+</style>
