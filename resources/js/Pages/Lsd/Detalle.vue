@@ -589,6 +589,14 @@ const exportarResumenExcel = () => {
   font-size: 0.8125rem;
 }
 
+/* Hover de filas: pinta toda la fila (pisa las variables de Bootstrap 5.3 para
+   ganarle al rayado de table-striped y al color de table-hover). */
+.table > tbody > tr:hover > * {
+  --bs-table-bg-state: #e7e7ff;
+  --bs-table-accent-bg: #e7e7ff;
+  background-color: #e7e7ff;
+}
+
 /* Columnas ordenables */
 .sortable {
   cursor: pointer;
