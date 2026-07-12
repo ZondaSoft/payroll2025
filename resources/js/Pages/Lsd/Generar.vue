@@ -344,10 +344,25 @@ const mostrarAdvertenciaAportes = (items) => {
       <td style="padding:4px 8px;border:1px solid #dee2e6;text-align:right;">${escapeHtml(formatMoney(i.esperado))}</td>
       <td style="padding:4px 8px;border:1px solid #dee2e6;text-align:right;">${escapeHtml(formatMoney(i.informado))}</td>
       <td style="padding:4px 8px;border:1px solid #dee2e6;text-align:right;color:#dc3545;font-weight:600;">${escapeHtml(formatMoney(i.diferencia))}</td>
+      <td style="padding:4px 8px;border:1px solid #dee2e6;text-align:center;">
+        ${i.legajo_id
+          ? `<a href="${route('liquidacion.individual.index', { legajo_id: i.legajo_id, periodo: formulario.periodo_id })}"
+                class="lupa-concepto"
+                target="_blank"
+                rel="noopener"
+                title="Ver la liquidación individual del legajo ${escapeHtml(i.legajo)}">
+               <i class="ri-search-line"></i>
+             </a>`
+          : '—'}
+      </td>
     </tr>
   `).join('')
 
   const html = `
+    <style>
+      .lupa-concepto{display:inline-flex;align-items:center;justify-content:center;width:30px;height:30px;border-radius:50%;border:1px solid var(--bs-secondary, #6c757d);color:var(--bs-secondary, #6c757d);background:transparent;text-decoration:none;transition:all .15s ease;}
+      .lupa-concepto:hover,.lupa-concepto:focus{background:var(--bs-primary, #696cff);border-color:var(--bs-primary, #696cff);color:#fff;outline:none;}
+    </style>
     <div style="text-align:left;font-size:14px;">
       <p style="margin-bottom:8px;">El archivo <strong>ya se generó y se descargó</strong>. Se detectaron diferencias entre el aporte descontado y <strong>base × alícuota</strong> (base = mín. entre bruto y tope vigente). Suele deberse a un <strong>tope desactualizado en el liquidador de origen</strong>.</p>
       <div style="max-height:300px;overflow:auto;">
@@ -362,6 +377,7 @@ const mostrarAdvertenciaAportes = (items) => {
               <th style="padding:6px 8px;border:1px solid #dee2e6;text-align:right;">Esperado</th>
               <th style="padding:6px 8px;border:1px solid #dee2e6;text-align:right;">Informado</th>
               <th style="padding:6px 8px;border:1px solid #dee2e6;text-align:right;">Diferencia</th>
+              <th style="padding:6px 8px;border:1px solid #dee2e6;text-align:center;">Revisar</th>
             </tr>
           </thead>
           <tbody>${filas}</tbody>

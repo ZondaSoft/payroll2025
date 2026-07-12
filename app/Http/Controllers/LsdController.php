@@ -703,6 +703,7 @@ class LsdController extends Controller
             $query->where('sue001s.grupo_emp', $codEmpresa);
         }
         $rows = $query->get([
+            'sue001s.id as legajo_id',
             'sue001s.codigo as legajo',
             'sue001s.cuil as cuil',
             'sue001s.detalle as apellido',
@@ -720,7 +721,7 @@ class LsdController extends Controller
             if (!isset($porLegajo[$leg])) {
                 // Empleado = apellido (detalle) + nombres.
                 $nombreCompleto = trim(((string) ($row->apellido ?? '')) . ' ' . ((string) ($row->nombres ?? '')));
-                $porLegajo[$leg] = ['cuil' => $row->cuil, 'nombre' => $nombreCompleto, 'jornada_id' => $row->jornada_id, 'bruto' => 0.0, 'brutoSac' => 0.0, 'aportes' => []];
+                $porLegajo[$leg] = ['legajo_id' => $row->legajo_id, 'cuil' => $row->cuil, 'nombre' => $nombreCompleto, 'jornada_id' => $row->jornada_id, 'bruto' => 0.0, 'brutoSac' => 0.0, 'aportes' => []];
             }
             $arca = (string) ($row->concepto_arca ?? '');
             if ($tiporemPorConcepto($row->concepto) === 'H') {
@@ -772,6 +773,7 @@ class LsdController extends Controller
                 if (abs($diferencia) > 0.01) {
                     $diferencias[] = [
                         'legajo'     => $leg,
+                        'legajo_id'  => $data['legajo_id'] !== null ? (int) $data['legajo_id'] : null,
                         'cuil'       => (string) $data['cuil'],
                         'nombre'     => (string) $data['nombre'],
                         'aporte'     => $ap['nombre'],
