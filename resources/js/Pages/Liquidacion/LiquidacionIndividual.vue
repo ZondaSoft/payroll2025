@@ -1,5 +1,6 @@
 <script setup>
 import FormHeader from '@/Components/FormHeader.vue';
+import UserAvatar from '@/Components/UserAvatar.vue';
 import { computed, ref, watch, nextTick, onMounted } from 'vue';
 import { router } from '@inertiajs/vue3';
 import axios from 'axios';
@@ -50,6 +51,18 @@ const props = defineProps({
 });
 
 onMounted(() => avisarAjustesTipos(props.ajustesTipos));
+
+// Foto del empleado: foto_url ya trae el avatar por defecto (/img/avatars/...) cuando no hay
+// foto real. Lo descartamos para que el UserAvatar caiga a las iniciales (en prod, bajo la
+// subcarpeta, ese avatar por defecto además 404). Si hay foto real y falla la carga, el
+// componente igual cae a iniciales por su @error.
+const fotoEmpleado = computed(() => {
+    const url = props.empleado?.foto_url || '';
+    return url.includes('/img/avatars/') ? '' : url;
+});
+const nombreEmpleado = computed(() =>
+    `${props.empleado?.detalle ?? ''} ${props.empleado?.nombres ?? ''}`.trim()
+);
 
 // Copia reactiva de los conceptos (para edición inline + totales). Se resincroniza con la prop
 // cada vez que cambia (recarga por legajo/período o tras guardar una edición).
@@ -477,14 +490,14 @@ const confirmarEliminar = async () => {
                                     </li>
                                 </ul>
                             </div>
-                            <!-- Foto del empleado -->
+                            <!-- Foto del empleado (con avatar de iniciales si no hay foto) -->
                             <div class="col-auto d-flex align-items-end mt-1">
-                                <img
-                                    :src="empleado?.foto_url || '/img/avatars/1.png'"
+                                <UserAvatar
+                                    :src="fotoEmpleado"
+                                    :name="nombreEmpleado"
+                                    :size="55"
                                     alt="Foto empleado"
-                                    class="rounded-circle border"
-                                    style="width: 55px; height: 55px; object-fit: cover;"
-                                >
+                                />
                             </div>
                             <!-- Selector de período -->
                             <div class="col-6 col-md-3 mt-1 ms-9">

@@ -1777,6 +1777,7 @@ class LsdController extends Controller
                 'cuil' => $registro->cuil ?? '',
                 'legajo' => $registro->legajo_codigo ?? $registro->legajo ?? '',
                 'codigo_concepto' => $registro->concepto ?? '',
+                'tipoliq' => $registro->tipoliq ?? null,
                 'cantidad' => $registro->cantidad ?? 0,
                 'unidades' => $registro->unidades ?? '',
                 'importe' => $registro->importe ?? 0,

@@ -17,6 +17,7 @@ class LsdItem extends Model
         'fecha_pago',
         'forma_pago',
         'codigo_concepto',
+        'tipoliq',
         'cantidad',
         'unidades',
         'importe',
