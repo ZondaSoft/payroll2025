@@ -386,6 +386,12 @@ onMounted(() => {
     buscarConceptosArca('').then(() => {
         cargarConceptoSeleccionado();
     });
+
+    // Alta por copia (create?copiar_de=): viene con tipo precargado y sin código; el watch
+    // de form.tipo no dispara en el valor inicial, así que se pide el próximo código acá.
+    if (modoAgregar.value && form.tipo && !form.codigo) {
+        buscarProximoCodigo();
+    }
 });
 
 watch(() => props.agregar, () => {
@@ -439,6 +445,13 @@ watch(() => props.concepto, (nuevo) => {
     form.gcias_afecta   = nuevo.gcias_afecta ?? false;
     form.concepto_arca  = nuevo.concepto_arca ?? null;
     cargarConceptoSeleccionado();
+
+    // Alta por copia (create?copiar_de=): llega con tipo precargado y sin código. Si el tipo
+    // no cambió respecto del concepto que se estaba viendo, el watch de form.tipo no dispara,
+    // así que el próximo código libre se pide acá.
+    if (modoAgregar.value && form.tipo && !form.codigo) {
+        buscarProximoCodigo();
+    }
 }, { deep: true });
 
 // Función para pasar el foco del tipo al código
@@ -446,6 +459,24 @@ const moverFocoACodigoDesdeSelect = () => {
     setTimeout(() => {
         txtcodigo.value?.focus();
     }, 0);
+};
+
+// ---- Menú contextual del botón Agregar: "Copiar concepto" ----
+const menuCopiar = ref({ visible: false, x: 0, y: 0 });
+
+const onContextmenuCrear = (e) => {
+    // Solo con un concepto cargado en modo visualización.
+    if (modoAgregar.value || modoEdicion.value || !form.id) return;
+    e.preventDefault();
+    menuCopiar.value = { visible: true, x: e.clientX, y: e.clientY };
+};
+
+const cerrarMenuCopiar = () => { menuCopiar.value.visible = false; };
+
+const copiarConcepto = () => {
+    cerrarMenuCopiar();
+    // Abre el alta precargada con los datos del concepto actual (create?copiar_de=id).
+    router.get(route('liquidacion.conceptos.create', { copiar_de: form.id }));
 };
 
 </script>
@@ -471,7 +502,18 @@ const moverFocoACodigoDesdeSelect = () => {
                 @edit="setFocus"
                 @delete="() => {}"
                 @cancelar="() => {}"
+                @contextmenu-crear="onContextmenuCrear"
             />
+
+            <!-- Menú contextual del botón Agregar: copiar el concepto actual -->
+            <template v-if="menuCopiar.visible">
+                <div class="menu-contextual-backdrop" @click="cerrarMenuCopiar" @contextmenu.prevent="cerrarMenuCopiar"></div>
+                <ul class="menu-contextual" :style="{ top: menuCopiar.y + 'px', left: menuCopiar.x + 'px' }">
+                    <li @click="copiarConcepto">
+                        <i class="ri-file-copy-line me-2"></i> Copiar concepto {{ form.codigo }}
+                    </li>
+                </ul>
+            </template>
             <!-- END HEAD Y BOTONES -->
 
             <div class="row">
@@ -948,5 +990,36 @@ const moverFocoACodigoDesdeSelect = () => {
     }
     .tab-slider {
         display: none;
+    }
+
+    /* Menú contextual del botón Agregar (mismo estilo que en LiquidacionIndividual.vue) */
+    .menu-contextual-backdrop {
+        position: fixed;
+        inset: 0;
+        z-index: 1090;
+    }
+    .menu-contextual {
+        position: fixed;
+        z-index: 1091;
+        min-width: 180px;
+        margin: 0;
+        padding: 4px 0;
+        list-style: none;
+        background: #fff;
+        border: 1px solid #e0e0e0;
+        border-radius: 6px;
+        box-shadow: 0 6px 20px rgba(0, 0, 0, 0.18);
+    }
+    .menu-contextual li {
+        padding: 8px 16px;
+        font-size: 0.875rem;
+        cursor: pointer;
+        white-space: nowrap;
+        display: flex;
+        align-items: center;
+    }
+    .menu-contextual li:hover {
+        background: var(--bs-primary, #696cff);
+        color: #fff;
     }
 </style>

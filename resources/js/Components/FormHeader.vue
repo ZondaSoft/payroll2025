@@ -72,7 +72,9 @@ defineProps({
     }
 });
 
-defineEmits(['edit', 'delete', 'grabar', 'cancelar']);
+// contextmenu-crear: click derecho sobre el botón de crear (para menús contextuales
+// del padre, ej. "Copiar concepto"). Si el padre no lo escucha, no cambia nada.
+defineEmits(['edit', 'delete', 'grabar', 'cancelar', 'contextmenu-crear']);
 
 </script>
 
@@ -152,7 +154,8 @@ defineEmits(['edit', 'delete', 'grabar', 'cancelar']);
             <Link
                 :href="rutaCreate"
                 class="btn btn-info waves-effect waves-light"
-                @click="$emit('edit')">
+                @click="$emit('edit')"
+                @contextmenu="$emit('contextmenu-crear', $event)">
                 {{ textoCrear }}
             </Link>
             <Link

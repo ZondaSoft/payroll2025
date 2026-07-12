@@ -87,7 +87,16 @@ class ConceptosLiquidacionController extends Controller
 
         // Permite precargar el código (ej. al venir desde "conceptos sin parametrizar" del LSD)
         $concepto = new Sue102();
-        if ($request->filled('codigo')) {
+        if ($request->filled('copiar_de')) {
+            // Copia de un concepto existente (opción "Copiar" del menú contextual del botón
+            // Agregar): precarga todos los datos del origen; el id queda nulo (registro nuevo)
+            // y el código lo propone el frontend (próximo libre para el tipo).
+            $origen = Sue102::find($request->query('copiar_de'));
+            if ($origen) {
+                $concepto = $origen->replicate();
+                $concepto->codigo = null;
+            }
+        } elseif ($request->filled('codigo')) {
             $concepto->codigo = (int) $request->query('codigo');
         }
 
