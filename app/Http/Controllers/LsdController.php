@@ -1952,7 +1952,7 @@ class LsdController extends Controller
         $codEmpresa = $empresa->codigo ?? null;
         $empleados = DB::table('sue001s')
             ->when($codEmpresa, fn ($q) => $q->where('grupo_emp', $codEmpresa))
-            ->get(['codigo', 'cuil', 'detalle', 'nombres'])
+            ->get(['id', 'codigo', 'cuil', 'detalle', 'nombres'])
             ->keyBy('cuil');
 
         $tiposLiq = [1 => 'Normal', 2 => '1er. Quincena', 3 => '2da. Quincena', 4 => 'SAC', 5 => 'Liq. Final', 6 => 'DIF.HAB.'];
@@ -1988,9 +1988,11 @@ class LsdController extends Controller
 
             $lineas[] = [
                 'legajo' => $it->legajo,
+                'legajo_id' => ($emp && $emp->id !== null) ? (int) $emp->id : null,
                 'cuil' => (string) $it->cuil,
                 'nombre' => $emp ? trim(((string) ($emp->detalle ?? '')) . ' ' . ((string) ($emp->nombres ?? ''))) : '',
                 'tipo_liq' => $tipoliq !== null ? ($tiposLiq[(int) $tipoliq] ?? ('Tipo ' . $tipoliq)) : '—',
+                'tipoliq_cod' => $tipoliq !== null ? (int) $tipoliq : null,
                 'cantidad' => (float) $it->cantidad,
                 'importe' => $monto,
                 'debito_credito' => $it->debito_credito,

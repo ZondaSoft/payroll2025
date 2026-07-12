@@ -1,5 +1,6 @@
 <script setup>
 import { ref, computed } from 'vue'
+import { Link } from '@inertiajs/vue3'
 import * as XLSX from 'xlsx'
 
 const props = defineProps({
@@ -8,6 +9,13 @@ const props = defineProps({
   concepto: Object,           // { codigo, descripcion }
   lineas: { type: Array, default: () => [] },
   total: { type: Number, default: 0 },
+})
+
+// URL a la liquidación individual de la que proviene la línea (legajo + período + tipoliq).
+const urlLiquidacion = (l) => route('liquidacion.individual.index', {
+  legajo_id: l.legajo_id,
+  periodo: props.emision?.periodo,
+  ...(l.tipoliq_cod != null ? { tipoliq: l.tipoliq_cod } : {}),
 })
 
 const busqueda = ref('')
@@ -143,6 +151,7 @@ const exportarExcel = () => {
                   <th class="sortable text-end" @click="setSort('cantidad')">Cantidad <i :class="sortIcon('cantidad')"></i></th>
                   <th class="text-center">D/C</th>
                   <th class="sortable text-end" @click="setSort('importe')">Importe <i :class="sortIcon('importe')"></i></th>
+                  <th class="text-center">Ver</th>
                 </tr>
               </thead>
               <tbody>
@@ -156,15 +165,27 @@ const exportarExcel = () => {
                     <span :class="l.debito_credito === 'C' ? 'text-success' : 'text-danger'">{{ l.debito_credito }}</span>
                   </td>
                   <td class="text-end fw-bold" :class="l.importe < 0 ? 'text-danger' : ''">$ {{ formatNumber(l.importe) }}</td>
+                  <td class="text-center">
+                    <Link
+                      v-if="l.legajo_id"
+                      :href="urlLiquidacion(l)"
+                      class="lupa-liq"
+                      title="Ir a la liquidación individual de este legajo"
+                    >
+                      <i class="ri-search-line"></i>
+                    </Link>
+                    <span v-else class="text-muted">—</span>
+                  </td>
                 </tr>
                 <tr v-if="!lineasFiltradas.length">
-                  <td colspan="7" class="text-center text-muted py-4">No hay líneas para este concepto</td>
+                  <td colspan="8" class="text-center text-muted py-4">No hay líneas para este concepto</td>
                 </tr>
               </tbody>
               <tfoot v-if="lineasFiltradas.length" class="table-light fw-bold">
                 <tr>
                   <td colspan="6" class="text-end">Total</td>
                   <td class="text-end" :class="totalFiltrado < 0 ? 'text-danger' : ''">$ {{ formatNumber(totalFiltrado) }}</td>
+                  <td></td>
                 </tr>
               </tfoot>
             </table>
@@ -209,5 +230,26 @@ const exportarExcel = () => {
 .lsd-sort-ic {
   font-size: 1rem;
   vertical-align: middle;
+}
+
+.lupa-liq {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 30px;
+  height: 30px;
+  border-radius: 50%;
+  border: 1px solid var(--bs-secondary, #6c757d);
+  color: var(--bs-secondary, #6c757d);
+  background: transparent;
+  text-decoration: none;
+  transition: all .15s ease;
+}
+.lupa-liq:hover,
+.lupa-liq:focus {
+  background: var(--bs-primary, #696cff);
+  border-color: var(--bs-primary, #696cff);
+  color: #fff;
+  outline: none;
 }
 </style>
