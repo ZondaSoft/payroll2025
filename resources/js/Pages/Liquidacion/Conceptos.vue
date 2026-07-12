@@ -376,22 +376,6 @@ const manejarNavegacionDropdown = (evento) => {
     }
 };
 
-// Función para reinicializar el tab-slider de Bootstrap
-const reinitializeTabSlider = () => {
-    nextTick(() => {
-        const navTabs = document.querySelector('.nav-tabs');
-        const activeTab = navTabs?.querySelector('.nav-link.active');
-        const tabSlider = navTabs?.querySelector('.tab-slider');
-
-        if (activeTab && tabSlider) {
-            const left = activeTab.offsetLeft;
-            const width = activeTab.offsetWidth;
-            tabSlider.style.left = left + 'px';
-            tabSlider.style.width = width + 'px';
-        }
-    });
-};
-
 onMounted(() => {
     // Inicializar con los valores de los props
     modoAgregar.value = props.agregar;
@@ -402,9 +386,6 @@ onMounted(() => {
     buscarConceptosArca('').then(() => {
         cargarConceptoSeleccionado();
     });
-    
-    // Reinicializar slider
-    reinitializeTabSlider();
 });
 
 watch(() => props.agregar, () => {
@@ -956,5 +937,16 @@ const moverFocoACodigoDesdeSelect = () => {
 <style scoped>
     .form-control:focus {
         box-shadow: 0 0 0 0.2rem rgba(13, 110, 253, 0.25);
+    }
+
+    /* Subrayado de la pestaña activa por CSS (el slider JS del template no sigue los clicks
+       tras un re-render de Inertia —ej. después de grabar—, así que la pestaña recién
+       activada quedaba sin la raya). Mismo fix que en LiquidacionIndividual.vue. */
+    .nav-tabs .nav-link.active {
+        color: var(--bs-primary, #696cff);
+        border-bottom: 2px solid var(--bs-primary, #696cff) !important;
+    }
+    .tab-slider {
+        display: none;
     }
 </style>

@@ -351,23 +351,22 @@ class ConceptosLiquidacionController extends Controller
             ], 400);
         }
 
-        // Buscar el próximo código disponible
-        $proximoCodigo = Sue102::where('codigo', '>=', $rango->desde)
-            ->where('codigo', '<=', $rango->hasta)
-            ->where('tipo', $tipo)
-            ->orderBy('codigo', 'desc')
-            ->first();
+        // Buscar el primer código libre del rango. El código es único en sue102s sin importar
+        // el tipo, por eso se consideran ocupados todos los códigos del rango numérico.
+        // (Antes se proponía "máximo usado + 1": si el tope del rango ya estaba usado —ej. el
+        // 199 en H— devolvía "sin códigos disponibles" aunque hubiera huecos libres en el medio.)
+        $usados = Sue102::whereBetween('codigo', [$rango->desde, $rango->hasta])
+            ->pluck('codigo')
+            ->map(fn ($c) => (int) $c)
+            ->flip();
 
-        if ($proximoCodigo === null) {
-            // No hay códigos usados, empezar desde el inicio del rango
-            $codigo = $rango->desde;
-        } else {
-            // El próximo disponible es el siguiente al último usado
-            $codigo = $proximoCodigo->codigo + 1;
+        $codigo = (int) $rango->desde;
+        $hasta = (int) $rango->hasta;
+        while ($codigo <= $hasta && isset($usados[$codigo])) {
+            $codigo++;
         }
 
-        // Verificar si el código está dentro del rango
-        if ($codigo > $rango->hasta) {
+        if ($codigo > $hasta) {
             return response()->json([
                 'error' => "No hay más códigos disponibles para el tipo {$tipo}. Rango: {$rango->desde} a {$rango->hasta}"
             ], 400);
