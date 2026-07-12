@@ -88,7 +88,7 @@ class LiquidacionIndividualController extends Controller
         }
 
         if ($legajoId) {
-            $empleado = Sue001::with(['sector', 'jerarquia', 'ccosto', 'convenios', 'obraSijp', 'grupoEmpresario'])->find($legajoId);
+            $empleado = Sue001::with(['sector', 'categorias', 'ccosto', 'convenios', 'obraSijp', 'grupoEmpresario'])->find($legajoId);
         }
 
         if ($empleado && $periodoStr) {

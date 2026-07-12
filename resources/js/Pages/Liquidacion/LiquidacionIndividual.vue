@@ -588,6 +588,11 @@ const confirmarEliminar = async () => {
                                         : '—' }}
                                 </span>
                             </div>
+                            <!-- Categoría -->
+                            <div class="col-6 col-md-3">
+                                <small class="text-muted d-block">Categoría</small>
+                                <span class="fw-semibold">{{ empleado?.categorias?.detalle ?? '—' }}</span>
+                            </div>
                             <!-- Función / Cargo -->
                             <div class="col-6 col-md-3">
                                 <small class="text-muted d-block">Función</small>
@@ -597,11 +602,6 @@ const confirmarEliminar = async () => {
                             <div class="col-6 col-md-3">
                                 <small class="text-muted d-block">Sector</small>
                                 <span class="fw-semibold">{{ empleado?.sector?.detalle ?? '—' }}</span>
-                            </div>
-                            <!-- Jerarquía -->
-                            <div class="col-6 col-md-3">
-                                <small class="text-muted d-block">Jerarquía</small>
-                                <span class="fw-semibold">{{ empleado?.jerarquia?.detalle ?? '—' }}</span>
                             </div>
                             <!-- Obra Social -->
                             <div class="col-6 col-md-2">
