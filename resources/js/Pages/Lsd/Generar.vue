@@ -118,7 +118,6 @@ const generarEmision = async (opts = {}) => {
       router.reload({ only: ['emisiones'] })
 
       const excluidos = response.data.legajos_excluidos
-      const advertencias = response.data.advertencias_aportes
       if (Array.isArray(excluidos) && excluidos.length) {
         // Se generó ignorando legajos con datos SICOSS incompletos: avisar cuáles quedaron afuera.
         Swal.fire({
@@ -129,9 +128,6 @@ const generarEmision = async (opts = {}) => {
                 `Esos legajos <b>no se informan</b> en este LSD. Completá sus datos SICOSS y regenerá si corresponde.`,
           confirmButtonText: 'Entendido',
         })
-      } else if (Array.isArray(advertencias) && advertencias.length) {
-        // El .txt YA se generó. Mostramos las diferencias de aportes como aviso no bloqueante.
-        mostrarAdvertenciaAportes(advertencias)
       } else {
         Swal.fire({
           icon: 'success',
@@ -150,6 +146,9 @@ const generarEmision = async (opts = {}) => {
       mostrarErrorSinArca(data.message, data.sin_arca)
     } else if (data?.tipo_error === 'datos_inconsistentes' && Array.isArray(data?.inconsistencias)) {
       mostrarErrorInconsistencias(data.message, data.inconsistencias)
+    } else if (data?.tipo_error === 'diferencias_aportes' && Array.isArray(data?.diferencias)) {
+      // Control bloqueante POR LIQUIDACIÓN (Normal/SAC/Final por separado): el TXT no se generó.
+      mostrarAdvertenciaAportes(data.diferencias)
     } else {
       const msg = data?.message || error.message || 'Error desconocido'
       Swal.fire({
@@ -280,6 +279,7 @@ const exportarAportesXLSX = (items) => {
     'Legajo': i.legajo,
     'CUIL': i.cuil,
     'Empleado': i.nombre || '',
+    'Tipo liq.': i.tipo_liq || '',
     'Aporte': i.aporte,
     'Alícuota': `${(Number(i.alicuota) * 100).toFixed(2)}%`,
     'Bruto': Number(i.bruto),
@@ -287,15 +287,16 @@ const exportarAportesXLSX = (items) => {
     'Esperado': Number(i.esperado),
     'Informado': Number(i.informado),
     'Diferencia': Number(i.diferencia),
+    'Problema': i.sin_haberes ? 'Aporte sin haberes en la liquidación (bruto $0)' : '',
   }))
 
   const ws = XLSX.utils.json_to_sheet(data)
-  ws['!cols'] = [{ wch: 10 }, { wch: 14 }, { wch: 28 }, { wch: 16 }, { wch: 10 }, { wch: 16 }, { wch: 18 }, { wch: 16 }, { wch: 16 }, { wch: 14 }]
+  ws['!cols'] = [{ wch: 10 }, { wch: 14 }, { wch: 28 }, { wch: 12 }, { wch: 16 }, { wch: 10 }, { wch: 16 }, { wch: 18 }, { wch: 16 }, { wch: 16 }, { wch: 14 }, { wch: 40 }]
 
-  // Formato moneda en columnas F-J (Bruto..Diferencia = índices 5..9)
+  // Formato moneda en columnas Bruto..Diferencia (índices 6..10)
   const range = XLSX.utils.decode_range(ws['!ref'])
   for (let row = range.s.r + 1; row <= range.e.r; row++) {
-    for (const c of [5, 6, 7, 8, 9]) {
+    for (const c of [6, 7, 8, 9, 10]) {
       const ref = XLSX.utils.encode_cell({ c, r: row })
       if (ws[ref]) { ws[ref].t = 'n'; ws[ref].z = '"$"#,##0.00' }
     }
@@ -334,11 +335,15 @@ const ajustarAportes = async (items) => {
 const mostrarAdvertenciaAportes = (items) => {
   const ordenados = [...items]
 
+  // Casos "bruto $0": aporte descontado en una liquidación sin haberes — se resaltan para revisión.
+  const sinHaberes = ordenados.filter(i => i.sin_haberes)
+
   const filas = ordenados.map(i => `
-    <tr>
+    <tr${i.sin_haberes ? ' style="background:#fff3cd;"' : ''}>
       <td style="padding:4px 8px;border:1px solid #dee2e6;font-family:monospace;">${escapeHtml(i.legajo)}</td>
       <td style="padding:4px 8px;border:1px solid #dee2e6;font-family:monospace;">${escapeHtml(i.cuil)}</td>
       <td style="padding:4px 8px;border:1px solid #dee2e6;">${escapeHtml(i.nombre || '—')}</td>
+      <td style="padding:4px 8px;border:1px solid #dee2e6;white-space:nowrap;">${escapeHtml(i.tipo_liq || '—')}${i.sin_haberes ? ' <span title="Aporte descontado en una liquidación sin haberes (bruto $0)">⚠️</span>' : ''}</td>
       <td style="padding:4px 8px;border:1px solid #dee2e6;">${escapeHtml(i.aporte)}</td>
       <td style="padding:4px 8px;border:1px solid #dee2e6;text-align:right;">${escapeHtml(formatMoney(i.bruto))}</td>
       <td style="padding:4px 8px;border:1px solid #dee2e6;text-align:right;">${escapeHtml(formatMoney(i.esperado))}</td>
@@ -346,7 +351,7 @@ const mostrarAdvertenciaAportes = (items) => {
       <td style="padding:4px 8px;border:1px solid #dee2e6;text-align:right;color:#dc3545;font-weight:600;">${escapeHtml(formatMoney(i.diferencia))}</td>
       <td style="padding:4px 8px;border:1px solid #dee2e6;text-align:center;">
         ${i.legajo_id
-          ? `<a href="${route('liquidacion.individual.index', { legajo_id: i.legajo_id, periodo: formulario.periodo_id })}"
+          ? `<a href="${route('liquidacion.individual.index', { legajo_id: i.legajo_id, periodo: formulario.periodo_id, ...(i.tipoliq != null ? { tipoliq: i.tipoliq } : {}) })}"
                 class="lupa-concepto"
                 target="_blank"
                 rel="noopener"
@@ -364,7 +369,12 @@ const mostrarAdvertenciaAportes = (items) => {
       .lupa-concepto:hover,.lupa-concepto:focus{background:var(--bs-primary, #696cff);border-color:var(--bs-primary, #696cff);color:#fff;outline:none;}
     </style>
     <div style="text-align:left;font-size:14px;">
-      <p style="margin-bottom:8px;">El archivo <strong>ya se generó y se descargó</strong>. Se detectaron diferencias entre el aporte descontado y <strong>base × alícuota</strong> (base = mín. entre bruto y tope vigente). Suele deberse a un <strong>tope desactualizado en el liquidador de origen</strong>.</p>
+      <p style="margin-bottom:8px;">El archivo <strong>todavía no se generó</strong>. Se detectaron diferencias entre el aporte descontado y <strong>base × alícuota</strong> (base = mín. entre bruto y tope vigente), controladas <strong>por liquidación</strong> (Normal, SAC y Liq. Final por separado). Suele deberse a un <strong>tope desactualizado en el liquidador de origen</strong>.</p>
+      ${sinHaberes.length ? `
+      <p style="margin-bottom:8px;padding:6px 10px;background:#fff3cd;border:1px solid #ffe69c;border-radius:6px;">
+        ⚠️ <strong>${sinHaberes.length} caso(s)</strong> con aporte descontado en una liquidación <strong>sin haberes (bruto $0)</strong> — resaltados en amarillo.
+        Revisá con la lupa si los haberes quedaron en otra liquidación <strong>antes de "Ajustar valores"</strong> (el ajuste llevaría esos aportes a $0).
+      </p>` : ''}
       <div style="max-height:300px;overflow:auto;">
         <table style="width:100%;border-collapse:collapse;font-size:12px;">
           <thead style="position:sticky;top:0;background:#f8f9fa;">
@@ -372,6 +382,7 @@ const mostrarAdvertenciaAportes = (items) => {
               <th style="padding:6px 8px;border:1px solid #dee2e6;text-align:left;">Legajo</th>
               <th style="padding:6px 8px;border:1px solid #dee2e6;text-align:left;">CUIL</th>
               <th style="padding:6px 8px;border:1px solid #dee2e6;text-align:left;">Empleado</th>
+              <th style="padding:6px 8px;border:1px solid #dee2e6;text-align:left;">Tipo liq.</th>
               <th style="padding:6px 8px;border:1px solid #dee2e6;text-align:left;">Aporte</th>
               <th style="padding:6px 8px;border:1px solid #dee2e6;text-align:right;">Bruto</th>
               <th style="padding:6px 8px;border:1px solid #dee2e6;text-align:right;">Esperado</th>
@@ -388,9 +399,12 @@ const mostrarAdvertenciaAportes = (items) => {
           <i class="ri-file-excel-2-line me-1"></i> Exportar Excel
         </button>
         <div style="display:flex;gap:8px;">
-          <button type="button" id="ap-cerrar" class="btn btn-outline-secondary">Continuar</button>
+          <button type="button" id="ap-cerrar" class="btn btn-outline-secondary">Cancelar</button>
           <button type="button" id="ap-ajustar" class="btn btn-warning">
             <i class="ri-refresh-line me-1"></i> Ajustar valores
+          </button>
+          <button type="button" id="ap-continuar" class="btn btn-primary">
+            Continuar igual
           </button>
         </div>
       </div>
@@ -408,6 +422,11 @@ const mostrarAdvertenciaAportes = (items) => {
       document.getElementById('ap-exportar')?.addEventListener('click', () => exportarAportesXLSX(ordenados))
       document.getElementById('ap-cerrar')?.addEventListener('click', () => Swal.close())
       document.getElementById('ap-ajustar')?.addEventListener('click', () => ajustarAportes(ordenados))
+      // Generar el TXT aceptando las diferencias tal como están (salta solo este control).
+      document.getElementById('ap-continuar')?.addEventListener('click', () => {
+        Swal.close()
+        generarEmision({ ignorar_diferencias_aportes: true })
+      })
     },
   })
 }

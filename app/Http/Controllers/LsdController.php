@@ -309,6 +309,26 @@ class LsdController extends Controller
                     ->all();
             }
 
+            // Pre-check 4: diferencias de aportes (Jubilación/PAMI/OS) vs base × alícuota, controladas
+            // POR LIQUIDACIÓN (Normal, SAC y Final por separado — el liquidador de origen calcula cada
+            // una independiente). Bloqueante: el TXT recién se genera si no hay diferencias, si el
+            // usuario las ajusta ("Ajustar valores") o si decide seguir igual (ignorar_diferencias_aportes).
+            if (!$request->boolean('ignorar_diferencias_aportes')) {
+                $diferenciasAportes = $this->detectarDiferenciasAportes($empresa, $periodoStr, $tiposLiq);
+                if (!empty($diferenciasAportes)) {
+                    return response()->json([
+                        'success' => false,
+                        'tipo_error' => 'diferencias_aportes',
+                        'message' => sprintf(
+                            'Se detectaron %d diferencias entre los aportes descontados y base × alícuota (control por liquidación). ' .
+                            'El archivo todavía no se generó.',
+                            count($diferenciasAportes)
+                        ),
+                        'diferencias' => $diferenciasAportes,
+                    ], 422);
+                }
+            }
+
             // Número de emisión: correlativo ascendente por empresa + período.
             // Solo contamos las emisiones que efectivamente llegaron a ARCA (enviado/confirmado/rechazado).
             // Las que están en borrador/generado son tentativas locales — ARCA no las conoce, no cuentan,
@@ -370,18 +390,14 @@ class LsdController extends Controller
             }
 
             // Devolver JSON con éxito y URL de descarga para que el frontend la procese
+            // (el control de aportes ya corrió como pre-check bloqueante antes de generar).
             $filename = $fileData['filename'];
-
-            // Control NO bloqueante de aportes (Jubilación/PAMI/OS) vs base × alícuota. El .txt ya se generó;
-            // estas diferencias suelen venir de un tope desactualizado en el liquidador de origen.
-            $advertenciasAportes = $this->detectarDiferenciasAportes($empresa, $periodoStr, $tiposLiq);
 
             return response()->json([
                 'success' => true,
                 'message' => 'Emisión generada exitosamente',
                 'download_url' => route('lsd.emision.download', $emision->id),
                 'emision_id' => $emision->id,
-                'advertencias_aportes' => $advertenciasAportes,
                 'legajos_excluidos' => $legajosExcluidos,
             ]);
         } catch (\DomainException $e) {
@@ -711,34 +727,42 @@ class LsdController extends Controller
             'sue001s.jornada_id as jornada_id',
             'sue090s.concepto',
             'sue090s.importe',
+            'sue090s.tipoliq',
             'sue102s.concepto_arca',
         ]);
 
-        // Agrupar por legajo: bruto (Σ H) y aporte descontado por código ARCA.
-        $porLegajo = [];
+        // Agrupar por (legajo, tipoliq): cada liquidación (Normal, SAC, Final) se controla POR SEPARADO,
+        // igual que la calcula el liquidador de origen. Con "(Todas)" evita el falso positivo de comparar
+        // un aporte descontado en una sola liquidación (ej. OS solo en la Normal) contra el bruto sumado
+        // de todas. Con filtro específico hay un único tipoliq y equivale al agrupado por legajo.
+        $nombresTipoLiq = [1 => 'Normal', 2 => '1er. Quincena', 3 => '2da. Quincena', 4 => 'SAC', 5 => 'Liq. Final', 6 => 'DIF.HAB.'];
+        $porGrupo = [];
         foreach ($rows as $row) {
             $leg = (string) $row->legajo;
-            if (!isset($porLegajo[$leg])) {
+            $tipoliqRow = (int) ($row->tipoliq ?? 0);
+            $clave = $leg . '|' . $tipoliqRow;
+            if (!isset($porGrupo[$clave])) {
                 // Empleado = apellido (detalle) + nombres.
                 $nombreCompleto = trim(((string) ($row->apellido ?? '')) . ' ' . ((string) ($row->nombres ?? '')));
-                $porLegajo[$leg] = ['legajo_id' => $row->legajo_id, 'cuil' => $row->cuil, 'nombre' => $nombreCompleto, 'jornada_id' => $row->jornada_id, 'bruto' => 0.0, 'brutoSac' => 0.0, 'aportes' => []];
+                $porGrupo[$clave] = ['legajo' => $leg, 'tipoliq' => $tipoliqRow, 'legajo_id' => $row->legajo_id, 'cuil' => $row->cuil, 'nombre' => $nombreCompleto, 'jornada_id' => $row->jornada_id, 'bruto' => 0.0, 'brutoSac' => 0.0, 'aportes' => []];
             }
             $arca = (string) ($row->concepto_arca ?? '');
             if ($tiporemPorConcepto($row->concepto) === 'H') {
                 $imp = (float) ($row->importe ?? 0);
-                $porLegajo[$leg]['bruto'] += $imp;
+                $porGrupo[$clave]['bruto'] += $imp;
                 // El SAC (concepto ARCA 12xxxx) se topea contra medio tope, aparte del mensual.
                 if (str_starts_with($arca, '12')) {
-                    $porLegajo[$leg]['brutoSac'] += $imp;
+                    $porGrupo[$clave]['brutoSac'] += $imp;
                 }
             }
             if ($arca !== '') {
-                $porLegajo[$leg]['aportes'][$arca] = ($porLegajo[$leg]['aportes'][$arca] ?? 0.0) + abs((float) ($row->importe ?? 0));
+                $porGrupo[$clave]['aportes'][$arca] = ($porGrupo[$clave]['aportes'][$arca] ?? 0.0) + abs((float) ($row->importe ?? 0));
             }
         }
 
         $diferencias = [];
-        foreach ($porLegajo as $leg => $data) {
+        foreach ($porGrupo as $data) {
+            $leg = $data['legajo'];
             $bruto = $data['bruto'];
             // Tope por COMPONENTE en meses con SAC: cada tramo contra su propio techo, sin compensación
             // (min(mensual, tope) + min(SAC, tope/2)). En meses sin SAC, brutoSac=0 → equivale a min(bruto, tope).
@@ -776,6 +800,12 @@ class LsdController extends Controller
                         'legajo_id'  => $data['legajo_id'] !== null ? (int) $data['legajo_id'] : null,
                         'cuil'       => (string) $data['cuil'],
                         'nombre'     => (string) $data['nombre'],
+                        'tipoliq'    => (int) $data['tipoliq'],
+                        'tipo_liq'   => $nombresTipoLiq[(int) $data['tipoliq']] ?? ('Tipo ' . $data['tipoliq']),
+                        // Aporte descontado en una liquidación SIN haberes (bruto $0): dato de origen
+                        // sospechoso (¿haberes cargados en otro tipoliq?). Se resalta para revisar antes
+                        // de ajustar (el ajuste lo llevaría a $0).
+                        'sin_haberes' => $bruto <= 0,
                         'aporte'     => $ap['nombre'],
                         'arca'       => $ap['arca'],
                         'alicuota'   => $ap['alicuota'],
@@ -789,7 +819,7 @@ class LsdController extends Controller
             }
         }
 
-        usort($diferencias, fn($a, $b) => strnatcmp($a['legajo'], $b['legajo']) ?: strcmp($a['aporte'], $b['aporte']));
+        usort($diferencias, fn($a, $b) => strnatcmp($a['legajo'], $b['legajo']) ?: strcmp($a['aporte'], $b['aporte']) ?: ($a['tipoliq'] <=> $b['tipoliq']));
 
         return $diferencias;
     }
@@ -828,11 +858,18 @@ class LsdController extends Controller
             foreach ($diferencias as $dif) {
                 // Filas del aporte (puede haber más de una con el mismo código ARCA): se ajusta la primera
                 // y las demás se ponen en 0, para que la suma del aporte = esperado.
+                // El control es POR LIQUIDACIÓN: cada diferencia trae su tipoliq y el ajuste se limita
+                // a esa liquidación (con "Todas" no debe pisar filas de otro tipoliq del mismo legajo).
+                $tipoliqDif = $dif['tipoliq'] ?? null;
                 $filas = DB::table('sue090s')
                     ->join('sue102s', 'sue090s.concepto', '=', 'sue102s.codigo')
                     ->where('sue090s.legajo', $dif['legajo'])
                     ->where('sue090s.periodo', $periodoStr)
-                    ->when($tiposLiq, fn ($q) => $q->whereIn('sue090s.tipoliq', $tiposLiq))
+                    ->when(
+                        $tipoliqDif !== null,
+                        fn ($q) => $q->where('sue090s.tipoliq', $tipoliqDif),
+                        fn ($q) => $q->when($tiposLiq, fn ($q2) => $q2->whereIn('sue090s.tipoliq', $tiposLiq))
+                    )
                     ->where('sue102s.concepto_arca', $dif['arca'])
                     ->select('sue090s.id', 'sue090s.importe', 'sue090s.concepto', 'sue090s.tipoliq')
                     ->orderBy('sue090s.id')
