@@ -1,15 +1,57 @@
 <script setup>
 import { ref, computed } from 'vue'
-import { Link } from '@inertiajs/vue3'
+import { Link, router } from '@inertiajs/vue3'
+import axios from 'axios'
+import Swal from 'sweetalert2'
 import * as XLSX from 'xlsx'
 
 const props = defineProps({
   emision: Object,
   empresa: Object,
-  concepto: Object,           // { codigo, descripcion }
+  concepto: Object,           // { codigo, descripcion, tipo }
   lineas: { type: Array, default: () => [] },
   total: { type: Number, default: 0 },
+  // Catálogo de conceptos del mismo tipo que el original (para editar el código por línea).
+  conceptosMismoTipo: { type: Array, default: () => [] },
 })
+
+// ---- Modal "Editar código del concepto" (por línea) ----
+const lineaEnEdicion = ref(null)   // línea seleccionada (null = modal cerrado)
+const nuevoCodigo = ref('')
+const grabandoCodigo = ref(false)
+
+const abrirEditarCodigo = (l) => {
+  lineaEnEdicion.value = l
+  nuevoCodigo.value = ''
+}
+const cerrarEditarCodigo = () => { lineaEnEdicion.value = null }
+
+const grabarNuevoCodigo = async () => {
+  if (!nuevoCodigo.value || !lineaEnEdicion.value || grabandoCodigo.value) return
+  grabandoCodigo.value = true
+  try {
+    const response = await axios.post(
+      route('lsd.emision.detalle.concepto.editar_codigo', [props.emision.id, props.concepto.codigo]),
+      { item_id: lineaEnEdicion.value.item_id, nuevo_codigo: nuevoCodigo.value },
+    )
+    cerrarEditarCodigo()
+    await Swal.fire({
+      icon: 'success',
+      title: 'Código actualizado',
+      text: (response.data?.message || '') + ' Regenerá la emisión para que el TXT lo refleje.',
+      timer: 3000,
+      showConfirmButton: false,
+    })
+    router.reload()
+  } catch (error) {
+    const msg = error.response?.data?.message
+      || Object.values(error.response?.data?.errors || {}).flat().join(' ')
+      || error.message
+    Swal.fire({ icon: 'error', title: 'No se pudo actualizar', text: msg, confirmButtonText: 'Cerrar' })
+  } finally {
+    grabandoCodigo.value = false
+  }
+}
 
 // URL a la liquidación individual de la que proviene la línea (legajo + período + tipoliq).
 const urlLiquidacion = (l) => route('liquidacion.individual.index', {
@@ -152,6 +194,7 @@ const exportarExcel = () => {
                   <th class="text-center">D/C</th>
                   <th class="sortable text-end" @click="setSort('importe')">Importe <i :class="sortIcon('importe')"></i></th>
                   <th class="text-center">Ver</th>
+                  <th class="text-center"></th>
                 </tr>
               </thead>
               <tbody>
@@ -176,15 +219,26 @@ const exportarExcel = () => {
                     </Link>
                     <span v-else class="text-muted">—</span>
                   </td>
+                  <td class="text-center">
+                    <button
+                      type="button"
+                      class="lupa-liq"
+                      title="Editar código del concepto"
+                      @click="abrirEditarCodigo(l)"
+                    >
+                      <i class="ri-pencil-line"></i>
+                    </button>
+                  </td>
                 </tr>
                 <tr v-if="!lineasFiltradas.length">
-                  <td colspan="8" class="text-center text-muted py-4">No hay líneas para este concepto</td>
+                  <td colspan="9" class="text-center text-muted py-4">No hay líneas para este concepto</td>
                 </tr>
               </tbody>
               <tfoot v-if="lineasFiltradas.length" class="table-light fw-bold">
                 <tr>
                   <td colspan="6" class="text-end">Total</td>
                   <td class="text-end" :class="totalFiltrado < 0 ? 'text-danger' : ''">$ {{ formatNumber(totalFiltrado) }}</td>
+                  <td></td>
                   <td></td>
                 </tr>
               </tfoot>
@@ -193,6 +247,60 @@ const exportarExcel = () => {
           <div class="d-flex justify-content-start mt-3">
             <button type="button" class="btn btn-success" @click="exportarExcel">
               <i class="ri-file-excel-2-line me-1"></i> Exportar a Excel
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Modal: editar código del concepto de una línea -->
+    <div v-if="lineaEnEdicion" class="lsd-modal-backdrop" @click.self="cerrarEditarCodigo">
+      <div class="lsd-modal-card">
+        <div class="lsd-modal-header">
+          <div>
+            <h5 class="mb-1">Editar código del concepto</h5>
+            <small class="text-muted">
+              Legajo {{ lineaEnEdicion.legajo }} · {{ lineaEnEdicion.nombre || '—' }} · {{ lineaEnEdicion.tipo_liq }}
+            </small>
+          </div>
+          <button type="button" class="btn-close" @click="cerrarEditarCodigo"></button>
+        </div>
+
+        <div class="lsd-modal-body">
+          <div class="mb-4">
+            <label class="form-label mb-1">Código actual</label>
+            <p class="fw-semibold mb-0">{{ concepto?.codigo }} — {{ concepto?.descripcion || 'Sin descripción' }}</p>
+          </div>
+
+          <div class="mb-2">
+            <label for="nuevo_codigo" class="form-label mb-1">Nuevo código</label>
+            <select id="nuevo_codigo" v-model="nuevoCodigo" class="form-select">
+              <option value="" disabled>Seleccionar nuevo código...</option>
+              <option v-for="c in conceptosMismoTipo" :key="c.codigo" :value="c.codigo">
+                {{ c.codigo }} - {{ c.detalle }}
+              </option>
+            </select>
+            <small class="text-muted">
+              Solo conceptos del mismo tipo ({{ concepto?.tipo || '—' }}). El cambio impacta en la
+              liquidación de origen; regenerá la emisión para que el TXT lo refleje.
+            </small>
+          </div>
+        </div>
+
+        <div class="lsd-modal-footer">
+          <div class="d-flex justify-content-end gap-2">
+            <button type="button" class="btn btn-outline-secondary" @click="cerrarEditarCodigo">Cancelar</button>
+            <button
+              type="button"
+              class="btn btn-primary"
+              :disabled="!nuevoCodigo || grabandoCodigo"
+              @click="grabarNuevoCodigo"
+            >
+              <span v-if="!grabandoCodigo">Grabar</span>
+              <span v-else>
+                <span class="spinner-border spinner-border-sm me-2" role="status" aria-hidden="true"></span>
+                Grabando...
+              </span>
             </button>
           </div>
         </div>
@@ -251,5 +359,41 @@ const exportarExcel = () => {
   border-color: var(--bs-primary, #696cff);
   color: #fff;
   outline: none;
+}
+
+/* Modal (mismo estilo que los modales del detalle de emisión) */
+.lsd-modal-backdrop {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, .5);
+  display: flex;
+  align-items: flex-start;
+  justify-content: center;
+  z-index: 99999;
+  padding: 3rem 1rem;
+  overflow-y: auto;
+}
+.lsd-modal-card {
+  background: var(--bs-card-bg, #fff);
+  border-radius: .5rem;
+  width: 100%;
+  max-width: 560px;
+  box-shadow: 0 .5rem 2rem rgba(0, 0, 0, .25);
+}
+.lsd-modal-header,
+.lsd-modal-footer {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 1rem 1.5rem;
+  border-bottom: 1px solid var(--bs-border-color, #e0e0e0);
+}
+.lsd-modal-footer {
+  border-bottom: none;
+  border-top: 1px solid var(--bs-border-color, #e0e0e0);
+  justify-content: flex-end;
+}
+.lsd-modal-body {
+  padding: 1.25rem 1.5rem;
 }
 </style>

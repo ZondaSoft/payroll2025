@@ -1987,6 +1987,7 @@ class LsdController extends Controller
             $total += $monto;
 
             $lineas[] = [
+                'item_id' => $it->id,
                 'legajo' => $it->legajo,
                 'legajo_id' => ($emp && $emp->id !== null) ? (int) $emp->id : null,
                 'cuil' => (string) $it->cuil,
@@ -1999,14 +2000,106 @@ class LsdController extends Controller
             ];
         }
 
-        $descripcion = DB::table('sue102s')->where('codigo', $concepto)->value('detalle') ?? '';
+        $conceptoCatalogo = DB::table('sue102s')->where('codigo', $concepto)->first(['detalle', 'tipo']);
+        $descripcion = $conceptoCatalogo->detalle ?? '';
+        $tipoConcepto = $conceptoCatalogo->tipo ?? null;
+
+        // Catálogo de conceptos del mismo tipo (para "Editar código del concepto" por línea).
+        $conceptosMismoTipo = $tipoConcepto
+            ? DB::table('sue102s')
+                ->where('tipo', $tipoConcepto)
+                ->where('codigo', '!=', (int) $concepto)
+                ->orderBy('codigo')
+                ->get(['codigo', 'detalle'])
+            : collect();
 
         return Inertia::render('Lsd/DetalleConcepto', [
             'emision' => $emision,
             'empresa' => $empresa,
-            'concepto' => ['codigo' => (string) $concepto, 'descripcion' => $descripcion],
+            'concepto' => ['codigo' => (string) $concepto, 'descripcion' => $descripcion, 'tipo' => $tipoConcepto],
             'lineas' => $lineas,
             'total' => round($total, 2),
+            'conceptosMismoTipo' => $conceptosMismoTipo,
+        ]);
+    }
+
+    /**
+     * Cambia el código de concepto de UNA línea de la emisión: actualiza la fila de origen en
+     * sue090s (la fuente de la liquidación), el lsd_item para que el detalle quede consistente,
+     * y asienta el cambio en liquidacion_correcciones. El TXT ya emitido no se toca: hay que
+     * regenerar la emisión para que lo refleje. Solo se admite un código del mismo tipo.
+     */
+    public function editarCodigoConcepto(Request $request, $id, $concepto)
+    {
+        $request->validate([
+            'item_id' => 'required|exists:lsd_items,id',
+            'nuevo_codigo' => 'required|exists:sue102s,codigo',
+        ], [
+            'item_id.required' => 'Falta la línea a editar.',
+            'nuevo_codigo.required' => 'Seleccioná el nuevo código.',
+            'nuevo_codigo.exists' => 'El nuevo código no existe en el catálogo de conceptos.',
+        ]);
+
+        $emision = LsdEmision::findOrFail($id);
+        $item = LsdItem::where('id', $request->item_id)
+            ->where('lsd_emision_id', $emision->id)
+            ->where('codigo_concepto', $concepto)
+            ->first();
+
+        if (!$item) {
+            return response()->json(['success' => false, 'message' => 'La línea no pertenece a esta emisión/concepto.'], 404);
+        }
+
+        $nuevoCodigo = (int) $request->nuevo_codigo;
+        if ($nuevoCodigo === (int) $concepto) {
+            return response()->json(['success' => false, 'message' => 'El nuevo código es igual al actual.'], 422);
+        }
+
+        $tipoOriginal = DB::table('sue102s')->where('codigo', $concepto)->value('tipo');
+        $conceptoNuevo = DB::table('sue102s')->where('codigo', $nuevoCodigo)->first(['detalle', 'tipo', 'concepto_arca']);
+        if (!$tipoOriginal || !$conceptoNuevo || trim((string) $conceptoNuevo->tipo) !== trim((string) $tipoOriginal)) {
+            return response()->json(['success' => false, 'message' => "El nuevo código debe ser del mismo tipo ({$tipoOriginal}) que el concepto original."], 422);
+        }
+
+        // Fila de origen en sue090s: por período/legajo/concepto (+tipoliq si se conoce),
+        // priorizando la que coincide en importe si hubiera más de una.
+        $filaQuery = DB::table('sue090s')
+            ->where('periodo', $emision->periodo)
+            ->where('legajo', $item->legajo)
+            ->where('concepto', $concepto)
+            ->when($item->tipoliq !== null, fn ($q) => $q->where('tipoliq', $item->tipoliq));
+
+        $fila = (clone $filaQuery)->where('importe', $item->importe)->orderBy('id')->first()
+            ?? $filaQuery->orderBy('id')->first();
+
+        if (!$fila) {
+            return response()->json(['success' => false, 'message' => 'No se encontró la línea en la liquidación de origen (sue090s). Puede haber sido modificada o eliminada después de generar la emisión.'], 404);
+        }
+
+        $descOriginal = DB::table('sue102s')->where('codigo', $concepto)->value('detalle') ?? '';
+
+        DB::transaction(function () use ($fila, $item, $emision, $concepto, $nuevoCodigo, $conceptoNuevo, $descOriginal) {
+            DB::table('sue090s')->where('id', $fila->id)->update(['concepto' => $nuevoCodigo]);
+            $item->update(['codigo_concepto' => $nuevoCodigo]);
+
+            LiquidacionCorreccion::registrar([
+                'periodo'          => $emision->periodo,
+                'tipoliq'          => $fila->tipoliq ?? null,
+                'legajo'           => (string) $item->legajo,
+                'cuil'             => $item->cuil,
+                'concepto'         => (string) $nuevoCodigo,
+                'concepto_arca'    => $conceptoNuevo->concepto_arca ?? null,
+                'sue090_id'        => $fila->id,
+                'importe_anterior' => (float) $fila->importe,
+                'importe_nuevo'    => (float) $fila->importe,
+                'motivo'           => "Código de concepto: {$concepto} ({$descOriginal}) → {$nuevoCodigo} ({$conceptoNuevo->detalle}) (edición desde detalle LSD, emisión #{$emision->numero_emision})",
+                'origen'           => 'edicion_codigo_lsd',
+            ]);
+        });
+
+        return response()->json([
+            'success' => true,
+            'message' => "Línea del legajo {$item->legajo} movida al concepto {$nuevoCodigo}.",
         ]);
     }
 

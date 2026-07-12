@@ -325,6 +325,7 @@ Route::middleware('auth')->group(function () {
         Route::post('/ajustar-aportes', [LsdController::class, 'ajustarAportes'])->name('ajustar.aportes');
         Route::get('/emision/{id}/detalle', [LsdController::class, 'detalle'])->name('emision.detalle');
         Route::get('/emision/{id}/detalle/{concepto}', [LsdController::class, 'detalleConcepto'])->name('emision.detalle.concepto');
+        Route::post('/emision/{id}/detalle/{concepto}/editar-codigo', [LsdController::class, 'editarCodigoConcepto'])->name('emision.detalle.concepto.editar_codigo');
         Route::get('/emision/{id}/download', [LsdController::class, 'download'])->name('emision.download');
         Route::get('/emision/{id}', [LsdController::class, 'obtenerEmision'])->name('emision');
         Route::put('/emision/{id}/estado', [LsdController::class, 'actualizarEstado'])->name('emision.estado');
