@@ -95,6 +95,19 @@ class LiquidacionIndividualController extends Controller
             $conceptos = $this->cargarConceptos($empleado, $periodoStr, $tipoliq);
         }
 
+        // Pares "periodo|tipoliq" con liquidación en sue090s para el legajo seleccionado:
+        // el selector de períodos del frontend se limita a estas opciones.
+        $periodosLegajo = [];
+        if ($empleado) {
+            $periodosLegajo = DB::table('sue090s')
+                ->where('legajo', $empleado->codigo)
+                ->distinct()
+                ->get(['periodo', 'tipoliq'])
+                ->map(fn ($r) => $r->periodo . '|' . $r->tipoliq)
+                ->values()
+                ->all();
+        }
+
         return Inertia::render('Liquidacion/LiquidacionIndividual', [
             'empleado'   => $empleado,
             'conceptos'  => $conceptos,
@@ -102,6 +115,7 @@ class LiquidacionIndividualController extends Controller
             'empresa'    => $empresa,
             'legajos'    => $legajos,
             'periodos'   => $periodos,
+            'periodosLegajo' => $periodosLegajo,
             'legajoId'   => $legajoId ? (int) $legajoId : null,
             'tipoliq'    => $tipoliq,
             'ajustesTipos' => $ajustesTipos,

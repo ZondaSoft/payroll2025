@@ -32,6 +32,11 @@ const props = defineProps({
         type: Array,
         default: () => [],
     },
+    // Pares "periodo|tipoliq" con liquidación en sue090s para el legajo seleccionado.
+    periodosLegajo: {
+        type: Array,
+        default: () => [],
+    },
     tipoliq: {
         type: [Number, String, null],
         default: null,
@@ -295,6 +300,14 @@ watch(filtrarPeriodosActivo, () => {
     recargarLegajos();
 });
 
+// Con un legajo seleccionado, el selector de períodos solo ofrece los períodos donde ese
+// legajo tiene liquidación (periodosLegajo). Sin legajo seleccionado se muestran todos.
+const periodosDisponibles = computed(() => {
+    if (!selectedLegajoId.value) return props.periodos;
+    const delLegajo = new Set(props.periodosLegajo || []);
+    return props.periodos.filter(p => delLegajo.has(`${p.periodo}|${p.tipoliq ?? ''}`));
+});
+
 const buscar = () => {
     const [periodoSeleccionado, tipoliqSeleccionado] = String(selectedPeriodoKey.value || '').split('|');
 
@@ -525,7 +538,7 @@ const confirmarEliminar = async () => {
                                 </label>
                                 <select class="form-select" style="font-size: 0.75rem; max-height: 39px;" v-model="selectedPeriodoKey">
                                     <option value="">— Seleccionar período —</option>
-                                    <option v-for="per in periodos" :key="per.id" :value="`${per.periodo}|${per.tipoliq ?? ''}`">
+                                    <option v-for="per in periodosDisponibles" :key="per.id" :value="`${per.periodo}|${per.tipoliq ?? ''}`">
                                         {{ formatPeriodoConTipo(per) }}
                                     </option>
                                 </select>
