@@ -409,6 +409,24 @@ onMounted(() => {
                 window.bootstrap.Tab.getOrCreateInstance(btn).show();
             }
         }, 0);
+
+        // Precarga de defaults para acelerar la corrección: solo los campos SICOSS que están
+        // vacíos toman el valor habitual del cliente. Nada se graba hasta pulsar Actualizar.
+        // Situación 1 (Activo), Condición 1 (Serv. Comunes >18), Actividad 49 (No clasificadas),
+        // Modalidad 8 (Tiempo completo indeterminado), Siniestrado 0 (No siniestrado), Zona 61.
+        const defaultsSicoss = [
+            ['sicoss_situa', 1, true],
+            ['sicoss_condi', 1, true],
+            ['sicoss_activ', 49, true],
+            ['sicoss_modal', 8, true],
+            ['sicoss_sini', 0, false], // 0 = "No siniestrado" es un valor válido: solo se completa si está vacío
+            ['sicoss_zona', 61, true],
+        ];
+        for (const [campo, valorDefault, zeroBlank] of defaultsSicoss) {
+            if (esBlankSicoss(form[campo], zeroBlank)) {
+                form[campo] = valorDefault;
+            }
+        }
     }
 });
 
