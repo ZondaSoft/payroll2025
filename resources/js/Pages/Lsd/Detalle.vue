@@ -393,6 +393,7 @@ const exportarResumenExcel = () => {
                     <th class="text-end">Importes totales</th>
                     <th class="text-end">Importe período actual</th>
                     <th class="text-end">Importe otros períodos</th>
+                    <th class="text-center"></th>
                   </tr>
                 </thead>
                 <tbody>
@@ -402,9 +403,18 @@ const exportarResumenExcel = () => {
                     <td class="text-end" :class="c.total < 0 ? 'text-danger' : ''">$ {{ formatNumber(c.total) }}</td>
                     <td class="text-end" :class="c.actual < 0 ? 'text-danger' : ''">$ {{ formatNumber(c.actual) }}</td>
                     <td class="text-end" :class="c.otros < 0 ? 'text-danger' : ''">$ {{ formatNumber(c.otros) }}</td>
+                    <td class="text-center">
+                      <a
+                        :href="route('lsd.emision.detalle.concepto', [emision.id, c.codigo])"
+                        class="lupa-detalle"
+                        title="Ver líneas que conforman el total de este concepto"
+                      >
+                        <i class="ri-search-line"></i>
+                      </a>
+                    </td>
                   </tr>
                   <tr v-if="!(resumenLiq?.conceptos || []).length">
-                    <td colspan="5" class="text-center text-muted py-3">Sin conceptos</td>
+                    <td colspan="6" class="text-center text-muted py-3">Sin conceptos</td>
                   </tr>
                 </tbody>
               </table>

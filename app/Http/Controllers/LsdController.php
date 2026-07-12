@@ -1934,6 +1934,81 @@ class LsdController extends Controller
     }
 
     /**
+     * Detalle de un concepto dentro de una emisión: las líneas (lsd_items) que
+     * conforman el total de ese concepto, con legajo, apellido y nombre y tipo
+     * de liquidación por línea.
+     */
+    public function detalleConcepto($id, $concepto)
+    {
+        $emision = LsdEmision::findOrFail($id);
+        $empresa = Sue086::find($emision->id_empresa);
+
+        $items = LsdItem::where('lsd_emision_id', $emision->id)
+            ->where('codigo_concepto', $concepto)
+            ->orderBy('legajo')
+            ->get();
+
+        // Apellido y nombre por CUIL (apellido = detalle, nombre = nombres), como en detalle().
+        $codEmpresa = $empresa->codigo ?? null;
+        $empleados = DB::table('sue001s')
+            ->when($codEmpresa, fn ($q) => $q->where('grupo_emp', $codEmpresa))
+            ->get(['codigo', 'cuil', 'detalle', 'nombres'])
+            ->keyBy('cuil');
+
+        $tiposLiq = [1 => 'Normal', 2 => '1er. Quincena', 3 => '2da. Quincena', 4 => 'SAC', 5 => 'Liq. Final', 6 => 'DIF.HAB.'];
+
+        // Fallback para items de emisiones previas a lsd_items.tipoliq:
+        //   1) si la emisión se generó con un filtro específico, todas las líneas son de ese tipo;
+        //   2) si no, se busca en sue090s por (periodo, concepto, legajo) — si el legajo tiene un
+        //      único tipoliq para ese concepto, se usa; con más de uno queda indeterminado (null).
+        $tipoliqFiltroEspecifico = ($emision->tipoliq_filtro !== null && $emision->tipoliq_filtro !== '' && $emision->tipoliq_filtro !== 'todas')
+            ? (int) $emision->tipoliq_filtro
+            : null;
+
+        $tipoliqPorLegajo = [];
+        if ($items->contains(fn ($it) => $it->tipoliq === null) && $tipoliqFiltroEspecifico === null) {
+            $tipoliqPorLegajo = DB::table('sue090s')
+                ->where('periodo', $emision->periodo)
+                ->where('concepto', $concepto)
+                ->get(['legajo', 'tipoliq'])
+                ->groupBy('legajo')
+                ->map(fn ($g) => $g->pluck('tipoliq')->unique()->count() === 1 ? (int) $g->first()->tipoliq : null);
+        }
+
+        $lineas = [];
+        $total = 0.0;
+        foreach ($items as $it) {
+            $tipoliq = $it->tipoliq
+                ?? $tipoliqFiltroEspecifico
+                ?? ($tipoliqPorLegajo[$it->legajo] ?? null);
+            $emp = $empleados[$it->cuil] ?? null;
+            // Mismo criterio de signo que el resumen de liquidación: crédito suma, débito resta.
+            $monto = (($it->debito_credito === 'C') ? 1 : -1) * abs((float) $it->importe);
+            $total += $monto;
+
+            $lineas[] = [
+                'legajo' => $it->legajo,
+                'cuil' => (string) $it->cuil,
+                'nombre' => $emp ? trim(((string) ($emp->detalle ?? '')) . ' ' . ((string) ($emp->nombres ?? ''))) : '',
+                'tipo_liq' => $tipoliq !== null ? ($tiposLiq[(int) $tipoliq] ?? ('Tipo ' . $tipoliq)) : '—',
+                'cantidad' => (float) $it->cantidad,
+                'importe' => $monto,
+                'debito_credito' => $it->debito_credito,
+            ];
+        }
+
+        $descripcion = DB::table('sue102s')->where('codigo', $concepto)->value('detalle') ?? '';
+
+        return Inertia::render('Lsd/DetalleConcepto', [
+            'emision' => $emision,
+            'empresa' => $empresa,
+            'concepto' => ['codigo' => (string) $concepto, 'descripcion' => $descripcion],
+            'lineas' => $lineas,
+            'total' => round($total, 2),
+        ]);
+    }
+
+    /**
      * Cuenta los registros del TXT por tipo (01-05) y devuelve la letra de tipo de liquidación del Reg 01.
      */
     private function contarRegistros(?string $path): array
