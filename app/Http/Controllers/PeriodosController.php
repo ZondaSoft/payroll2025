@@ -4,6 +4,7 @@ namespace App\Http\Controllers;
 
 use App\Models\Sue100;
 use Illuminate\Http\Request;
+use Illuminate\Validation\Rule;
 use Inertia\Inertia;
 
 class PeriodosController extends Controller
@@ -67,7 +68,10 @@ class PeriodosController extends Controller
     public function store(Request $request)
     {
         $validated = $request->validate([
-            'periodo'        => 'required|string|max:6|unique:sue100s,periodo',
+            // Único por (período, tipoliq): un mismo mes admite Normal + SAC + Liq. Final,
+            // pero no dos encabezados del mismo tipo (duplicaba el selector de períodos).
+            'periodo'        => ['required', 'string', 'max:6',
+                Rule::unique('sue100s', 'periodo')->where(fn ($q) => $q->where('tipoliq', (int) $request->input('tipoliq')))],
             'tipoliq'        => 'required|integer|in:1,2,3,4,5',
             'fecha'          => 'required|date',
             'fecha_pago'     => 'nullable|date',
@@ -78,7 +82,7 @@ class PeriodosController extends Controller
             'estado'         => 'nullable|string|max:20',
         ], [
             'periodo.required' => 'El período es obligatorio.',
-            'periodo.unique'   => 'Ya existe un período con ese código.',
+            'periodo.unique'   => 'Ya existe un período con ese código y tipo de liquidación.',
             'tipoliq.required' => 'El tipo de liquidación es obligatorio.',
             'tipoliq.in'       => 'El tipo de liquidación debe ser uno de los valores válidos.',
             'fecha.required'   => 'La fecha es obligatoria.',
@@ -124,7 +128,9 @@ class PeriodosController extends Controller
     public function update(Request $request, Sue100 $periodo)
     {
         $validated = $request->validate([
-            'periodo'        => 'required|string|max:6|unique:sue100s,periodo,' . $periodo->id,
+            // Único por (período, tipoliq), ignorando el propio registro al editar.
+            'periodo'        => ['required', 'string', 'max:6',
+                Rule::unique('sue100s', 'periodo')->where(fn ($q) => $q->where('tipoliq', (int) $request->input('tipoliq')))->ignore($periodo->id)],
             'tipoliq'        => 'required|integer|in:1,2,3,4,5',
             'fecha'          => 'required|date',
             'fecha_pago'     => 'nullable|date',
@@ -135,7 +141,7 @@ class PeriodosController extends Controller
             'estado'         => 'nullable|string|max:20',
         ], [
             'periodo.required' => 'El período es obligatorio.',
-            'periodo.unique'   => 'Ya existe un período con ese código.',
+            'periodo.unique'   => 'Ya existe un período con ese código y tipo de liquidación.',
             'tipoliq.required' => 'El tipo de liquidación es obligatorio.',
             'tipoliq.in'       => 'El tipo de liquidación debe ser uno de los valores válidos.',
             'fecha.required'   => 'La fecha es obligatoria.',
