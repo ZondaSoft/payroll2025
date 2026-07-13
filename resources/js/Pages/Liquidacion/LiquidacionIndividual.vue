@@ -383,6 +383,16 @@ const formatPeriodoConTipo = (periodoObj) => {
     return tipo ? `${periodoFmt} - ${tipo}` : periodoFmt;
 };
 
+// Vista de lista del período seleccionado (una fila por legajo con su neto).
+const abrirVistaLista = () => {
+    const [periodoSel, tipoliqSel] = String(selectedPeriodoKey.value || '').split('|');
+    const periodoDestino = periodoSel || props.periodo;
+    if (!periodoDestino) return;
+    router.get(route('liquidacion.individual.lista', periodoDestino), {
+        ...(tipoliqSel ? { tipoliq: tipoliqSel } : {}),
+    });
+};
+
 // Totales calculados
 const totales = computed(() => {
     return conceptosLocal.value.reduce(
@@ -449,10 +459,18 @@ const confirmarEliminar = async () => {
 
         <!-- HEAD Y BOTONES -->
         <div class="row mb-4">
-            <div class="col">
+            <div class="col d-flex align-items-center justify-content-between">
                 <h4 class="fw-bold mb-0">
                     <span class="text-muted fw-light">Liquidación /</span> Recibo Individual
                 </h4>
+                <button
+                    type="button"
+                    class="btn rounded-pill btn-outline-info waves-effect"
+                    title="Ver la liquidación del período como lista"
+                    @click="abrirVistaLista"
+                >
+                    <i class="ri-table-line me-1"></i> Vista de lista
+                </button>
             </div>
         </div>
 

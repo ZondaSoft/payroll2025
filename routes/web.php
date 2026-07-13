@@ -465,6 +465,10 @@ Route::middleware('auth')->group(function () {
     //---------------------------------------------
     Route::get('liquidacion/individual', [LiquidacionIndividualController::class, 'index'])
         ->name('liquidacion.individual.index');
+    Route::get('liquidacion/individual/lista/{periodo}', [LiquidacionIndividualController::class, 'lista'])
+        ->name('liquidacion.individual.lista');
+    Route::get('liquidacion/individual/lista/{periodo}/pdf', [LiquidacionIndividualController::class, 'listaPdf'])
+        ->name('liquidacion.individual.lista.pdf');
     Route::delete('liquidacion/individual/eliminar', [LiquidacionIndividualController::class, 'eliminar'])
         ->name('liquidacion.individual.eliminar');
     Route::post('liquidacion/individual/actualizar-concepto', [LiquidacionIndividualController::class, 'actualizarConcepto'])

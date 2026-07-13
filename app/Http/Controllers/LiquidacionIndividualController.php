@@ -22,7 +22,12 @@ class LiquidacionIndividualController extends Controller
         $ajustesTipos = Sue102::normalizarTiposNumericos();
 
         $empresa  = Datoempr::first();
-        $periodos = Sue100::orderBy('periodo', 'desc')->orderBy('tipoliq', 'asc')->get(['id', 'periodo', 'tipoliq']);
+        // Un período por (periodo, tipoliq): si hubiera encabezados duplicados en sue100s se
+        // queda con el más reciente (id más alto), para que el selector no repita opciones.
+        $periodos = Sue100::orderBy('periodo', 'desc')->orderBy('tipoliq', 'asc')->orderBy('id', 'desc')
+            ->get(['id', 'periodo', 'tipoliq'])
+            ->unique(fn ($p) => $p->periodo . '|' . $p->tipoliq)
+            ->values();
         $periodoActual = $periodos->first()?->periodo;
         $tipoliqActual = $periodos->first()?->tipoliq;
         $periodoStr = $request->get('periodo', '');
@@ -121,6 +126,112 @@ class LiquidacionIndividualController extends Controller
             'ajustesTipos' => $ajustesTipos,
             'historial'  => $this->cargarHistorial($empleado, $periodoStr, $tipoliq),
         ]);
+    }
+
+    /**
+     * Vista de lista de la liquidación de un período: una fila por legajo con su neto a pagar
+     * (misma clasificación y fórmula que el recibo: haberes − retenciones + asignaciones + no rem.).
+     */
+    public function lista(Request $request, string $periodo)
+    {
+        $tipoliq = $request->filled('tipoliq') ? (int) $request->get('tipoliq') : null;
+
+        $empresa = Datoempr::first();
+        $periodoRow = Sue100::where('periodo', $periodo)
+            ->when($tipoliq !== null, fn ($q) => $q->where('tipoliq', $tipoliq))
+            ->first();
+
+        return Inertia::render('Liquidacion/ListaIndividual', [
+            'periodo' => $periodo,
+            'tipoliq' => $tipoliq,
+            'tipoLiqNombre' => $tipoliq !== null ? (self::TIPOS_LIQ[$tipoliq] ?? ('Tipo ' . $tipoliq)) : 'Todas',
+            'fechaPago' => $periodoRow?->fecha_pago ? substr((string) $periodoRow->fecha_pago, 0, 10) : null,
+            'empresa' => $empresa,
+            'lineas' => $this->resumenPorLegajo($periodo, $tipoliq),
+        ]);
+    }
+
+    /**
+     * Exporta la vista de lista a PDF (dompdf, se abre inline en otra pestaña).
+     */
+    public function listaPdf(Request $request, string $periodo)
+    {
+        $tipoliq = $request->filled('tipoliq') ? (int) $request->get('tipoliq') : null;
+        $lineas = $this->resumenPorLegajo($periodo, $tipoliq);
+
+        $pdf = \Barryvdh\DomPDF\Facade\Pdf::loadView('liquidacion.lista_pdf', [
+            'periodo' => $periodo,
+            'periodoFmt' => strlen($periodo) >= 6 ? substr($periodo, 0, 4) . '/' . substr($periodo, 4, 2) : $periodo,
+            'tipoLiqNombre' => $tipoliq !== null ? (self::TIPOS_LIQ[$tipoliq] ?? ('Tipo ' . $tipoliq)) : 'Todas',
+            'empresa' => Datoempr::first(),
+            'lineas' => $lineas,
+            'totalNeto' => round(array_sum(array_column($lineas, 'neto')), 2),
+        ])->setPaper('a4', 'portrait');
+
+        return $pdf->stream("liquidacion_lista_{$periodo}.pdf");
+    }
+
+    /** Nombres de tipo de liquidación (Mapa A, el que rige el LSD). */
+    private const TIPOS_LIQ = [1 => 'Normal', 2 => '1er. Quincena', 3 => '2da. Quincena', 4 => 'SAC', 5 => 'Liq. Final', 6 => 'DIF.HAB.'];
+
+    /**
+     * Una fila por legajo con liquidación en (período, tipoliq): datos del empleado
+     * (foto, convenio, categoría) y neto a pagar con la clasificación del recibo.
+     */
+    private function resumenPorLegajo(string $periodoStr, ?int $tipoliq): array
+    {
+        $rangos = DB::table('sue089s')->get();
+        $tiporemPorRango = function ($concepto) use ($rangos): ?string {
+            foreach ($rangos as $r) {
+                if ($concepto >= $r->desde && $concepto <= $r->hasta) {
+                    return strtoupper(trim((string) $r->tiporem));
+                }
+            }
+            return null;
+        };
+
+        $rows = DB::table('sue090s')
+            ->leftJoin('sue102s', 'sue090s.concepto', '=', 'sue102s.codigo')
+            ->where('sue090s.periodo', $periodoStr)
+            ->when($tipoliq !== null, fn ($q) => $q->where('sue090s.tipoliq', $tipoliq))
+            ->get(['sue090s.legajo', 'sue090s.concepto', 'sue090s.importe', 'sue102s.tipo']);
+
+        if ($rows->isEmpty()) {
+            return [];
+        }
+
+        // Neto por legajo con la misma clasificación del recibo (tipo de sue102s, fallback rango sue089s).
+        $netos = [];
+        foreach ($rows as $row) {
+            $tipo = trim((string) ($row->tipo ?? '')) ?: ($tiporemPorRango($row->concepto) ?? '');
+            $importe = abs((float) ($row->importe ?? 0));
+            $leg = (string) $row->legajo;
+            $netos[$leg] = ($netos[$leg] ?? 0.0) + ($tipo === 'D' ? -$importe : $importe);
+        }
+
+        // Datos del empleado: foto, apellido y nombre, convenio y categoría.
+        $empleados = Sue001::with(['convenios', 'categorias'])
+            ->whereIn('codigo', array_keys($netos))
+            ->get()
+            ->keyBy('codigo');
+
+        $lineas = [];
+        foreach ($netos as $leg => $neto) {
+            $emp = $empleados[$leg] ?? null;
+            $lineas[] = [
+                'legajo' => $leg,
+                'legajo_id' => $emp?->id,
+                'nombre' => $emp ? trim(((string) ($emp->detalle ?? '')) . ' ' . ((string) ($emp->nombres ?? ''))) : '',
+                'foto_url' => $emp?->foto_url ?? '',
+                'convenio' => $emp?->convenios?->detalle ?? '',
+                'categoria' => $emp?->categorias?->detalle ?? '',
+                'neto' => round($neto, 2),
+            ];
+        }
+
+        usort($lineas, fn ($a, $b) => strnatcmp($a['legajo'], $b['legajo']));
+
+        return $lineas;
     }
 
     /**
