@@ -5,7 +5,7 @@
 import TextInput from '@/Components/TextInput.vue';
 import InputError from '@/Components/InputError.vue';
 import FloatMultiselect from '@/Components/FloatMultiselect.vue';
-import { Link, useForm, usePage } from '@inertiajs/vue3';
+import { Link, router, useForm, usePage } from '@inertiajs/vue3';
 import { reactive, ref, onMounted, watch, computed } from 'vue';
 import { PAISES } from '@/Data/paises';
 import Swal from 'sweetalert2';
@@ -348,14 +348,9 @@ const submit = () => {
         ruta = 'legajos.add';
 
         form.put(route(ruta), {
-            onSuccess: (response) => {
-                // Manejar el éxito (por ejemplo, limpiar el formulario, mostrar un mensaje, etc.)
-
-                //alert(response)
-
-                //console.log(form);
-
-                //console.log(response.data);
+            onSuccess: () => {
+                // Los datos ya quedaron grabados: el aviso de defaults precargados no aplica más.
+                defaultsSicossAplicados.value = false;
             },
             onError: () => {
                 goToFirstErrorTab();
@@ -364,7 +359,10 @@ const submit = () => {
     } else {
         form.patch(route(ruta, form.id), {
             preserveScroll: true,
-            onSuccess: () => {},
+            onSuccess: () => {
+                // Los datos ya quedaron grabados: el aviso de defaults precargados no aplica más.
+                defaultsSicossAplicados.value = false;
+            },
             onError: (errors) => {
                 console.log('Errores de validación:', errors);
                 goToFirstErrorTab();
@@ -400,6 +398,16 @@ const setFocus = () => {
 // Se completó al menos un campo SICOSS con los defaults al entrar por #sicoss:
 // muestra el cartel informativo junto a "Situación de revista".
 const defaultsSicossAplicados = ref(false);
+
+// El usuario pulsó Cancelar: ambos botones quedan grises/deshabilitados y Cancelar
+// muestra el spinner mientras navega de vuelta al índice.
+const cancelando = ref(false);
+
+const cancelar = () => {
+    if (cancelando.value || form.processing) return;
+    cancelando.value = true;
+    router.get(route('legajos.index'));
+};
 
 // Establecer el foco al montar el componente (solo campo MODIFICAR????)
 onMounted(() => {
@@ -512,21 +520,24 @@ watch(() => props.agregar, () => {
                         <button
                             type="submit"
                             class="btn"
-                            :class="form.processing ? 'btn-secondary' : 'btn-primary'"
-                            :disabled="form.processing"
+                            :class="(form.processing || cancelando) ? 'btn-secondary' : 'btn-primary'"
+                            :disabled="form.processing || cancelando"
                         >
                             <span v-if="form.processing" class="spinner-border spinner-border-sm me-2" role="status" aria-hidden="true"></span>
                             {{ form.processing ? 'Grabando...' : 'Grabar' }}
                         </button>
-                        <!-- <a href="/legajos" class="btn btn-outline-secondary">Cancelar 1</a> -->
 
-                        <Link
+                        <button
                             v-if="agregar || edicion"
-                            :href="route('legajos.index')"
-                            class="btn btn-outline-secondary"
-                            >
-                            Cancelar
-                        </Link>
+                            type="button"
+                            class="btn"
+                            :class="(form.processing || cancelando) ? 'btn-secondary' : 'btn-outline-secondary'"
+                            :disabled="form.processing || cancelando"
+                            @click="cancelar"
+                        >
+                            <span v-if="cancelando" class="spinner-border spinner-border-sm me-2" role="status" aria-hidden="true"></span>
+                            {{ cancelando ? 'Cancelando...' : 'Cancelar' }}
+                        </button>
                     </div>
                     <!-- Botones de CRUD -->
                     <div v-else class="d-flex align-content-center flex-wrap gap-4">
