@@ -509,7 +509,15 @@ watch(() => props.agregar, () => {
 
                     <!-- Botones de agregar/Grabar -->
                     <div v-if="agregar || edicion" class="d-flex align-content-center flex-wrap gap-4">
-                        <button type="submit" class="btn btn-primary">Grabar</button>
+                        <button
+                            type="submit"
+                            class="btn"
+                            :class="form.processing ? 'btn-secondary' : 'btn-primary'"
+                            :disabled="form.processing"
+                        >
+                            <span v-if="form.processing" class="spinner-border spinner-border-sm me-2" role="status" aria-hidden="true"></span>
+                            {{ form.processing ? 'Grabando...' : 'Grabar' }}
+                        </button>
                         <!-- <a href="/legajos" class="btn btn-outline-secondary">Cancelar 1</a> -->
 
                         <Link
@@ -1591,6 +1599,14 @@ watch(() => props.agregar, () => {
                                         @ endif -->
 
                                         <div class="row g-6">
+                                            <!-- Cartel de defaults precargados: arriba de los selectores, ancho completo -->
+                                            <div class="col-12" v-if="defaultsSicossAplicados">
+                                                <div class="alert alert-info d-flex align-items-center mb-0 py-2 px-3" role="alert">
+                                                    <i class="ri-information-line ri-22px me-2 flex-shrink-0"></i>
+                                                    <span>Se importaron los parámetros por defecto, ajústelos de ser necesario.</span>
+                                                </div>
+                                            </div>
+
                                             <div class="col-md-6">
                                                 <FloatMultiselect
                                                     id="sicoss_situa"
@@ -1600,13 +1616,6 @@ watch(() => props.agregar, () => {
                                                     :disabled="!edicion"
                                                     :error="form.errors.sicoss_situa"
                                                 />
-                                            </div>
-
-                                            <div class="col-md-6 d-flex align-items-center" v-if="defaultsSicossAplicados">
-                                                <div class="alert alert-info d-flex align-items-center mb-0 py-2 px-3" role="alert">
-                                                    <i class="ri-information-line ri-22px me-2 flex-shrink-0"></i>
-                                                    <span>Se importaron los parámetros por defecto, ajústelos de ser necesario.</span>
-                                                </div>
                                             </div>
 
                                             <div class="col-md-6 d-flex align-items-center" v-if="puedeImportarSicoss">
