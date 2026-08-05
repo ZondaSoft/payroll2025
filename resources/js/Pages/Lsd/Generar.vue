@@ -95,6 +95,11 @@ const topeSipaVigente = computed(() => {
   return (props.topesPeriodos ?? []).some(p => String(p) === periodo)
 })
 
+// Flags "ignorar_*" acumulados en la cadena de reintentos de los pre-checks: si el usuario ya
+// pasó un modal con "Continuar/Ignorar", los siguientes reintentos conservan esa decisión.
+// Un submit sin opts (botón Generar, o regenerar tras ajustar) arranca limpio y re-chequea todo.
+let ignorarFlags = {}
+
 const generarEmision = async (opts = {}) => {
   const faltanCamposSJ = !esRectificativa.value && (!formulario.tipo_liquidacion || !formulario.fecha_pago)
   if (!formulario.id_empresa || !formulario.periodo_id || faltanCamposSJ) {
@@ -107,9 +112,11 @@ const generarEmision = async (opts = {}) => {
     return
   }
 
+  ignorarFlags = Object.keys(opts).length ? { ...ignorarFlags, ...opts } : {}
+
   cargando.value = true
   try {
-    const response = await axios.post(route('lsd.generar.emision'), { ...formulario, ...opts })
+    const response = await axios.post(route('lsd.generar.emision'), { ...formulario, ...ignorarFlags })
 
     if (response.data.success) {
       if (response.data.download_url) {
@@ -144,6 +151,8 @@ const generarEmision = async (opts = {}) => {
       mostrarErrorHuerfanos(data.message, data.huerfanos)
     } else if (data?.tipo_error === 'conceptos_sin_arca' && Array.isArray(data?.sin_arca)) {
       mostrarErrorSinArca(data.message, data.sin_arca)
+    } else if (data?.tipo_error === 'conceptos_sin_parametrizacion' && Array.isArray(data?.sin_parametrizacion)) {
+      mostrarErrorSinParametrizacion(data.message, data.sin_parametrizacion)
     } else if (data?.tipo_error === 'datos_inconsistentes' && Array.isArray(data?.inconsistencias)) {
       mostrarErrorInconsistencias(data.message, data.inconsistencias)
     } else if (data?.tipo_error === 'diferencias_aportes' && Array.isArray(data?.diferencias)) {
@@ -607,6 +616,72 @@ const mostrarErrorSinArca = (mensaje, conceptos) => {
   })
 }
 
+// Conceptos usados en la liquidación que no están en la parametrización ARCA importada
+// (conceptosarcas) de la empresa: la BI 9 puede diferir de la determinada por ARCA.
+const mostrarErrorSinParametrizacion = (mensaje, conceptos) => {
+  const ordenados = [...conceptos].sort((a, b) =>
+    String(a.concepto).localeCompare(String(b.concepto), undefined, { numeric: true })
+  )
+
+  const filas = ordenados.map(h => `
+    <tr>
+      <td style="padding:4px 8px;border:1px solid #dee2e6;font-family:monospace;">${escapeHtml(h.concepto)}</td>
+      <td style="padding:4px 8px;border:1px solid #dee2e6;">${escapeHtml(h.descripcion || '—')}</td>
+      <td style="padding:4px 8px;border:1px solid #dee2e6;font-family:monospace;">${escapeHtml(h.concepto_arca || '—')}</td>
+      <td style="padding:4px 8px;border:1px solid #dee2e6;text-align:right;">${h.veces}</td>
+      <td style="padding:4px 8px;border:1px solid #dee2e6;text-align:right;">${h.legajos}</td>
+      <td style="padding:4px 8px;border:1px solid #dee2e6;text-align:right;">${escapeHtml(formatMoney(h.total))}</td>
+    </tr>
+  `).join('')
+
+  const html = `
+    <div style="text-align:left;font-size:14px;">
+      <p style="margin-bottom:12px;">${escapeHtml(mensaje)}</p>
+      <div style="max-height:300px;overflow:auto;">
+        <table style="width:100%;border-collapse:collapse;font-size:12px;">
+          <thead style="position:sticky;top:0;background:#f8f9fa;">
+            <tr>
+              <th style="padding:6px 8px;border:1px solid #dee2e6;text-align:left;">Código</th>
+              <th style="padding:6px 8px;border:1px solid #dee2e6;text-align:left;">Descripción</th>
+              <th style="padding:6px 8px;border:1px solid #dee2e6;text-align:left;">Cód. ARCA</th>
+              <th style="padding:6px 8px;border:1px solid #dee2e6;text-align:right;">Veces</th>
+              <th style="padding:6px 8px;border:1px solid #dee2e6;text-align:right;">Legajos</th>
+              <th style="padding:6px 8px;border:1px solid #dee2e6;text-align:right;">Total importe</th>
+            </tr>
+          </thead>
+          <tbody>${filas}</tbody>
+        </table>
+      </div>
+      <div style="display:flex;justify-content:space-between;align-items:center;gap:8px;margin-top:16px;">
+        <a href="${route('arca.importar')}" target="_blank" rel="noopener" class="btn btn-warning">
+          <i class="ri-download-2-line me-1"></i> Importar parametrización ARCA
+        </a>
+        <div style="display:flex;gap:8px;">
+          <button type="button" id="sp-cerrar" class="btn btn-outline-secondary">Cancelar</button>
+          <button type="button" id="sp-continuar" class="btn btn-primary">Continuar igual</button>
+        </div>
+      </div>
+    </div>
+  `
+
+  Swal.fire({
+    icon: 'warning',
+    title: 'Conceptos sin parametrización ARCA',
+    html,
+    width: 950,
+    showConfirmButton: false,
+    showCancelButton: false,
+    didOpen: () => {
+      document.getElementById('sp-cerrar')?.addEventListener('click', () => Swal.close())
+      // Generar igual, asumiendo el riesgo de que la BI 9 difiera de la determinada por ARCA.
+      document.getElementById('sp-continuar')?.addEventListener('click', () => {
+        Swal.close()
+        generarEmision({ ignorar_sin_parametrizacion: true })
+      })
+    },
+  })
+}
+
 const mostrarErrorHuerfanos = (mensaje, huerfanos) => {
   // Ordenar por código (numérico-aware: 5 antes que 100)
   const ordenados = [...huerfanos].sort((a, b) =>
@@ -880,6 +955,20 @@ const marcarRechazado = (id) => cambiarEstado(id, 'rechazado', {
                        rel="noopener noreferrer"
                        class="btn btn-sm rounded-pill btn-outline-warning waves-effect ms-3">
                       Actualizar topes SIPA
+                    </a>
+                  </div>
+                </div>
+
+                <!-- Con tope del período cargado: recordatorio preventivo en lugar de la advertencia -->
+                <div v-else class="col-12">
+                  <div class="alert alert-info mb-0 d-flex align-items-center py-2" role="alert">
+                    <i class="ri-information-line me-2 flex-shrink-0" style="font-size: 1.25rem;"></i>
+                    <span>Recuerde tener los topes previsionales (SIPA) actualizados</span>
+                    <a :href="route('sicoss.topes.index')"
+                       target="_blank"
+                       rel="noopener noreferrer"
+                       class="btn btn-sm rounded-pill btn-outline-info waves-effect ms-3">
+                      Ver topes SIPA
                     </a>
                   </div>
                 </div>

@@ -172,6 +172,19 @@ const exportarExcel = () => {
   XLSX.writeFile(wb, `totalizador_lsd_emision_${props.emision?.numero_emision ?? ''}_periodo_${periodo}.xlsx`)
 }
 
+// ---- Filtro "nuevos conceptos este mes" en el resumen de liquidación ----
+// Conceptos del catálogo dados de alta en el mes del período (flag `nuevo` del backend).
+const filtrarNuevos = ref(false)
+
+const nuevosCount = computed(() =>
+  (props.resumenLiq?.conceptos || []).filter(c => c.nuevo).length
+)
+
+const conceptosMostrados = computed(() => {
+  const todos = props.resumenLiq?.conceptos || []
+  return filtrarNuevos.value ? todos.filter(c => c.nuevo) : todos
+})
+
 // ---- Exportar el resumen de liquidación (totales por concepto) a Excel ----
 const exportarResumenExcel = () => {
   const data = (props.resumenLiq?.conceptos || []).map(c => ({
@@ -382,7 +395,19 @@ const exportarResumenExcel = () => {
         </div>
 
         <div class="card">
-          <div class="card-header"><h6 class="fw-bold mb-0">Detalle de conceptos ingresados</h6></div>
+          <div class="card-header d-flex align-items-center gap-4">
+            <h6 class="fw-bold mb-0">Detalle de conceptos ingresados</h6>
+            <button
+              v-if="nuevosCount > 0"
+              type="button"
+              class="btn btn-link p-0 text-success fw-semibold text-decoration-none"
+              :title="filtrarNuevos ? 'Quitar el filtro y mostrar todos los conceptos' : 'Ver solo los conceptos dados de alta en el mes del período'"
+              @click="filtrarNuevos = !filtrarNuevos"
+            >
+              <i :class="filtrarNuevos ? 'ri-filter-off-line' : 'ri-information-line'" class="me-1"></i>
+              {{ filtrarNuevos ? 'Ver todos' : (nuevosCount === 1 ? '1 nuevo concepto este mes' : `${nuevosCount} nuevos conceptos este mes`) }}
+            </button>
+          </div>
           <div class="card-body">
             <div class="table-responsive">
               <table class="table table-bordered table-striped tabla-totalizador">
@@ -397,7 +422,7 @@ const exportarResumenExcel = () => {
                   </tr>
                 </thead>
                 <tbody>
-                  <tr v-for="(c, i) in (resumenLiq?.conceptos || [])" :key="i">
+                  <tr v-for="(c, i) in conceptosMostrados" :key="i">
                     <td>{{ c.codigo }}</td>
                     <td>{{ c.descripcion || '—' }}</td>
                     <td class="text-end" :class="c.total < 0 ? 'text-danger' : ''">$ {{ formatNumber(c.total) }}</td>
@@ -413,7 +438,7 @@ const exportarResumenExcel = () => {
                       </a>
                     </td>
                   </tr>
-                  <tr v-if="!(resumenLiq?.conceptos || []).length">
+                  <tr v-if="!conceptosMostrados.length">
                     <td colspan="6" class="text-center text-muted py-3">Sin conceptos</td>
                   </tr>
                 </tbody>

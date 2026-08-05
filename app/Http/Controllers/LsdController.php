@@ -259,6 +259,65 @@ class LsdController extends Controller
                         ])->values(),
                     ], 422);
                 }
+
+                // Pre-check 2b: conceptos usados que NO están en la parametrización ARCA importada
+                // (conceptosarcas) de la empresa. Sin esa fila el generador no conoce las marcas del
+                // portal (ej. contribuciones LRT) y la BI 9 del Reg 04 puede diferir de la que ARCA
+                // determina desde el Reg 03 → rechazo del archivo. Causa típica: la parametrización
+                // se importó en un entorno y no en el otro. Se puede continuar bajo responsabilidad
+                // del usuario (ignorar_sin_parametrizacion).
+                if (!$request->boolean('ignorar_sin_parametrizacion')) {
+                    $sinParamQuery = DB::table('sue090s')
+                        ->join('sue001s', 'sue090s.legajo', '=', 'sue001s.codigo')
+                        ->join('sue102s', 'sue090s.concepto', '=', 'sue102s.codigo')
+                        ->leftJoin('conceptosarcas', function ($join) use ($empresa) {
+                            $join->on('conceptosarcas.codigo_contribuyente', '=', 'sue090s.concepto')
+                                ->where('conceptosarcas.id_empresa', '=', $empresa->id);
+                        })
+                        ->where('sue090s.periodo', $periodoStr)
+                        ->when($tiposLiq, fn ($q) => $q->whereIn('sue090s.tipoliq', $tiposLiq))
+                        ->where(fn ($q) => $q->whereNull('sue001s.baja')->orWhere('sue001s.baja', '>=', $this->inicioPeriodo($periodoStr)))
+                        ->whereNull('conceptosarcas.id');
+
+                    if ($codEmpresa !== null && $codEmpresa !== '') {
+                        $sinParamQuery->where('sue001s.grupo_emp', $codEmpresa);
+                    }
+
+                    $sinParametrizacion = $sinParamQuery
+                        ->select(
+                            'sue090s.concepto',
+                            DB::raw('MAX(sue102s.detalle) as descripcion'),
+                            DB::raw('MAX(sue102s.concepto_arca) as concepto_arca'),
+                            DB::raw('COUNT(*) as veces'),
+                            DB::raw('COUNT(DISTINCT sue090s.legajo) as legajos'),
+                            DB::raw('SUM(sue090s.importe) as total')
+                        )
+                        ->groupBy('sue090s.concepto')
+                        ->orderBy('sue090s.concepto')
+                        ->get();
+
+                    if ($sinParametrizacion->isNotEmpty()) {
+                        return response()->json([
+                            'success' => false,
+                            'tipo_error' => 'conceptos_sin_parametrizacion',
+                            'message' => sprintf(
+                                '%d conceptos usados en la liquidación no figuran en la parametrización ARCA importada (conceptosarcas) de %s. ' .
+                                'Sin sus marcas (ej. contribuciones LRT), la Base Imponible 9 puede diferir de la que ARCA determina y el archivo sería rechazado. ' .
+                                'Importá la parametrización vigente del portal en /arca/importar antes de generar.',
+                                $sinParametrizacion->count(),
+                                $empresa->detalle ?? 'la empresa'
+                            ),
+                            'sin_parametrizacion' => $sinParametrizacion->map(fn ($c) => [
+                                'concepto' => $c->concepto,
+                                'descripcion' => $c->descripcion ?? '',
+                                'concepto_arca' => $c->concepto_arca ?? '',
+                                'veces' => (int) $c->veces,
+                                'legajos' => (int) $c->legajos,
+                                'total' => (float) $c->total,
+                            ])->values(),
+                        ], 422);
+                    }
+                }
             }
 
             // Pre-check 3: inconsistencias de datos SICOSS que romperían el formato de ancho fijo del Reg 04.
@@ -1931,13 +1990,25 @@ class LsdController extends Controller
 
         // ---- Resumen de liquidación (totales por concepto + contadores de registros) ----
         // Importe con signo: crédito (+) suma, débito (−) resta. Período actual vs ajuste de otros períodos.
+        // Conceptos del catálogo (sue102s) dados de alta en el MES DE PROCESAMIENTO del período
+        // (el mes siguiente: el BASEDAT del período N se importa y parametriza en N+1). Se marcan
+        // como "nuevos" para la leyenda/filtro "N nuevos conceptos este mes" del resumen.
+        $perAnio = (int) substr((string) $emision->periodo, 0, 4);
+        $perMes = (int) substr((string) $emision->periodo, 4, 2);
+        $mesProcesamiento = sprintf('%04d%02d', $perMes === 12 ? $perAnio + 1 : $perAnio, $perMes === 12 ? 1 : $perMes + 1);
+        $conceptosNuevosMes = DB::table('sue102s')
+            ->whereRaw("DATE_FORMAT(created_at, '%Y%m') = ?", [$mesProcesamiento])
+            ->pluck('codigo')
+            ->map(fn ($c) => (string) $c)
+            ->flip();
+
         $conceptosTot = [];
         foreach ($items as $it) {
             $cod = (string) $it->codigo_concepto;
             $monto = (($it->debito_credito === 'C') ? 1 : -1) * abs((float) $it->importe);
             $esOtroPeriodo = trim((string) ($it->periodo_ajuste ?? '')) !== '';
             if (!isset($conceptosTot[$cod])) {
-                $conceptosTot[$cod] = ['codigo' => $cod, 'descripcion' => $descConcepto[$it->codigo_concepto] ?? '', 'total' => 0.0, 'actual' => 0.0, 'otros' => 0.0];
+                $conceptosTot[$cod] = ['codigo' => $cod, 'descripcion' => $descConcepto[$it->codigo_concepto] ?? '', 'nuevo' => isset($conceptosNuevosMes[$cod]), 'total' => 0.0, 'actual' => 0.0, 'otros' => 0.0];
             }
             $conceptosTot[$cod]['total'] += $monto;
             $conceptosTot[$cod][$esOtroPeriodo ? 'otros' : 'actual'] += $monto;
