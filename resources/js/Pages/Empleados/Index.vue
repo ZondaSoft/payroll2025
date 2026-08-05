@@ -397,6 +397,10 @@ const setFocus = () => {
     }
 };
 
+// Se completó al menos un campo SICOSS con los defaults al entrar por #sicoss:
+// muestra el cartel informativo junto a "Situación de revista".
+const defaultsSicossAplicados = ref(false);
+
 // Establecer el foco al montar el componente (solo campo MODIFICAR????)
 onMounted(() => {
     setFocus();
@@ -425,6 +429,7 @@ onMounted(() => {
         for (const [campo, valorDefault, zeroBlank] of defaultsSicoss) {
             if (esBlankSicoss(form[campo], zeroBlank)) {
                 form[campo] = valorDefault;
+                defaultsSicossAplicados.value = true;
             }
         }
     }
@@ -1595,6 +1600,13 @@ watch(() => props.agregar, () => {
                                                     :disabled="!edicion"
                                                     :error="form.errors.sicoss_situa"
                                                 />
+                                            </div>
+
+                                            <div class="col-md-6 d-flex align-items-center" v-if="defaultsSicossAplicados">
+                                                <div class="alert alert-info d-flex align-items-center mb-0 py-2 px-3" role="alert">
+                                                    <i class="ri-information-line ri-22px me-2 flex-shrink-0"></i>
+                                                    <span>Se importaron los parámetros por defecto, ajústelos de ser necesario.</span>
+                                                </div>
                                             </div>
 
                                             <div class="col-md-6 d-flex align-items-center" v-if="puedeImportarSicoss">
