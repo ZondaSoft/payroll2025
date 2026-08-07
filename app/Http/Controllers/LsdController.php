@@ -452,12 +452,19 @@ class LsdController extends Controller
             // (el control de aportes ya corrió como pre-check bloqueante antes de generar).
             $filename = $fileData['filename'];
 
+            // Aviso NO bloqueante: SAC (concepto ARCA 12xxxx) sin días que la generación completó
+            // con 30 días para que ARCA lo incluya en BI 1/4/5 (ver detectarSacSinDias).
+            $sacAutocompletado = ($identificadorEnvio === 'SJ')
+                ? $this->detectarSacSinDias($empresa, $periodoStr, $tiposLiq)
+                : [];
+
             return response()->json([
                 'success' => true,
                 'message' => 'Emisión generada exitosamente',
                 'download_url' => route('lsd.emision.download', $emision->id),
                 'emision_id' => $emision->id,
                 'legajos_excluidos' => $legajosExcluidos,
+                'sac_autocompletado' => $sacAutocompletado,
             ]);
         } catch (\DomainException $e) {
             return response()->json([
@@ -884,6 +891,56 @@ class LsdController extends Controller
     }
 
     /**
+     * Aviso NO bloqueante: conceptos de SAC (concepto ARCA 12xxxx) informados SIN días (cantidad ≤ 0).
+     * ARCA excluye esos conceptos de las bases imponibles TOPEADAS (BI 1/4/5) cuando van sin días,
+     * y rechaza con "La BI informada difiere de la determinada". La generación los completa con 30
+     * días (mes completo) para que ARCA los cuente; este método los lista para avisar al usuario que
+     * verifique en ARCA (por si el prorrateo del tope de SAC de ARCA requiere otro valor de días).
+     */
+    private function detectarSacSinDias($empresa, string $periodoStr, ?array $tiposLiq): array
+    {
+        $codEmpresa = $empresa->codigo ?? $empresa->id ?? null;
+
+        $query = DB::table('sue090s')
+            ->join('sue001s', 'sue090s.legajo', '=', 'sue001s.codigo')
+            ->join('sue102s', 'sue090s.concepto', '=', 'sue102s.codigo')
+            ->where('sue090s.periodo', $periodoStr)
+            ->when($tiposLiq, fn ($q) => $q->whereIn('sue090s.tipoliq', $tiposLiq))
+            ->where(fn ($q) => $q->whereNull('sue001s.baja')->orWhere('sue001s.baja', '>=', $this->inicioPeriodo($periodoStr)))
+            ->where('sue102s.concepto_arca', 'like', '12%')
+            ->where(fn ($q) => $q->whereNull('sue090s.cantidad')->orWhere('sue090s.cantidad', '<=', 0))
+            ->where('sue090s.importe', '<>', 0);
+        if ($codEmpresa !== null && $codEmpresa !== '') {
+            $query->where('sue001s.grupo_emp', $codEmpresa);
+        }
+
+        $rows = $query->get([
+            'sue001s.id as legajo_id',
+            'sue001s.codigo as legajo',
+            'sue001s.cuil as cuil',
+            'sue001s.detalle as apellido',
+            'sue001s.nombres as nombres',
+            'sue090s.tipoliq',
+            'sue090s.concepto',
+            'sue102s.detalle as descripcion',
+            'sue102s.concepto_arca',
+            'sue090s.importe',
+        ]);
+
+        return $rows->map(fn ($r) => [
+            'legajo'      => (string) $r->legajo,
+            'legajo_id'   => $r->legajo_id !== null ? (int) $r->legajo_id : null,
+            'cuil'        => (string) $r->cuil,
+            'nombre'      => trim(((string) ($r->apellido ?? '')) . ' ' . ((string) ($r->nombres ?? ''))),
+            'tipoliq'     => $r->tipoliq !== null ? (int) $r->tipoliq : null,
+            'concepto'    => (string) $r->concepto,
+            'descripcion' => (string) ($r->descripcion ?? ''),
+            'concepto_arca' => (string) ($r->concepto_arca ?? ''),
+            'importe'     => round((float) $r->importe, 2),
+        ])->values()->all();
+    }
+
+    /**
      * Ajusta en sue090s los importes de los aportes (Jubilación/PAMI/OS) para que cuadren con
      * base × alícuota (base = min(bruto, tope vigente)). Modifica los datos de la liquidación importada.
      * Recalcula del lado del servidor (no confía en valores del cliente).
@@ -1266,12 +1323,17 @@ class LsdController extends Controller
             $concepto = str_pad($registro->concepto ?? '', 10, ' ', STR_PAD_RIGHT);
             //$cantidad = str_pad(number_format($registro->cantidad ?? 0, 2, '.', ''), 6, ' ', STR_PAD_LEFT);
             $cantidadRaw = $registro->cantidad;
-            if ($cantidadRaw === null || $cantidadRaw === '') {
-                $cantidad = '00000';
-            } else {
-                $cantidadInt = (int) round($cantidadRaw * 100);
-                $cantidad = $cantidadInt > 99999 ? '99999' : str_pad((string) $cantidadInt, 5, '0', STR_PAD_LEFT);
+            $cantidadNum = ($cantidadRaw === null || $cantidadRaw === '') ? 0.0 : (float) $cantidadRaw;
+            // SAC (concepto ARCA 12xxxx): ARCA lo EXCLUYE de las bases topeadas (BI 1/4/5) cuando va
+            // sin días → "BI informada difiere de la determinada". Si el origen no informó días,
+            // mandamos 30 (mes completo) para que el tope de SAC no lo cape y ARCA lo cuente en 1/4/5.
+            // El importe no cambia; solo se completa la cantidad. Conceptos con días ya cargados no se tocan.
+            $esConceptoSac = str_starts_with((string) ($registro->concepto_arca ?? ''), '12');
+            if ($esConceptoSac && $cantidadNum <= 0) {
+                $cantidadNum = 30.0;
             }
+            $cantidadInt = (int) round($cantidadNum * 100);
+            $cantidad = $cantidadInt > 99999 ? '99999' : str_pad((string) $cantidadInt, 5, '0', STR_PAD_LEFT);
             $unidades = substr(str_pad($registro->unidades ?? ' ', 1, ' ', STR_PAD_LEFT), 0, 1);
             $importe = str_pad((string) (int) round(abs($registro->importe ?? 0) * 100), 15, '0', STR_PAD_LEFT);
 

@@ -125,6 +125,7 @@ const generarEmision = async (opts = {}) => {
       router.reload({ only: ['emisiones'] })
 
       const excluidos = response.data.legajos_excluidos
+      const sacAuto = response.data.sac_autocompletado
       if (Array.isArray(excluidos) && excluidos.length) {
         // Se generó ignorando legajos con datos SICOSS incompletos: avisar cuáles quedaron afuera.
         Swal.fire({
@@ -135,6 +136,9 @@ const generarEmision = async (opts = {}) => {
                 `Esos legajos <b>no se informan</b> en este LSD. Completá sus datos SICOSS y regenerá si corresponde.`,
           confirmButtonText: 'Entendido',
         })
+      } else if (Array.isArray(sacAuto) && sacAuto.length) {
+        // SAC sin días completado con 30 para que ARCA lo cuente en BI 1/4/5.
+        mostrarAvisoSacAutocompletado(sacAuto)
       } else {
         Swal.fire({
           icon: 'success',
@@ -437,6 +441,52 @@ const mostrarAdvertenciaAportes = (items) => {
         generarEmision({ ignorar_diferencias_aportes: true })
       })
     },
+  })
+}
+
+// Aviso NO bloqueante: SAC (concepto ARCA 12xxxx) que venía sin días y se completó con 30 para
+// que ARCA lo incluya en las bases topeadas (BI 1/4/5). El archivo ya se generó y descargó.
+const mostrarAvisoSacAutocompletado = (items) => {
+  const tipoLiqNombre = (t) => ({ 1: 'Normal', 2: '1er Quincena', 3: '2da Quincena', 4: 'SAC', 5: 'Liq. Final', 6: 'DIF.HAB.' }[t] || '—')
+  const filas = items.map(i => `
+    <tr>
+      <td style="padding:4px 8px;border:1px solid #dee2e6;font-family:monospace;">${escapeHtml(i.legajo)}</td>
+      <td style="padding:4px 8px;border:1px solid #dee2e6;font-family:monospace;">${escapeHtml(i.cuil)}</td>
+      <td style="padding:4px 8px;border:1px solid #dee2e6;">${escapeHtml(i.nombre || '—')}</td>
+      <td style="padding:4px 8px;border:1px solid #dee2e6;">${escapeHtml(i.concepto)} · ${escapeHtml(i.descripcion || '')}</td>
+      <td style="padding:4px 8px;border:1px solid #dee2e6;text-align:center;">${escapeHtml(tipoLiqNombre(i.tipoliq))}</td>
+      <td style="padding:4px 8px;border:1px solid #dee2e6;text-align:right;">${escapeHtml(formatMoney(i.importe))}</td>
+    </tr>
+  `).join('')
+
+  const html = `
+    <div style="text-align:left;font-size:14px;">
+      <p style="margin-bottom:8px;">El archivo <strong>ya se generó y se descargó</strong>. Se detectaron conceptos de <strong>SAC sin días</strong> que ARCA excluiría de las bases imponibles topeadas (BI 1/4/5). Para que ARCA los cuente, se informaron con <strong>30 días</strong> (mes completo) en el archivo.</p>
+      <p style="margin-bottom:8px;color:#664d03;">Verificá en ARCA que la BI 1/4/5 quede correcta; si el prorrateo del tope de SAC pidiera otro valor de días, avisá.</p>
+      <div style="max-height:300px;overflow:auto;">
+        <table style="width:100%;border-collapse:collapse;font-size:12px;">
+          <thead style="position:sticky;top:0;background:#f8f9fa;">
+            <tr>
+              <th style="padding:6px 8px;border:1px solid #dee2e6;text-align:left;">Legajo</th>
+              <th style="padding:6px 8px;border:1px solid #dee2e6;text-align:left;">CUIL</th>
+              <th style="padding:6px 8px;border:1px solid #dee2e6;text-align:left;">Empleado</th>
+              <th style="padding:6px 8px;border:1px solid #dee2e6;text-align:left;">Concepto SAC</th>
+              <th style="padding:6px 8px;border:1px solid #dee2e6;text-align:center;">Tipo Liq.</th>
+              <th style="padding:6px 8px;border:1px solid #dee2e6;text-align:right;">Importe</th>
+            </tr>
+          </thead>
+          <tbody>${filas}</tbody>
+        </table>
+      </div>
+    </div>
+  `
+
+  Swal.fire({
+    icon: 'info',
+    title: 'Emisión generada — SAC completado con días',
+    html,
+    width: 900,
+    confirmButtonText: 'Entendido',
   })
 }
 
