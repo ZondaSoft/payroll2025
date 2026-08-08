@@ -16,10 +16,7 @@ return Application::configure(basePath: dirname(__DIR__))
             \Illuminate\Http\Middleware\AddLinkHeadersForPreloadedAssets::class,
         ]);
 
-        // Detrás del proxy de drakma (HTTPS). Sin esto Laravel ve la request como HTTP y el
-        // manejo de la cookie de sesión / XSRF-TOKEN se vuelve inestable (CSRF token mismatch).
-        // Confía en los X-Forwarded-* del proxy para detectar bien el esquema (https) y el host.
-        $middleware->trustProxies(at: '*');
+        //
     })
     ->withExceptions(function (Exceptions $exceptions): void {
         //
