@@ -1137,15 +1137,6 @@ class LsdController extends Controller
             'sue102s.concepto_arca as concepto_arca'
         )->get();
 
-        // Debug: registrar información no intrusiva sobre $datos
-        try {
-            Log::debug('LSD datos count: ' . $datos->count());
-            $sample = array_slice($datos->toArray(), 0, 20);
-            Log::debug('LSD datos sample: ' . json_encode($sample, JSON_UNESCAPED_UNICODE));
-        } catch (\Throwable $e) {
-            // no interrumpir la ejecución por fallos en el logging
-        }
-
         if ($datos->isEmpty()) {
             // Contrato de error de generarTxt: array con status/message (ver generarEmision).
             // Un JsonResponse acá terminaba mostrándose como 500 "Error generando archivo".
@@ -1550,8 +1541,6 @@ class LsdController extends Controller
             // remuneracionBruta: suma de importes H y NR del legajo según rangos de sue089s (13 enteros + 2 decimales implícitos)
             $remuneracionBruta = str_pad((string) (int) round($remuneracionBrutaCalculada * 100), 15, '0', STR_PAD_LEFT);
             $totalHaberes = str_pad((string) (int) round($totalHaberesCalculado * 100), 15, '0', STR_PAD_LEFT);
-
-            Log::debug('Bruto: ' . $remuneracionBruta);
 
             // Bases imponibles: ARCA recalcula sumando solo los Reg 03 cuyos conceptos ARCA tributan a cada subsistema.
             // En este sistema, los conceptos NR no tienen mapeo ARCA específico para OS/SIPA, por lo que ARCA los excluye.

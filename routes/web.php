@@ -48,13 +48,16 @@ use Inertia\Inertia;
 //     return Inertia::render('Dashboard');
 // })->middleware(['auth', 'verified'])->name('dashboard');
 
+// Devuelve el token CSRF vigente y refresca la cookie XSRF-TOKEN. Lo usa el reintento automático
+// de axios ante un 419 (CSRF token mismatch) para recuperar la sesión sin recargar la página.
+// FUERA del grupo 'auth' a propósito: así el refresco funciona aunque el token haya rotado
+// (solo necesita la sesión 'web', no estar autenticado); si estuviera en 'auth', el reintento
+// no podría recuperarse cuando más se necesita.
+Route::get('/csrf-token', fn () => response()->json(['token' => csrf_token()]))->name('csrf.token');
+
 Route::middleware('auth')->group(function () {
     Route::get('/dashboard', [MainController::class, 'index'])->name('dashboard');
     Route::get('/', [MainController::class, 'index'])->name('main.index');
-
-    // Devuelve el token CSRF vigente y refresca la cookie XSRF-TOKEN. Lo usa el reintento automático
-    // de axios ante un 419 (CSRF token mismatch) para recuperar la sesión sin recargar la página.
-    Route::get('/csrf-token', fn () => response()->json(['token' => csrf_token()]))->name('csrf.token');
 
     // Profile Routes
     Route::get('/profile', [ProfileController::class, 'edit'])->name('profile.edit');
