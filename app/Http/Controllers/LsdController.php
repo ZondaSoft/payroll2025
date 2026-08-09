@@ -388,6 +388,32 @@ class LsdController extends Controller
                 }
             }
 
+            // Pre-check 5: empleados ACTIVOS sin liquidación en el período. Se pregunta (diálogo con
+            // checkbox por legajo, tildado por defecto) si se incluyen en el TXT con TODAS las bases en 0.
+            // No bloqueante: si el usuario ya revisó (activos_revisados), se toman los legajos elegidos.
+            $legajosCeroIncluir = [];
+            if (!$esRectificativa && !$request->boolean('activos_revisados')) {
+                $activosSinLiq = $this->detectarActivosSinLiquidacion($empresa, $periodoStr, $tiposLiq);
+                if (!empty($activosSinLiq)) {
+                    return response()->json([
+                        'success' => false,
+                        'tipo_error' => 'activos_sin_liquidacion',
+                        'message' => sprintf(
+                            'Hay %d empleado(s) activo(s) sin liquidación en el período. Elegí cuáles incluir ' .
+                            'en el archivo (se informarán con todas las bases en 0).',
+                            count($activosSinLiq)
+                        ),
+                        'activos_sin_liquidacion' => $activosSinLiq,
+                    ], 422);
+                }
+            } elseif (!$esRectificativa && $request->boolean('activos_revisados')) {
+                // Legajos elegidos por el usuario (checkbox tildado). Se validan contra la detección real
+                // para no confiar en el cliente (evita inyectar legajos que sí tienen liquidación).
+                $elegidos = collect($request->input('activos_incluidos', []))->map(fn ($l) => (string) $l)->all();
+                $validos = collect($this->detectarActivosSinLiquidacion($empresa, $periodoStr, $tiposLiq))->pluck('legajo')->all();
+                $legajosCeroIncluir = array_values(array_intersect($validos, $elegidos));
+            }
+
             // Número de emisión: correlativo ascendente por empresa + período.
             // Solo contamos las emisiones que efectivamente llegaron a ARCA (enviado/confirmado/rechazado).
             // Las que están en borrador/generado son tentativas locales — ARCA no las conoce, no cuentan,
@@ -400,7 +426,7 @@ class LsdController extends Controller
                 ->max('numero_emision') ?? 0;
             $numeroEmision = $ultimaEmision + 1;
 
-            $fileData = $this->generarTxt($empresa, $periodo, $tipoLiquidacion, $tiposLiq, $numeroEmision, $request->fecha_pago, $identificadorEnvio, $legajosExcluidos);
+            $fileData = $this->generarTxt($empresa, $periodo, $tipoLiquidacion, $tiposLiq, $numeroEmision, $request->fecha_pago, $identificadorEnvio, $legajosExcluidos, $legajosCeroIncluir);
 
             // Si generarTxt devolvió un error (por ejemplo 404), retornarlo y no crear la emisión
             if (!is_array($fileData) || ($fileData['status'] ?? 200) !== 200) {
@@ -941,6 +967,44 @@ class LsdController extends Controller
     }
 
     /**
+     * Empleados ACTIVOS (sue001s.baja = null) de la empresa que NO tienen ninguna liquidación en
+     * sue090s para el período (y el filtro de tipoliq elegido). El F931/LSD debe informar a todas
+     * las relaciones vigentes; estos, si el usuario los incluye, se informan con TODAS las bases en 0.
+     * Se devuelven para un diálogo con checkbox (incluir sí/no) por legajo.
+     */
+    private function detectarActivosSinLiquidacion($empresa, string $periodoStr, ?array $tiposLiq): array
+    {
+        $codEmpresa = $empresa->codigo ?? $empresa->id ?? null;
+
+        // Legajos que SÍ tienen liquidación en el período (mismo alcance de tipoliq que la generación).
+        $conLiquidacion = DB::table('sue090s')
+            ->where('periodo', $periodoStr)
+            ->when($tiposLiq, fn ($q) => $q->whereIn('tipoliq', $tiposLiq))
+            ->distinct()
+            ->pluck('legajo')
+            ->map(fn ($l) => (string) $l)
+            ->all();
+
+        $query = DB::table('sue001s')
+            ->whereNull('baja')
+            ->when(!empty($conLiquidacion), fn ($q) => $q->whereNotIn('codigo', $conLiquidacion));
+        if ($codEmpresa !== null && $codEmpresa !== '') {
+            $query->where('grupo_emp', $codEmpresa);
+        }
+
+        $rows = $query->orderByRaw('CAST(codigo AS UNSIGNED)')
+            ->get(['id', 'codigo', 'cuil', 'detalle', 'nombres', 'alta']);
+
+        return $rows->map(fn ($r) => [
+            'legajo'    => (string) $r->codigo,
+            'legajo_id' => $r->id !== null ? (int) $r->id : null,
+            'cuil'      => (string) ($r->cuil ?? ''),
+            'nombre'    => trim(((string) ($r->detalle ?? '')) . ' ' . ((string) ($r->nombres ?? ''))),
+            'alta'      => $r->alta,
+        ])->values()->all();
+    }
+
+    /**
      * Ajusta en sue090s los importes de los aportes (Jubilación/PAMI/OS) para que cuadren con
      * base × alícuota (base = min(bruto, tope vigente)). Modifica los datos de la liquidación importada.
      * Recalcula del lado del servidor (no confía en valores del cliente).
@@ -1027,7 +1091,7 @@ class LsdController extends Controller
         ]);
     }
 
-    public function generarTxt($empresa, $periodo, $tipoLiquidacion, ?array $tiposLiq, $numero_emision, $fechaPagoOverride = null, $identificadorEnvio = 'SJ', array $legajosExcluidos = [])
+    public function generarTxt($empresa, $periodo, $tipoLiquidacion, ?array $tiposLiq, $numero_emision, $fechaPagoOverride = null, $identificadorEnvio = 'SJ', array $legajosExcluidos = [], array $legajosCeroIncluir = [])
     {
         $empresaId = $empresa->id;
         $empresaName = $empresa->detalle ?? '';
@@ -1136,6 +1200,72 @@ class LsdController extends Controller
             'sue007s.porc_tarea_dif as porc_tarea_dif',
             'sue102s.concepto_arca as concepto_arca'
         )->get();
+
+        // Activos sin liquidación seleccionados por el usuario para incluirse con TODOS los valores en 0.
+        // Se inyecta una fila sintética por legajo (marcada es_cero) para que reutilice el armado de
+        // Reg 02 y Reg 04 (importe 0 → todas las bases en 0). Se saltean en Reg 03/05 y en lsd_items.
+        if (!empty($legajosCeroIncluir)) {
+            $cerosQuery = DB::table('sue001s')
+                ->leftJoin('sue007s', 'sue001s.convenio', '=', 'sue007s.codigo')
+                ->whereIn('sue001s.codigo', $legajosCeroIncluir)
+                ->whereNull('sue001s.baja');
+            if ($codEmpresa !== null && $codEmpresa !== '') {
+                $cerosQuery->where('sue001s.grupo_emp', $codEmpresa);
+            }
+            $yaEnDatos = $datos->pluck('cuil')->map(fn ($c) => (string) $c)->unique()->flip();
+            $cerosRows = $cerosQuery->select(
+                'sue001s.cuil as cuil',
+                'sue001s.codigo as legajo_codigo',
+                'sue001s.codigo as legajo',
+                'sue001s.sicoss_conyuge as conyugue',
+                'sue001s.sicoss_hijos as hijos',
+                'sue001s.sicoss_adherentes as adherentes',
+                'sue001s.sicoss_cob_scvo as sicoss_cob_scvo',
+                'sue001s.sicoss_reduccion as sicoss_reduccion',
+                'sue001s.sicoss_situa as sicoss_situa',
+                'sue001s.sicoss_condi as sicoss_condi',
+                'sue001s.sicoss_activ as sicoss_activ',
+                'sue001s.sicoss_modal as sicoss_modal',
+                'sue001s.sicoss_sini as sicoss_sini',
+                'sue001s.sicoss_zona as sicoss_zona',
+                'sue001s.obra_sijp as obra_sijp',
+                'sue001s.formap as formap',
+                'sue001s.cbu as cbu',
+                'sue001s.alta as alta',
+                'sue001s.baja as baja',
+                'sue001s.jornada_id as jornada_id',
+                'sue007s.porc_tarea_dif as porc_tarea_dif'
+            )->get();
+            foreach ($cerosRows as $r) {
+                // Evitar duplicar si por algún motivo ese CUIL ya tiene liquidación en $datos.
+                if ($yaEnDatos->has((string) $r->cuil)) {
+                    continue;
+                }
+                // Campos tipo sue090s en cero para que las sumas de bases den 0.
+                $r->id = null;
+                $r->periodo = $periodoStr;
+                $r->tipoliq = $tipoLiquidacion;
+                $r->detalle = null;
+                $r->concepto = 0;
+                $r->descripcion = '';
+                $r->valor = 0;
+                $r->cantidad = 0;
+                $r->unidades = ' ';
+                $r->importe = 0;
+                $r->sueldo = 0;
+                $r->tiporem = null;
+                $r->convenio = null;
+                $r->categoria = null;
+                $r->fechaingreso = null;
+                $r->zona = null;
+                $r->obra_social = null;
+                $r->modalidad = null;
+                $r->tarea = null;
+                $r->concepto_arca = '';
+                $r->es_cero = true;
+                $datos->push($r);
+            }
+        }
 
         if ($datos->isEmpty()) {
             // Contrato de error de generarTxt: array con status/message (ver generarEmision).
@@ -1309,6 +1439,11 @@ class LsdController extends Controller
         };
 
         foreach ($datos as $registro) {
+            // Empleados "activos sin liquidación" incluidos con valores en 0: no generan Reg 03
+            // (no tienen conceptos); solo aparecen en Reg 02 y Reg 04 con bases en cero.
+            if (!empty($registro->es_cero)) {
+                continue;
+            }
             $legajoValue = str_pad($registro->legajo_codigo ?? $registro->legajo ?? '', 10, ' ', STR_PAD_RIGHT);
             $cuilValue = $registro->cuil ?? '';
             $concepto = str_pad($registro->concepto ?? '', 10, ' ', STR_PAD_RIGHT);
@@ -1422,7 +1557,9 @@ class LsdController extends Controller
             // Jornada parcial (media jornada): sue001s.jornada_id → sue010s.parcial.
             // factorParcial = horas_semana / 48 (jornada completa). En jornada completa = 1 (sin efecto).
             $jornada = $jornadasPorId[$registro->jornada_id] ?? null;
-            $esJornadaParcial = $jornada && (int) ($jornada->parcial ?? 0) === 1;
+            // En empleados incluidos con valores en 0 se ignora la jornada parcial: no debe aplicarse
+            // el piso de base de OS (2× base mínima), para que todas las bases queden efectivamente en 0.
+            $esJornadaParcial = $jornada && (int) ($jornada->parcial ?? 0) === 1 && empty($registro->es_cero);
             $horasSemanaJornada = (float) ($jornada->horas_semana ?? 0);
             $factorParcial = ($esJornadaParcial && $horasSemanaJornada > 0)
                 ? min(1.0, $horasSemanaJornada / $HORAS_JORNADA_COMPLETA)
@@ -1671,6 +1808,10 @@ class LsdController extends Controller
         // Generar Registro Tipo 05 - Trabajadores Eventuales - Una fila por cada empleado declarado con modalidad 102 en el registro 4
         //---------------------------------------
         if (!$esRectificativa) { foreach ($datos as $registro) {
+            // Los empleados incluidos con valores en 0 no son eventuales → no generan Reg 05.
+            if (!empty($registro->es_cero)) {
+                continue;
+            }
             $legajoValue = str_pad($registro->legajo_codigo ?? $registro->legajo ?? '', 10, ' ', STR_PAD_RIGHT);
             $cuilValue = $registro->cuil ?? '';
             $conyugue = str_pad((string) ($registro->conyugue ?? 0), 1, '0', STR_PAD_LEFT);
@@ -1920,6 +2061,10 @@ class LsdController extends Controller
         // Preparar items para lsd_items (uno por cada concepto/registro tipo 03)
         $lsdItems = [];
         foreach ($datos as $registro) {
+            // Los empleados incluidos con valores en 0 no tienen conceptos (no hay Reg 03 que guardar).
+            if (!empty($registro->es_cero)) {
+                continue;
+            }
             $lsdItems[] = [
                 'cuil' => $registro->cuil ?? '',
                 'legajo' => $registro->legajo_codigo ?? $registro->legajo ?? '',

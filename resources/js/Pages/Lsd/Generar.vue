@@ -162,6 +162,9 @@ const generarEmision = async (opts = {}) => {
     } else if (data?.tipo_error === 'diferencias_aportes' && Array.isArray(data?.diferencias)) {
       // Control bloqueante POR LIQUIDACIÓN (Normal/SAC/Final por separado): el TXT no se generó.
       mostrarAdvertenciaAportes(data.diferencias)
+    } else if (data?.tipo_error === 'activos_sin_liquidacion' && Array.isArray(data?.activos_sin_liquidacion)) {
+      // Diálogo para elegir qué activos sin liquidación se incluyen (con bases en 0).
+      mostrarActivosSinLiquidacion(data.activos_sin_liquidacion)
     } else {
       const msg = data?.message || error.message || 'Error desconocido'
       Swal.fire({
@@ -487,6 +490,94 @@ const mostrarAvisoSacAutocompletado = (items) => {
     html,
     width: 900,
     confirmButtonText: 'Entendido',
+  })
+}
+
+// Diálogo: empleados ACTIVOS sin liquidación en el período. Checkbox por legajo (tildado por
+// defecto) para elegir si se incluyen en el TXT con todas las bases en 0; lupa para abrir el legajo.
+const mostrarActivosSinLiquidacion = (items) => {
+  const fmtFecha = (d) => {
+    if (!d) return '—'
+    const [y, m, day] = String(d).slice(0, 10).split('-')
+    return (y && m && day) ? `${day}/${m}/${y}` : String(d)
+  }
+
+  const filas = items.map(i => `
+    <tr>
+      <td style="padding:4px 8px;border:1px solid #dee2e6;font-family:monospace;">${escapeHtml(i.legajo)}</td>
+      <td style="padding:4px 8px;border:1px solid #dee2e6;font-family:monospace;">${escapeHtml(i.cuil)}</td>
+      <td style="padding:4px 8px;border:1px solid #dee2e6;">${escapeHtml(i.nombre || '—')}</td>
+      <td style="padding:4px 8px;border:1px solid #dee2e6;text-align:center;">${escapeHtml(fmtFecha(i.alta))}</td>
+      <td style="padding:4px 8px;border:1px solid #dee2e6;text-align:center;">
+        <input type="checkbox" class="chk-activo" data-legajo="${escapeHtml(i.legajo)}" checked
+               style="width:18px;height:18px;cursor:pointer;">
+      </td>
+      <td style="padding:4px 8px;border:1px solid #dee2e6;text-align:center;">
+        ${i.legajo_id
+          ? `<a href="${route('legajos.edit', i.legajo_id)}" class="lupa-concepto" target="_blank" rel="noopener" title="Abrir el legajo ${escapeHtml(i.legajo)}"><i class="ri-search-line"></i></a>`
+          : '—'}
+      </td>
+    </tr>
+  `).join('')
+
+  const html = `
+    <style>
+      .lupa-concepto{display:inline-flex;align-items:center;justify-content:center;width:30px;height:30px;border-radius:50%;border:1px solid var(--bs-secondary, #6c757d);color:var(--bs-secondary, #6c757d);background:transparent;text-decoration:none;transition:all .15s ease;}
+      .lupa-concepto:hover,.lupa-concepto:focus{background:var(--bs-primary, #696cff);border-color:var(--bs-primary, #696cff);color:#fff;outline:none;}
+    </style>
+    <div style="text-align:left;font-size:14px;">
+      <p style="margin-bottom:8px;">Estos empleados están <strong>activos</strong> pero <strong>no tienen liquidación</strong> en el período. Los que dejes <strong>tildados</strong> se incluirán en el archivo con <strong>todas las bases en 0</strong>. Destildá los que no quieras informar.</p>
+      <div style="display:flex;gap:8px;margin-bottom:8px;">
+        <button type="button" id="act-todos" class="btn btn-sm btn-outline-primary">Tildar todos</button>
+        <button type="button" id="act-ninguno" class="btn btn-sm btn-outline-secondary">Destildar todos</button>
+      </div>
+      <div style="max-height:320px;overflow:auto;">
+        <table style="width:100%;border-collapse:collapse;font-size:12px;">
+          <thead style="position:sticky;top:0;background:#f8f9fa;">
+            <tr>
+              <th style="padding:6px 8px;border:1px solid #dee2e6;text-align:left;">Legajo</th>
+              <th style="padding:6px 8px;border:1px solid #dee2e6;text-align:left;">CUIL</th>
+              <th style="padding:6px 8px;border:1px solid #dee2e6;text-align:left;">Empleado</th>
+              <th style="padding:6px 8px;border:1px solid #dee2e6;text-align:center;">Alta</th>
+              <th style="padding:6px 8px;border:1px solid #dee2e6;text-align:center;">Incluir</th>
+              <th style="padding:6px 8px;border:1px solid #dee2e6;text-align:center;">Ver</th>
+            </tr>
+          </thead>
+          <tbody>${filas}</tbody>
+        </table>
+      </div>
+    </div>
+  `
+
+  Swal.fire({
+    icon: 'question',
+    title: 'Empleados activos sin liquidación',
+    html,
+    width: 900,
+    showCancelButton: true,
+    confirmButtonText: 'Generar con seleccionados',
+    cancelButtonText: 'Cancelar',
+    confirmButtonColor: '#696cff',
+    didOpen: () => {
+      document.getElementById('act-todos')?.addEventListener('click', () => {
+        document.querySelectorAll('.chk-activo').forEach(c => { c.checked = true })
+      })
+      document.getElementById('act-ninguno')?.addEventListener('click', () => {
+        document.querySelectorAll('.chk-activo').forEach(c => { c.checked = false })
+      })
+    },
+    preConfirm: () => {
+      const incluidos = Array.from(document.querySelectorAll('.chk-activo'))
+        .filter(c => c.checked)
+        .map(c => c.getAttribute('data-legajo'))
+      return { incluidos }
+    },
+  }).then((res) => {
+    if (res.isConfirmed) {
+      const incluidos = res.value?.incluidos ?? []
+      // Regenerar informando que ya se revisó, con los legajos elegidos (posible lista vacía).
+      generarEmision({ activos_revisados: true, activos_incluidos: incluidos })
+    }
   })
 }
 
