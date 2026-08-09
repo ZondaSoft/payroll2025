@@ -514,7 +514,7 @@ const mostrarActivosSinLiquidacion = (items) => {
       </td>
       <td style="padding:4px 8px;border:1px solid #dee2e6;text-align:center;">
         ${i.legajo_id
-          ? `<a href="${route('legajos.edit', i.legajo_id)}" class="lupa-concepto" target="_blank" rel="noopener" title="Abrir el legajo ${escapeHtml(i.legajo)}"><i class="ri-search-line"></i></a>`
+          ? `<a href="${route('legajos.show', i.legajo_id)}" class="lupa-concepto" target="_blank" rel="noopener" title="Abrir el legajo ${escapeHtml(i.legajo)}"><i class="ri-search-line"></i></a>`
           : '—'}
       </td>
     </tr>

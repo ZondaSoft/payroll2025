@@ -430,17 +430,36 @@ const bajaForm = useForm({
     sicoss_baja: '',
     baja_det: '',
 });
+// Cierra el modal de baja y limpia los artefactos que Bootstrap a veces deja al navegar con
+// Inertia (backdrop gris + scroll bloqueado del body).
+const cerrarModalBaja = () => {
+    const modalEl = document.getElementById('modalDelete');
+    if (modalEl && window.bootstrap?.Modal) {
+        (window.bootstrap.Modal.getInstance(modalEl) || new window.bootstrap.Modal(modalEl)).hide();
+    }
+    document.querySelectorAll('.modal-backdrop').forEach((el) => el.remove());
+    document.body.classList.remove('modal-open');
+    document.body.style.overflow = '';
+    document.body.style.paddingRight = '';
+};
+
 const confirmarBaja = () => {
     if (!form.id || bajaForm.processing) return;
     bajaForm.post(route('legajos.baja', form.id), {
         preserveScroll: true,
         onSuccess: () => {
-            // Cerrar el modal de Bootstrap y limpiar el backdrop.
-            const modalEl = document.getElementById('modalDelete');
-            if (modalEl && window.bootstrap?.Modal) {
-                window.bootstrap.Modal.getInstance(modalEl)?.hide();
-            }
-            closeModal();
+            cerrarModalBaja();
+            Swal.fire({
+                icon: 'success',
+                title: 'Baja registrada',
+                text: 'El empleado fue dado de baja correctamente.',
+                confirmButtonText: 'Aceptar',
+                buttonsStyling: false,
+                customClass: { confirmButton: 'btn btn-primary rounded-pill px-4' },
+            }).then(() => {
+                // Refrescar la pantalla con los datos actualizados (muestra el cartel de baja).
+                router.reload();
+            });
         },
     });
 };
