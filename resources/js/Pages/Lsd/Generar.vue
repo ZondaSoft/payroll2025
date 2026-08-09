@@ -528,8 +528,8 @@ const mostrarActivosSinLiquidacion = (items) => {
     <div style="text-align:left;font-size:14px;">
       <p style="margin-bottom:8px;">Estos empleados están <strong>activos</strong> pero <strong>no tienen liquidación</strong> en el período. Los que dejes <strong>tildados</strong> se incluirán en el archivo con <strong>todas las bases en 0</strong>. Destildá los que no quieras informar.</p>
       <div style="display:flex;gap:8px;margin-bottom:8px;">
-        <button type="button" id="act-todos" class="btn btn-sm btn-outline-primary">Tildar todos</button>
-        <button type="button" id="act-ninguno" class="btn btn-sm btn-outline-secondary">Destildar todos</button>
+        <button type="button" id="act-todos" class="btn btn-sm btn-outline-primary rounded-pill px-3">Tildar todos</button>
+        <button type="button" id="act-ninguno" class="btn btn-sm btn-outline-secondary rounded-pill px-3">Destildar todos</button>
       </div>
       <div style="max-height:320px;overflow:auto;">
         <table style="width:100%;border-collapse:collapse;font-size:12px;">
@@ -555,9 +555,14 @@ const mostrarActivosSinLiquidacion = (items) => {
     html,
     width: 900,
     showCancelButton: true,
+    reverseButtons: true,                 // Cancelar a la izquierda, primario a la derecha
+    buttonsStyling: false,                // usamos clases Bootstrap/MD3 (botones ovalados)
     confirmButtonText: 'Generar con seleccionados',
     cancelButtonText: 'Cancelar',
-    confirmButtonColor: '#696cff',
+    customClass: {
+      confirmButton: 'btn btn-primary rounded-pill px-4',
+      cancelButton: 'btn btn-outline-secondary rounded-pill px-4 me-2',
+    },
     didOpen: () => {
       document.getElementById('act-todos')?.addEventListener('click', () => {
         document.querySelectorAll('.chk-activo').forEach(c => { c.checked = true })
