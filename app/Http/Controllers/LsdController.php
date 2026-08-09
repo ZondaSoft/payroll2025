@@ -392,7 +392,7 @@ class LsdController extends Controller
             // checkbox por legajo, tildado por defecto) si se incluyen en el TXT con TODAS las bases en 0.
             // No bloqueante: si el usuario ya revisó (activos_revisados), se toman los legajos elegidos.
             $legajosCeroIncluir = [];
-            if (!$esRectificativa && !$request->boolean('activos_revisados')) {
+            if ($identificadorEnvio !== 'RE' && !$request->boolean('activos_revisados')) {
                 $activosSinLiq = $this->detectarActivosSinLiquidacion($empresa, $periodoStr, $tiposLiq);
                 if (!empty($activosSinLiq)) {
                     return response()->json([
@@ -406,7 +406,7 @@ class LsdController extends Controller
                         'activos_sin_liquidacion' => $activosSinLiq,
                     ], 422);
                 }
-            } elseif (!$esRectificativa && $request->boolean('activos_revisados')) {
+            } elseif ($identificadorEnvio !== 'RE' && $request->boolean('activos_revisados')) {
                 // Legajos elegidos por el usuario (checkbox tildado). Se validan contra la detección real
                 // para no confiar en el cliente (evita inyectar legajos que sí tienen liquidación).
                 $elegidos = collect($request->input('activos_incluidos', []))->map(fn ($l) => (string) $l)->all();
