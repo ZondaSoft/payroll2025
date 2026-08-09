@@ -572,6 +572,73 @@ class LegajosController extends Controller
             ->with('success', 'Legajo eliminado exitosamente.');
     }
 
+    /**
+     * Dar de BAJA al empleado: setea sue001s.baja (fecha) sin borrar el registro. El legajo se
+     * conserva para el LSD/F931, liquidaciones históricas, etc. Reversible desde la edición del legajo.
+     */
+    public function baja(Request $request, $id)
+    {
+        $legajo = Sue001::findOrFail($id);
+
+        $request->validate([
+            'fecha_baja'  => 'required|date',
+            'sicoss_baja' => 'required',
+            'baja_det'    => 'nullable|string|max:255',
+        ], [
+            'fecha_baja.required'  => 'La fecha de baja es obligatoria.',
+            'fecha_baja.date'      => 'La fecha de baja no es válida.',
+            'sicoss_baja.required' => 'El motivo de baja es obligatorio.',
+        ]);
+
+        $fecha   = $request->input('fecha_baja');
+        $motivo  = $request->input('sicoss_baja');
+        $detalle = $request->input('baja_det');
+
+        DB::transaction(function () use ($legajo, $fecha, $motivo, $detalle) {
+            // 1) Marca de baja en el legajo activo (NO se borra).
+            $legajo->baja = $fecha;
+            if ($detalle !== null && $detalle !== '') {
+                $legajo->baja_det = $detalle;
+            }
+            $legajo->save();
+
+            // 2) Copia del legajo al archivo de bajas (sue070s), donde vive el motivo (sicoss_baja).
+            //    `codigo` es UNIQUE en sue070s → updateOrInsert por codigo (un registro de baja por
+            //    empleado). Se copian TODAS las columnas homónimas, truncando cada string al tamaño
+            //    de la columna destino (sue001s y sue070s difieren en tamaños; sin esto falla, ej. `banco`).
+            $meta = collect(DB::select(
+                "SELECT COLUMN_NAME, CHARACTER_MAXIMUM_LENGTH
+                 FROM INFORMATION_SCHEMA.COLUMNS
+                 WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'sue070s'"
+            ))->keyBy('COLUMN_NAME');
+
+            $attrs = $legajo->getAttributes();
+            $attrs['baja']        = $fecha;
+            $attrs['sicoss_baja'] = $motivo;
+            $attrs['baja_det']    = $detalle;
+
+            $data = [];
+            foreach ($meta as $col => $info) {
+                if (in_array($col, ['id', 'codigo', 'created_at', 'updated_at'], true)) {
+                    continue; // id/codigo: clave; timestamps: los maneja la DB
+                }
+                if (!array_key_exists($col, $attrs)) {
+                    continue; // columna que no existe en sue001s → queda con su default
+                }
+                $val = $attrs[$col];
+                if (is_string($val) && $info->CHARACTER_MAXIMUM_LENGTH !== null) {
+                    $val = mb_substr($val, 0, (int) $info->CHARACTER_MAXIMUM_LENGTH);
+                }
+                $data[$col] = $val;
+            }
+
+            DB::table('sue070s')->updateOrInsert(['codigo' => $legajo->codigo], $data);
+        });
+
+        return redirect()->route('legajos.show', $legajo->id)
+            ->with('success', 'Empleado dado de baja el ' . Carbon::parse($fecha)->format('d/m/Y') . '.');
+    }
+
     // Primer registro
     public function first()
     {

@@ -72,6 +72,8 @@ Route::middleware('auth')->group(function () {
     // Rutas adicionales para navegación
     Route::get('legajos/{id}/previous', [LegajosController::class, 'previous'])->name('legajos.previous');
     Route::get('legajos/{id}/next', [LegajosController::class, 'next'])->name('legajos.next');
+    // Dar de baja (setea sue001s.baja, no borra). Distinto de destroy (borrado físico).
+    Route::post('legajos/{id}/baja', [LegajosController::class, 'baja'])->name('legajos.baja');
 
     // Empleados Routes - rutas literales ANTES del resource
     Route::get('bajas/first', [BajasController::class, 'first'])->name('bajas.first');

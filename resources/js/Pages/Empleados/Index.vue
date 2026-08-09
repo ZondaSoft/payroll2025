@@ -382,6 +382,69 @@ const closeModal = () => {
     }
 };
 
+// Baja del empleado: setea sue001s.baja (fecha), NO borra el registro (se conserva para LSD/historial).
+const hoyISOBaja = () => {
+    const d = new Date();
+    return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+};
+// Catálogo oficial de motivos de baja (sicoss_codigos_bajas). Se ordena por descripción.
+const motivosBaja = [
+    { v: '25', t: 'Abandono del trabajo / Art.244 LCT' },
+    { v: '53', t: 'Baja de oficio por denuncia' },
+    { v: '2',  t: 'Baja otras causales (renuncia, jubilación, etc.)' },
+    { v: '4',  t: 'Baja otras causales Decreto N°796/97' },
+    { v: '7',  t: 'Baja por despido' },
+    { v: '8',  t: 'Baja por despido (según Decreto N°796/97)' },
+    { v: '1',  t: 'Baja por fallecimiento' },
+    { v: '40', t: 'Cesantía laboral' },
+    { v: '20', t: 'Cesión del personal (Art. 229 LCT)' },
+    { v: '32', t: 'Concurso del Empleador Art.251 LCT' },
+    { v: '23', t: 'Denuncia de contrato de trabajo por el empleador / Art.242 LCT' },
+    { v: '24', t: 'Denuncia de contrato de trabajo por el trabajador / Art.242 LCT' },
+    { v: '19', t: 'Denuncia por transferencia de establecimiento (Art. 226 LCT)' },
+    { v: '26', t: 'Despido / ART. 245 - LCT' },
+    { v: '36', t: 'Despido con o sin justa causa / ART.64 Inc.c) Ley 22248' },
+    { v: '37', t: 'Despido por fuerza mayor-Trabajo Agrario / Art.64 Inc.d) L.22248' },
+    { v: '41', t: 'Exoneración' },
+    { v: '52', t: 'Extinción por mutuo acuerdo (Art. 241 LCT)' },
+    { v: '29', t: 'Fallecimiento del empleador / Art.249 LCT' },
+    { v: '27', t: 'Falta o disminución del trabajo / Art.247 LCT' },
+    { v: '38', t: 'Fin contrato de aprendizaje y pasantías / ART.1 y 2 Ley 25877; ART.2 y 19 Ley 25013' },
+    { v: '47', t: 'Fin de pago retiro voluntario (Dec. 263/2018 y otros)' },
+    { v: '28', t: 'Fuerza mayor / ART.247 - LCT' },
+    { v: '34', t: 'Incapacidad o inhabilidad del trabajador / ART.254 - LCT' },
+    { v: '46', t: 'Inicio de pago por retiro voluntario (Dec. 263/2018 y otros)' },
+    { v: '33', t: 'Jubilación / Art.252 LCT / Art.64 Inc.e) L.22248 y otras' },
+    { v: '31', t: 'Quiebra del empleador / Art.251 LCT' },
+    { v: '21', t: 'Renuncia del trabajador (Art. 240 LCT, Art. 64 inc. a)' },
+    { v: '54', t: 'Retiro anticipado o voluntario' },
+    { v: '18', t: 'Transferencia del contrato (Art. 225 LCT)' },
+    { v: '99', t: 'Vencimiento de contrato a plazo fijo/determinado' },
+    { v: '30', t: 'Vencimiento de plazo / ART. 250 - LCT' },
+    { v: '22', t: 'Voluntad concurrente (Art. 241 LCT, acuerdo)' },
+    { v: '35', t: 'Voluntad concurrente de las partes-Trabajo Agrario / Art.64 Inc.b) L.22248' },
+]
+
+const bajaForm = useForm({
+    fecha_baja: hoyISOBaja(),
+    sicoss_baja: '',
+    baja_det: '',
+});
+const confirmarBaja = () => {
+    if (!form.id || bajaForm.processing) return;
+    bajaForm.post(route('legajos.baja', form.id), {
+        preserveScroll: true,
+        onSuccess: () => {
+            // Cerrar el modal de Bootstrap y limpiar el backdrop.
+            const modalEl = document.getElementById('modalDelete');
+            if (modalEl && window.bootstrap?.Modal) {
+                window.bootstrap.Modal.getInstance(modalEl)?.hide();
+            }
+            closeModal();
+        },
+    });
+};
+
 // Crear una referencia para el input que recibira el foco
 const txtcodigo = ref(null);
 const txtdetalle = ref(null);
@@ -1746,47 +1809,93 @@ watch(() => props.agregar, () => {
         <div class="mt-4">
             <!-- Modal -->
             <div id="modalDelete" class="modal fade" data-bs-backdrop="static" tabindex="-1">
-                <div class="modal-dialog">
-                    <form class="modal-content">
-                        <div class="modal-header">
-                            <h4 class="onboarding-title text-body">Borrar registro ?</h4>
-                            <button
-                                type="button"
-                                class="btn-close"
-                                data-bs-dismiss="modal"
-                                aria-label="Close">
-                            </button>
-                        </div>
-                        <div class="modal-body">
-                            <div class="row">
-                            <div class="col mb-6 mt-1">
-
-                                <div class="alert d-flex align-items-center alert-warning mb-0 h6" role="alert">
-                                <span class="alert-icon rounded-4"><i class="ri-information-line ri-22px"></i></span>
-
-                                <span>  <br>Esta seguro de eliminar el registro seleccionado? <br> No podra recuperar el registro borrado...  <br> <br></span>
+                <div class="modal-dialog modal-dialog-centered">
+                    <form class="modal-content" @submit.prevent="confirmarBaja">
+                        <div class="modal-header border-0 pb-0">
+                            <div class="d-flex align-items-center gap-3">
+                                <span class="d-inline-flex align-items-center justify-content-center rounded-circle"
+                                      style="width:48px;height:48px;background:rgba(255,171,0,.16);color:#ffab00;">
+                                    <i class="ri-user-unfollow-line ri-28px"></i>
+                                </span>
+                                <div>
+                                    <h4 class="mb-0">Dar de baja al empleado</h4>
+                                    <small class="text-muted">El legajo se conserva; solo se registra la fecha de baja.</small>
                                 </div>
+                            </div>
+                            <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Cerrar"></button>
+                        </div>
 
+                        <div class="modal-body pt-3">
+                            <div class="bg-lighter rounded-3 p-3 mb-4">
+                                <div class="fw-semibold">{{ form.codigo }} — {{ form.detalle }}, {{ form.nombres }}</div>
+                                <small class="text-muted font-monospace">{{ form.cuil }}</small>
                             </div>
+
+                            <div class="mb-3">
+                                <label for="fechaBaja" class="form-label">Fecha de baja *</label>
+                                <input
+                                    id="fechaBaja"
+                                    v-model="bajaForm.fecha_baja"
+                                    type="date"
+                                    class="form-control"
+                                    :class="{ 'is-invalid': bajaForm.errors.fecha_baja }"
+                                    required
+                                />
+                                <div v-if="bajaForm.errors.fecha_baja" class="invalid-feedback">{{ bajaForm.errors.fecha_baja }}</div>
                             </div>
-                            <div class="row g-4">
-                            <br>
+
+                            <div class="mb-3">
+                                <label for="sicoss_baja" class="form-label d-flex align-items-center flex-wrap" style="gap:8px;">
+                                    <span>Motivo de baja *</span>
+                                    <span class="d-inline-flex align-items-center text-muted" style="font-size:11px; gap:4px; font-weight:400;">
+                                        <i class="ri-information-line" style="font-size:14px;"></i>
+                                        <span>Más comunes:</span>
+                                        <a href="#" @click.prevent="bajaForm.sicoss_baja = '7'"
+                                           class="text-decoration-underline text-secondary">7-Baja por despido</a>
+                                        <span>·</span>
+                                        <a href="#" @click.prevent="bajaForm.sicoss_baja = '21'"
+                                           class="text-decoration-underline text-secondary">21-Renuncia (Art.240 LCT)</a>
+                                    </span>
+                                </label>
+                                <select
+                                    id="sicoss_baja"
+                                    v-model="bajaForm.sicoss_baja"
+                                    class="form-select"
+                                    :class="{ 'is-invalid': bajaForm.errors.sicoss_baja }"
+                                    required
+                                >
+                                    <option value="" disabled>(Seleccione un motivo de baja)</option>
+                                    <option v-for="m in motivosBaja" :key="m.v" :value="m.v">{{ m.t }} ({{ m.v }})</option>
+                                </select>
+                                <div v-if="bajaForm.errors.sicoss_baja" class="invalid-feedback">{{ bajaForm.errors.sicoss_baja }}</div>
+                            </div>
+
+                            <div class="mb-2">
+                                <label for="bajaMotivo" class="form-label">Observaciones (opcional)</label>
+                                <textarea
+                                    id="bajaMotivo"
+                                    v-model="bajaForm.baja_det"
+                                    rows="2"
+                                    maxlength="255"
+                                    class="form-control"
+                                    placeholder="Detalle o aclaración de la baja…"
+                                ></textarea>
+                            </div>
+
+                            <div class="alert alert-info d-flex align-items-center mb-0" role="alert">
+                                <i class="ri-information-line ri-22px me-2"></i>
+                                <span>No se borra el legajo: sigue disponible para el Libro de Sueldo Digital y el historial. Podés revertirlo editando el legajo.</span>
                             </div>
                         </div>
-                        <div class="modal-footer">
-                            <Link
-                                type="button"
-                                :href="form.id ? route('legajos.destroy', form.id) : '#'"
-                                class="btn btn-danger waves-effect waves-light"
-                                style="color: white"
-                                @click="closeModal"
-                                >Borrar
-                            </Link>
 
-                            <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">
-                            Cancelar
+                        <div class="modal-footer border-0 pt-0">
+                            <button type="button" class="btn btn-outline-secondary rounded-pill px-4" data-bs-dismiss="modal">
+                                Cancelar
                             </button>
-
+                            <button type="submit" class="btn btn-danger rounded-pill px-4" :disabled="bajaForm.processing">
+                                <span v-if="!bajaForm.processing"><i class="ri-user-unfollow-line me-1"></i> Confirmar baja</span>
+                                <span v-else><span class="spinner-border spinner-border-sm me-2"></span>Dando de baja…</span>
+                            </button>
                         </div>
                     </form>
                 </div>
