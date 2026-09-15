@@ -10,6 +10,7 @@ enum FuenteComponente: string
     case BaseZonda = 'BASE_ZONDA';
     case Basico = 'BASICO';
     case Manual = 'MANUAL';
+    case ModuloSistema = 'MODULO_SISTEMA';
     case NoAplica = 'NO_APLICA';
 
     public function etiqueta(): string
@@ -21,6 +22,7 @@ enum FuenteComponente: string
             self::BaseZonda => 'Base de Zonda',
             self::Basico => 'Sueldo básico',
             self::Manual => 'Manual',
+            self::ModuloSistema => 'Módulo del sistema',
             self::NoAplica => 'No aplica',
         };
     }

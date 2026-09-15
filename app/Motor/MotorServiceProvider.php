@@ -48,7 +48,18 @@ class MotorServiceProvider extends ServiceProvider
 
     private function registrarPersistencia(): void
     {
-        // F2-b
+        $ns = 'App\\Motor\\Infraestructura\\Persistencia\\Eloquent\\Repositorios\\';
+        foreach ([
+            'RepositorioConceptos', 'RepositorioVersiones', 'RepositorioBasesArca', 'RepositorioSubsistemas', 'RepositorioAlicuotas',
+            'RepositorioTopes', 'RepositorioRegimenes', 'RepositorioEncuadramientos', 'RepositorioParametros', 'RepositorioModelosAntiguedad',
+            'RepositorioModelosVacaciones', 'RepositorioBasicos', 'RepositorioBasesZonda', 'RepositorioIncidenciasArca', 'RepositorioAplicabilidad',
+            'RepositorioRelacionesLaborales', 'RepositorioIfRelacionOrigen', 'RepositorioNovedades', 'RepositorioIfNovedadOrigen', 'RepositorioTiposNovedad',
+        ] as $puerto) {
+            $this->app->bind('App\\Motor\\Aplicacion\\Puertos\\'.$puerto, $ns.$puerto.'Eloquent');
+        }
+        $this->app->bind(\App\Motor\Aplicacion\Puertos\UnidadDeTrabajo::class, $ns.'UnidadDeTrabajoEloquent');
+        // Resultados: persistencia real es fase futura (sue090s/sue_cp090s pendientes de relevamiento).
+        $this->app->singleton(\App\Motor\Aplicacion\Puertos\RepositorioResultados::class, \App\Motor\Infraestructura\EnMemoria\RepositorioResultadosEnMemoria::class);
     }
 
     private function registrarAdaptadoresLegacy(): void

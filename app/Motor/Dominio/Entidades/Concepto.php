@@ -164,7 +164,7 @@ final readonly class Concepto
     }
 
     /** Reconstruye desde una definición (snapshot). Inversa de aDefinicion(). */
-    public static function desdeDefinicion(array $d, ?int $id = null, bool $activo = true, EstadoConfiguracion $estado = EstadoConfiguracion::Publicado): self
+    public static function desdeDefinicion(array $d, ?int $id = null, bool $activo = true, EstadoConfiguracion $estado = EstadoConfiguracion::Publicado, ?int $ordenVisual = null, ?string $observaciones = null): self
     {
         $enum = static fn (string $clase, mixed $v) => $v === null ? null : $clase::from($v);
 
@@ -212,6 +212,8 @@ final readonly class Concepto
             clasificacionFuncional: $d['clasificacion_funcional'] ?? null,
             ausentismoEvitable: $d['ausentismo_evitable'] ?? null,
             ordenCalculo: $d['orden_calculo'] ?? null,
+            ordenVisual: $ordenVisual,
+            observaciones: $observaciones,
         );
     }
 }
