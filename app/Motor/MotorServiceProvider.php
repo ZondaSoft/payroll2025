@@ -64,6 +64,16 @@ class MotorServiceProvider extends ServiceProvider
 
     private function registrarAdaptadoresLegacy(): void
     {
-        // F2-c
+        $this->app->bind(\App\Motor\Aplicacion\Puertos\RepositorioCatalogosArca::class, \App\Motor\Infraestructura\Persistencia\Eloquent\Repositorios\RepositorioCatalogosArcaEloquent::class);
+
+        $ns = 'App\\Motor\\Infraestructura\\Legacy\\';
+        foreach ([
+            'ProveedorCategorias' => 'AdaptadorCategoriasSue006', 'ProveedorConvenios' => 'AdaptadorConveniosSue007',
+            'ProveedorJornadas' => 'AdaptadorJornadasSue010', 'ProveedorEmpresas' => 'AdaptadorEmpresasSue086',
+            'ProveedorLegajos' => 'AdaptadorLegajosSue001', 'ProveedorNovedadesOrigen' => 'AdaptadorNovedadesSue028',
+            'ProveedorCatalogosSicoss' => 'AdaptadorCatalogosSicoss', 'ProveedorIncidenciasLegacy' => 'AdaptadorIncidenciasConceptosArca',
+        ] as $puerto => $adaptador) {
+            $this->app->bind('App\\Motor\\Aplicacion\\Puertos\\'.$puerto, $ns.$adaptador);
+        }
     }
 }

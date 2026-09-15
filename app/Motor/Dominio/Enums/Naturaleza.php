@@ -7,7 +7,7 @@ enum Naturaleza: string
     case Remunerativo = 'REMUNERATIVO';
     case NoRemunerativo = 'NO_REMUNERATIVO';
     case Descuento = 'DESCUENTO';
-    case Contribucion = 'CONTRIBUCION';
+    case Contribucion = 'CONTRIB_PATRONAL';
 
     public function etiqueta(): string
     {
