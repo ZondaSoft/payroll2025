@@ -139,3 +139,13 @@ Archivo Excel → `Conceptosarca` → mapeo a `Sue102.concepto_arca`
 - El LSD soporta estados: `borrador`, `generado`, `enviado`, `confirmado`, `rechazado`
 - Las importaciones generan registros de OK/ERR para auditoría
 - Toda la aplicación requiere autenticación (middleware `auth`)
+
+## Motor de Cálculo (Zonda Sueldos) — `app/Motor/`
+
+Módulo que calcula la liquidación desde cero (básicos, antigüedad, novedades, bases Zonda, bases ARCA, topes, aportes, contribuciones, regímenes). Guía de operación: `docs/motor/operacion.md`. Diccionario de tablas: `docs/motor/diccionario.md`.
+
+- **Frontera hexagonal / MVC**: solo `app/Motor/` es hexagonal. `Dominio/` es PHP puro (prohibido `Illuminate\`, `App\Models\`, `Carbon\`, helpers `config()/app()/now()`…; lo verifica `tests/Unit/Motor/ArquitecturaTest.php`); `Aplicacion/` define puertos y casos de uso; `Infraestructura/` implementa Eloquent, adaptadores legacy y EnMemoria. `MotorServiceProvider` es el único lugar que lee `config()` y hace los bindings. Los controladores (`app/Http/Controllers/Motor/`) y páginas (`resources/js/Pages/Motor/`) siguen el MVC del resto del repo.
+- **Tablas** con prefijo `motor_` (41), migraciones en `database/migrations/motor/` (cargadas por el provider). Aritmética con `Brick\Math\BigDecimal` (escala 6, HALF_UP); nunca float. FK físicas solo entre `motor_*`; hacia `sue*` la referencia es lógica y los adaptadores nunca hacen JOIN con legacy.
+- **Rutas**: bloque `Route::prefix('motor')->name('motor.')` en `routes/web.php`; las rutas literales van **antes** de cada `Route::resource`. Catálogos normativos genéricos vía `Catalogo/CatalogoMotorController` + `DefinicionCatalogo`.
+- **Fail-closed**: todo dato normativo tiene `estado_validacion`; en `PRODUCCION` solo `CONFIRMADO` habilita el cálculo. El liquidador acumula `Bloqueo[]` en vez de lanzar.
+- **Tests**: `php artisan test --filter=Motor` es la **única** invocación de tests permitida (los Feature de Breeze usan `RefreshDatabase` contra la base compartida). Los Feature del motor exigen `pdo_sqlite`.
