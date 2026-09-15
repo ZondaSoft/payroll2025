@@ -37,15 +37,13 @@ trait UsaEsquemaMotor
             return;
         }
 
-        // El flag vive en EsquemaLegacyMinimo (no en el trait): una propiedad estática de un
-        // trait es privada de cada clase que lo usa, y el esquema se recrearía por clase de test.
-        // Se comprueba además que las tablas sigan ahí: otro test con RefreshDatabase (migrate:fresh)
-        // sobre la misma base las habría borrado dejando el flag mintiendo.
-        if (! EsquemaLegacyMinimo::$preparado || ! Schema::hasTable('motor_conceptos')) {
+        // El esquema del motor y el de la app son excluyentes sobre la misma base: si está
+        // montado el otro (o ninguno), se reconstruye. El estado vive en BaseDeTests.
+        if (BaseDeTests::$esquemaMontado !== 'motor') {
             Schema::dropAllTables();
             EsquemaLegacyMinimo::crear();
             $this->migrarEsquemaMotor();
-            EsquemaLegacyMinimo::$preparado = true;
+            BaseDeTests::$esquemaMontado = 'motor';
         }
 
         DB::beginTransaction();

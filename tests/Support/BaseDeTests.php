@@ -20,6 +20,16 @@ use RuntimeException;
  */
 final class BaseDeTests
 {
+    /**
+     * Qué esquema está montado ahora mismo en la base de tests ('app' | 'motor' | null).
+     *
+     * Los tests de la app y los del motor levantan esquemas distintos y excluyentes sobre
+     * la MISMA base, así que cada grupo debe reconstruir el suyo cuando el montado es otro.
+     * Vive acá (y no en un trait) porque una propiedad estática de trait es privada de cada
+     * clase que lo usa, y se recrearía el esquema una vez por clase de test.
+     */
+    public static ?string $esquemaMontado = null;
+
     /** Únicas bases sobre las que se permite correr tests y borrar tablas. */
     public const PERMITIDAS = [
         'mysql' => ['payroll2025_test'],

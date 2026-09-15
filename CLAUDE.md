@@ -148,4 +148,17 @@ Módulo que calcula la liquidación desde cero (básicos, antigüedad, novedades
 - **Tablas** con prefijo `motor_` (41), migraciones en `database/migrations/motor/` (cargadas por el provider). Aritmética con `Brick\Math\BigDecimal` (escala 6, HALF_UP); nunca float. FK físicas solo entre `motor_*`; hacia `sue*` la referencia es lógica y los adaptadores nunca hacen JOIN con legacy.
 - **Rutas**: bloque `Route::prefix('motor')->name('motor.')` en `routes/web.php`; las rutas literales van **antes** de cada `Route::resource`. Catálogos normativos genéricos vía `Catalogo/CatalogoMotorController` + `DefinicionCatalogo`.
 - **Fail-closed**: todo dato normativo tiene `estado_validacion`; en `PRODUCCION` solo `CONFIRMADO` habilita el cálculo. El liquidador acumula `Bloqueo[]` en vez de lanzar.
-- **Tests**: corren sobre MySQL en la base dedicada `payroll2025_test` (declarada en `phpunit.xml`), no sobre sqlite: solo ahí se verifican CHECK, collation, DECIMAL y FK RESTRICT. `php artisan test --filter=Motor` → 90 tests en ~20 s. El guardarraíl `tests/Support/BaseDeTests.php` aborta cualquier test cuya conexión no esté en la lista blanca, y lo hace en `TestCase::refreshApplication()`, **antes** de que `RefreshDatabase` pueda ejecutar `migrate:fresh` — así una configuración cacheada apuntando a `swnov` ya no puede destruir la base compartida.
+- **Tests**: `php artisan test` → 121 en verde (~25 s). Corren sobre MySQL en la base dedicada `payroll2025_test` (declarada en `phpunit.xml`), no sobre sqlite: solo ahí se verifican CHECK, collation, DECIMAL y FK RESTRICT. `php artisan test --filter=Motor` → 90 tests en ~20 s. El guardarraíl `tests/Support/BaseDeTests.php` aborta cualquier test cuya conexión no esté en la lista blanca, y lo hace en `TestCase::refreshApplication()`, **antes** de que `RefreshDatabase` pueda ejecutar `migrate:fresh` — así una configuración cacheada apuntando a `swnov` ya no puede destruir la base compartida.
+
+## Tests y esquema de la base
+
+⚠️ **`migrate:fresh` / `RefreshDatabase` no pueden funcionar en este proyecto.** payroll2025 se monta sobre un esquema que no le pertenece: `sue*`, `sicoss*`, `users`, `password_reset_tokens`, `jobs`, `failed_jobs` y `roles` las crea el portal Drakma (`/var/www/html/swnov2024`) en la base compartida `swnov`, y en este repo esos `Schema::create` están comentados a propósito. 36 migraciones de payroll alteran 12 tablas que ninguna migración propia crea, así que en una base vacía la primera de ellas falla.
+
+Por eso los tests levantan su propio esquema en lugar de migrar todo:
+
+| Grupo | Trait | Qué monta |
+|---|---|---|
+| Motor | `tests/Support/Motor/UsaEsquemaMotor.php` | tablas legacy mínimas que leen los adaptadores + `database/migrations/motor` |
+| Resto (auth, perfil) | `tests/Support/UsaEsquemaApp.php` | migraciones propias de la app (sesiones, colas, permisos) + `users`/`password_reset_tokens` |
+
+Ambos esquemas son excluyentes sobre la misma base; `BaseDeTests::$esquemaMontado` decide cuándo reconstruir. Cada test corre dentro de una transacción que se revierte.

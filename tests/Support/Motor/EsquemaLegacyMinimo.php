@@ -15,9 +15,6 @@ use Illuminate\Support\Facades\Schema;
  */
 final class EsquemaLegacyMinimo
 {
-    /** Compartido por TODAS las clases de test del proceso: el esquema se levanta una sola vez. */
-    public static bool $preparado = false;
-
     public static function crear(): void
     {
         Schema::create('users', function (Blueprint $t) {

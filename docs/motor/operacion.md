@@ -76,7 +76,7 @@ CREATE DATABASE payroll2025_test CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_c
 
 Los tests Feature del motor levantan su propio esquema (`tests/Support/Motor/UsaEsquemaMotor.php`): las tablas legacy mínimas que leen los adaptadores + solo las migraciones de `database/migrations/motor`. El esquema se crea una vez por proceso y cada test corre dentro de una transacción que se revierte. Los unitarios usan repositorios en memoria y el fixture `tests/Fixtures/Motor/CasoJulio2026.php`.
 
-> Los 24 tests de Breeze (auth, perfil) fallan por una causa preexistente y ajena al motor: en `database/migrations/2025_12_11_173741_create_permission_tables.php` el `Schema::create` de la tabla `roles` está comentado, pero `model_has_roles` y `role_has_permissions` siguen declarando su FK. Por eso el proyecto **no puede migrar desde cero** en ninguna base nueva.
+Los tests que no son del motor (auth, perfil) usan `tests/Support/UsaEsquemaApp.php` por el mismo motivo por el que no usan `RefreshDatabase`: **`migrate:fresh` no puede funcionar en este proyecto**. payroll2025 se monta sobre un esquema que no le pertenece — `sue*`, `sicoss*`, `users`, `jobs` y `roles` las crea el portal Drakma, y este repo tiene comentados esos `Schema::create` (36 de sus migraciones alteran 12 tablas que ninguna crea). Ese trait levanta solo lo propio de la app más las tablas compartidas que los tests necesitan.
 
 ## 6. Entorno
 

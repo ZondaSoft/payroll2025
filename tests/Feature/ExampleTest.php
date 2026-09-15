@@ -2,7 +2,7 @@
 
 namespace Tests\Feature;
 
-// use Illuminate\Foundation\Testing\RefreshDatabase;
+// use Tests\Support\UsaEsquemaApp;
 use Tests\TestCase;
 
 class ExampleTest extends TestCase
@@ -10,10 +10,11 @@ class ExampleTest extends TestCase
     /**
      * A basic test example.
      */
-    public function test_the_application_returns_a_successful_response(): void
+    public function test_la_raiz_redirige_al_login_cuando_no_hay_sesion(): void
     {
         $response = $this->get('/');
 
-        $response->assertStatus(200);
+        // Toda la aplicación exige autenticación: un invitado en la raíz va al login.
+        $response->assertRedirect(route('login'));
     }
 }
