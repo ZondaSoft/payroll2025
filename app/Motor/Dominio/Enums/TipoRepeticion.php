@@ -8,6 +8,7 @@ enum TipoRepeticion: string
     case CadaNMeses = 'CADA_N_MESES';
     case DuranteNMeses = 'DURANTE_N_MESES';
     case MesesEspecificos = 'MESES_ESPECIFICOS';
+    case SinRestriccion = 'SIN_RESTRICCION_PERIODICA';
 
     public function etiqueta(): string
     {
@@ -16,6 +17,7 @@ enum TipoRepeticion: string
             self::CadaNMeses => 'Cada N meses',
             self::DuranteNMeses => 'Durante N meses',
             self::MesesEspecificos => 'Meses específicos',
+            self::SinRestriccion => 'Sin restricción periódica',
         };
     }
 
