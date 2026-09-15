@@ -19,9 +19,15 @@ final class MigracionesMotorTest extends TestCase
 
     public function test_crea_las_41_tablas_del_motor(): void
     {
-        $tablas = array_filter(Schema::getTableListing(), fn (string $t) => str_starts_with(substr($t, (int) strrpos('.'.$t, '.')), 'motor_'));
+        // Schema::getTableListing() en MySQL puede listar todos los schemas visibles
+        // (swnov también tiene tablas motor_*), así que se filtra por la base de tests.
+        $base = DB::getDatabaseName();
+        $tablas = array_filter(
+            array_map(fn (string $t) => str_contains($t, '.') ? explode('.', $t, 2) : [$base, $t], Schema::getTableListing()),
+            fn (array $p) => $p[0] === $base && str_starts_with($p[1], 'motor_')
+        );
 
-        self::assertCount(41, $tablas, implode(', ', $tablas));
+        self::assertCount(41, $tablas, implode(', ', array_column($tablas, 1)));
     }
 
     public function test_seed_normativo_carga_los_conteos_del_excel(): void

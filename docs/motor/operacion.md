@@ -60,10 +60,23 @@ Precedencia de parámetros y aplicabilidad: TRABAJADOR (5) > EMPRESA (4) > CATEG
 ## 5. Tests
 
 ```bash
-php artisan test --filter=Motor      # ÚNICA forma permitida de correr tests en este proyecto
+php artisan test --filter=Motor      # 90 tests del motor (~20 s)
+php artisan test                     # suite completa
 ```
 
-`tests/TestCase.php` aborta si la conexión no es sqlite `:memory:`. Los tests Feature del motor levantan su propio esquema (`tests/Support/Motor/UsaEsquemaMotor.php`) y **requieren `pdo_sqlite`** (`sudo apt install php8.3-sqlite3`); sin la extensión se marcan *skipped*. Los tests unitarios corren con repositorios en memoria y el fixture `tests/Fixtures/Motor/CasoJulio2026.php`.
+Corren sobre **MySQL**, en la base dedicada **`payroll2025_test`** (la declara `phpunit.xml`). Es a propósito: la spec exige MySQL 8.0.46 y solo ahí se verifican de verdad los `CHECK`, la collation, los `DECIMAL(18,6)` y las **FK RESTRICT** — sqlite dejaba pasar violaciones de integridad reales.
+
+**Guardarraíl** (`tests/Support/BaseDeTests.php`): ningún test corre, y ninguna tabla se borra, si la conexión no es una base de la lista blanca (`mysql → payroll2025_test`, `sqlite → :memory:`). Se valida en `TestCase::refreshApplication()`, es decir **antes** de que `setUpTraits()` dispare `RefreshDatabase` (`migrate:fresh`): ese orden es el que impide repetir el incidente del 2026-09-15, en el que una configuración cacheada apuntando a `swnov` hizo que un test borrara la base compartida. `GuardarrailBaseDeTestsTest` lo verifica.
+
+Si la base de tests no existe:
+
+```sql
+CREATE DATABASE payroll2025_test CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
+```
+
+Los tests Feature del motor levantan su propio esquema (`tests/Support/Motor/UsaEsquemaMotor.php`): las tablas legacy mínimas que leen los adaptadores + solo las migraciones de `database/migrations/motor`. El esquema se crea una vez por proceso y cada test corre dentro de una transacción que se revierte. Los unitarios usan repositorios en memoria y el fixture `tests/Fixtures/Motor/CasoJulio2026.php`.
+
+> Los 24 tests de Breeze (auth, perfil) fallan por una causa preexistente y ajena al motor: en `database/migrations/2025_12_11_173741_create_permission_tables.php` el `Schema::create` de la tabla `roles` está comentado, pero `model_has_roles` y `role_has_permissions` siguen declarando su FK. Por eso el proyecto **no puede migrar desde cero** en ninguna base nueva.
 
 ## 6. Entorno
 

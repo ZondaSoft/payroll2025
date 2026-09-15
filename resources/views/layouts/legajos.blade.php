@@ -140,14 +140,14 @@
                     </defs>
                   </svg> -->
                   <!-- <svg width="268" height="150" viewBox="0 0 38 20" fill="none" xmlns="http://www.w3.org/2000/svg"> -->
-                  @if ($GLOBALS['cliente_id'] == 1)
+                  @if (($GLOBALS['cliente_id'] ?? null) == 1)
                     <img width="150" height="70" class="ms-5 mt-5" viewBox="0 0 38 20" src="{{ asset('img/logo.png') }}" alt="Grupo Petroandina">
                   @else
                     <img width="50" height="45" viewBox="0 0 38 20" src="{{ asset('img/logo_af.png') }}" alt="Agrotecnica Fueguina">
                   @endif
                 </span>
               </span>
-              @if ($GLOBALS['cliente_id'] == 2)
+              @if (($GLOBALS['cliente_id'] ?? null) == 2)
                 <span class="app-brand-text demo menu-text fw-semibold ms-2">Agrotecnica</span>
               @endif
             </a>

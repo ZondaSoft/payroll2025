@@ -103,10 +103,12 @@ final class NormalizarNovedades
         foreach ($this->ifNovedades->delPeriodo($periodo, self::SISTEMA, self::TABLA) as $if) {
             if ($if->estado === EstadoIfNovedad::Normalizada && ! isset($clavesVistas[$if->claveOrigen])) {
                 $this->uow->ejecutar(function () use ($if, $ahora, $periodo) {
+                    // Primero se desvincula la interfaz y recién después se borra la novedad:
+                    // la FK motor_if_novedad_origen.id_novedad es RESTRICT, el orden inverso falla.
+                    $this->ifNovedades->guardar(new IfNovedadOrigen($if->id, null, $if->sistemaOrigen, $if->tablaOrigen, $if->claveOrigen, $ahora, $if->hashOrigen, EstadoIfNovedad::Anulada, "[{$periodo}] la fila de origen ya no existe"));
                     if ($if->idNovedad !== null) {
                         $this->novedades->eliminar($if->idNovedad);
                     }
-                    $this->ifNovedades->guardar(new IfNovedadOrigen($if->id, null, $if->sistemaOrigen, $if->tablaOrigen, $if->claveOrigen, $ahora, $if->hashOrigen, EstadoIfNovedad::Anulada, "[{$periodo}] la fila de origen ya no existe"));
                 });
                 $reporte->anuladas++;
             }

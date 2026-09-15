@@ -22,6 +22,20 @@ final class SimularLiquidacionTest extends TestCase
     {
         parent::setUp();
         $this->prepararEsquemaMotor();
+        // El seed normativo del Excel no trae reglas de aplicabilidad (se cargan por pantalla):
+        // sin una regla coincidente ningún concepto se liquida. Se abre el ámbito GENERAL para el
+        // recibo mínimo de cualquier trabajador (básico + antigüedad + aportes y contribuciones);
+        // los conceptos por novedad (kilómetros, pernoctada, horas extras…) NO se abren porque no
+        // corresponden a este legajo de estación de servicio. Va ANTES de publicar las versiones,
+        // porque el snapshot de cada versión incluye su aplicabilidad.
+        $ahoraSetup = now();
+        DB::table('motor_concepto_aplicabilidad')->insert(
+            DB::table('motor_conceptos')->where('activo', 1)
+                ->whereIn('estrategia_calculo', ['BASICO', 'ANTIGUEDAD', 'MODULO_SISTEMA'])->pluck('codigo_concepto')
+                ->map(fn (string $c) => ['codigo_concepto' => $c, 'tipo_ambito' => 'GENERAL', 'accion' => 'INCLUIR',
+                    'vigencia_desde' => '2026-01-01', 'estado_validacion' => 'SIN_CONFIRMAR', 'created_at' => $ahoraSetup, 'updated_at' => $ahoraSetup])
+                ->all()
+        );
         $this->seed(MotorVersionesInicialesSeeder::class);
         DB::table('sue086s')->insert(['id' => 6, 'codigo' => '05', 'detalle' => 'BLEXA']);
         DB::table('sue007s')->insert(['id' => 9, 'codigo' => '3', 'detalle' => 'Estaciones de servicio']);
@@ -43,7 +57,7 @@ final class SimularLiquidacionTest extends TestCase
 
         self::assertSame('BLOQUEADO', $r['estado']);
         $codigos = array_unique(array_column($r['bloqueos'], 'codigo'));
-        self::assertContains('BASICO_SIN_IMPORTE', $codigos, 'no hay básico cargado para la categoría real 0106');
+        self::assertContains('BASICO_SIN_IMPORTE', $codigos, 'no hay básico cargado para la categoría real 0106. Bloqueos: '.implode(', ', $codigos));
         self::assertContains('ENCUADRAMIENTO_AUSENTE', $codigos);
         self::assertGreaterThanOrEqual(2, count($codigos));
     }
@@ -53,6 +67,10 @@ final class SimularLiquidacionTest extends TestCase
         $ahora = now();
         DB::table('motor_basicos')->insert(['id_categoria' => 300, 'codigo_categoria' => '0106', 'vigencia_desde' => '2026-07-01', 'importe_basico' => '1312961.90', 'moneda' => 'ARS', 'estado_validacion' => 'SIN_CONFIRMAR', 'created_at' => $ahora, 'updated_at' => $ahora]);
         DB::table('motor_empresa_encuadramiento')->insert(['empresa_id' => 6, 'encuadramiento' => 'B', 'vigencia_desde' => '2026-01-01', 'estado_validacion' => 'SIN_CONFIRMAR', 'created_at' => $ahora, 'updated_at' => $ahora]);
+        // El seed del Excel trae los topes de REM_1 y REM_5 pero no el MÁXIMO de REM_4 (base de
+        // aportes de obra social, también topeable): sin él la regla B bloquea, así que se carga
+        // igual que lo haría el usuario desde la pantalla de topes.
+        DB::table('motor_topes_minimos')->insert(['codigo' => 'TOP-TEST-REM4', 'periodo' => '2026-07', 'codigo_base' => 'REM_4', 'tipo_tope' => 'MAXIMO', 'componente' => 'MENSUAL', 'importe' => '4509567.41', 'estado_validacion' => 'SIN_CONFIRMAR', 'created_at' => $ahora, 'updated_at' => $ahora]);
         // el convenio real 9 (código 3) necesita modelo de antigüedad para ANTIG
         DB::table('motor_convenio_modelo_antiguedad')->insert(['id_convenio' => 9, 'id_modelo_antiguedad' => 1, 'vigencia_desde' => '2026-07-01', 'estado_validacion' => 'SIN_CONFIRMAR', 'created_at' => $ahora, 'updated_at' => $ahora]);
         // parámetros del convenio 371/03 para convenio real 9

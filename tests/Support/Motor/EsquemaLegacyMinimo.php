@@ -15,6 +15,9 @@ use Illuminate\Support\Facades\Schema;
  */
 final class EsquemaLegacyMinimo
 {
+    /** Compartido por TODAS las clases de test del proceso: el esquema se levanta una sola vez. */
+    public static bool $preparado = false;
+
     public static function crear(): void
     {
         Schema::create('users', function (Blueprint $t) {
@@ -137,6 +140,43 @@ final class EsquemaLegacyMinimo
                 $t->decimal($marca, 9, 3)->nullable();
             }
             $t->timestamps();
+        });
+        // Tablas de spatie/laravel-permission: el layout `legajos` (que renderizan las
+        // pantallas del motor) usa @can en el menú, y sin ellas la vista revienta con 500.
+        Schema::create('permissions', function (Blueprint $t) {
+            $t->id();
+            $t->string('name');
+            $t->string('guard_name');
+            $t->timestamps();
+            $t->unique(['name', 'guard_name']);
+        });
+
+        Schema::create('roles', function (Blueprint $t) {
+            $t->id();
+            $t->string('name');
+            $t->string('guard_name');
+            $t->timestamps();
+            $t->unique(['name', 'guard_name']);
+        });
+
+        Schema::create('model_has_permissions', function (Blueprint $t) {
+            $t->unsignedBigInteger('permission_id');
+            $t->string('model_type');
+            $t->unsignedBigInteger('model_id');
+            $t->primary(['permission_id', 'model_id', 'model_type']);
+        });
+
+        Schema::create('model_has_roles', function (Blueprint $t) {
+            $t->unsignedBigInteger('role_id');
+            $t->string('model_type');
+            $t->unsignedBigInteger('model_id');
+            $t->primary(['role_id', 'model_id', 'model_type']);
+        });
+
+        Schema::create('role_has_permissions', function (Blueprint $t) {
+            $t->unsignedBigInteger('permission_id');
+            $t->unsignedBigInteger('role_id');
+            $t->primary(['permission_id', 'role_id']);
         });
     }
 }
