@@ -2,7 +2,6 @@
 
 namespace Database\Seeders;
 
-use Illuminate\Database\Console\Seeds\WithoutModelEvents;
 use Illuminate\Database\Seeder;
 use Illuminate\Support\Facades\DB;
 
@@ -371,6 +370,7 @@ class SicossObrasSeeder extends Seeder
             $r['codigo'] = str_pad((string) $r['codigo'], 6, '0', STR_PAD_LEFT);
             $r['created_at'] = $now;
             $r['updated_at'] = $now;
+
             return $r;
         }, $rows);
 

@@ -2,9 +2,8 @@
 
 namespace Database\Seeders;
 
-use Illuminate\Database\Console\Seeds\WithoutModelEvents;
-use Illuminate\Database\Seeder;
 use App\Models\SicossConceptosArca;
+use Illuminate\Database\Seeder;
 
 class SicossConceptosArcaSeeder extends Seeder
 {
@@ -138,4 +137,3 @@ class SicossConceptosArcaSeeder extends Seeder
         }
     }
 }
-

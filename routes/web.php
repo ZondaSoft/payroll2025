@@ -1,38 +1,38 @@
 <?php
 
-use App\Http\Controllers\ProfileController;
-use Illuminate\Foundation\Application;
-use Illuminate\Support\Facades\Route;
-use App\Http\Controllers\MainController;
-use App\Http\Controllers\LegajosController;
-use App\Http\Controllers\BajasController;
-use App\Http\Controllers\ConveniosController;
-use App\Http\Controllers\SicossActivController;
-use App\Http\Controllers\SicossCondicController;
-use App\Http\Controllers\SicossModalidadController;
-use App\Http\Controllers\SicossSituacionController;
-use App\Http\Controllers\SicossObrasSocialesController;
-use App\Http\Controllers\SicossSiniestroController;
-use App\Http\Controllers\SicossImportarController;
 use App\Http\Controllers\ArcaImportarController;
-use App\Http\Controllers\SicossLocalidadesController;
+use App\Http\Controllers\BajasController;
+use App\Http\Controllers\CategoriasController;
+use App\Http\Controllers\CentrosCostoController;
+use App\Http\Controllers\ConceptosArcaController;
+use App\Http\Controllers\ConceptosLiquidacionController;
+use App\Http\Controllers\ConveniosController;
+use App\Http\Controllers\CuadrillasController;
+use App\Http\Controllers\GruposEmpresariosController;
+use App\Http\Controllers\LegajosController;
+use App\Http\Controllers\LiquidacionCorreccionesController;
 use App\Http\Controllers\LiquidacionImportarController;
+use App\Http\Controllers\LiquidacionIndividualController;
 use App\Http\Controllers\LsdController;
 use App\Http\Controllers\LsdImporteDetraerController;
 use App\Http\Controllers\LsdTopeController;
-use App\Http\Controllers\ConceptosLiquidacionController;
-use App\Http\Controllers\LiquidacionIndividualController;
-use App\Http\Controllers\LiquidacionCorreccionesController;
-use App\Http\Controllers\PeriodosController;
-use App\Http\Controllers\GruposEmpresariosController;
-use App\Http\Controllers\CentrosCostoController;
-use App\Http\Controllers\SectoresController;
-use App\Http\Controllers\CuadrillasController;
-use App\Http\Controllers\SindicatosController;
-use App\Http\Controllers\CategoriasController;
-use App\Http\Controllers\TiposContratoController;
+use App\Http\Controllers\MainController;
 use App\Http\Controllers\ParametrosController;
-use App\Http\Controllers\ConceptosArcaController;
+use App\Http\Controllers\PeriodosController;
+use App\Http\Controllers\ProfileController;
+use App\Http\Controllers\SectoresController;
+use App\Http\Controllers\SicossActivController;
+use App\Http\Controllers\SicossCondicController;
+use App\Http\Controllers\SicossImportarController;
+use App\Http\Controllers\SicossLocalidadesController;
+use App\Http\Controllers\SicossModalidadController;
+use App\Http\Controllers\SicossObrasSocialesController;
+use App\Http\Controllers\SicossSiniestroController;
+use App\Http\Controllers\SicossSituacionController;
+use App\Http\Controllers\SindicatosController;
+use App\Http\Controllers\TiposContratoController;
+use Illuminate\Foundation\Application;
+use Illuminate\Support\Facades\Route;
 use Inertia\Inertia;
 
 // Route::get('/', function () {
@@ -135,7 +135,6 @@ Route::middleware('auth')->group(function () {
         ->parameters(['condiciones' => 'condicion'])
         ->names('sicoss.condiciones');
 
-
     // Sicoss: Modalidades
     Route::get('sicoss/modalidades/search', [SicossModalidadController::class, 'search'])
         ->name('sicoss.modalidades.search');
@@ -156,7 +155,6 @@ Route::middleware('auth')->group(function () {
     Route::resource('sicoss/modalidades', SicossModalidadController::class)
         ->parameters(['modalidades' => 'modalidad'])
         ->names('sicoss.modalidades');
-
 
     // Sicoss: Situaciones
     Route::get('sicoss/situacion/search', [SicossSituacionController::class, 'search'])
@@ -179,7 +177,6 @@ Route::middleware('auth')->group(function () {
         ->parameters(['situacion' => 'situacion'])
         ->names('sicoss.situacion');
 
-        
     // Sicoss: Obras
     Route::get('sicoss/obras/search', [SicossObrasSocialesController::class, 'search'])
         ->name('sicoss.obras.search');
@@ -243,9 +240,9 @@ Route::middleware('auth')->group(function () {
         ->parameters(['localidades' => 'localidad'])
         ->names('sicoss.localidades');
 
-    //--------------------------------------------
+    // --------------------------------------------
     // Sicoss importacion de datos de empleados
-    //---------------------------------------------
+    // ---------------------------------------------
     Route::get('sicoss/importar', [SicossImportarController::class, 'index'])
         ->name('sicoss.importar');
 
@@ -262,15 +259,15 @@ Route::middleware('auth')->group(function () {
     // Importaciones
     Route::get('/sicoss/importar/exportar-ok', [SicossImportarController::class, 'exportarOk'])->name('sicoss.importar.exportarOk');
     Route::get('/sicoss/importar/exportar-err', [SicossImportarController::class, 'exportarErr'])->name('sicoss.importar.exportarErr');
-    
+
     Route::get('/sicoss/importar/resumen', [SicossImportarController::class, 'resumenLiq'])->name('sicoss.importar.resumen');
     Route::get('/sicoss/importar/resumen/export-xlsx', [SicossImportarController::class, 'resumenLiqExportXlsx'])->name('sicoss.importar.resumen.export.xlsx');
 
     Route::get('/sicoss/import-resultados', [SicossImportarController::class, 'resultadosImport'])->name('sicoss.import.resultados');
 
-    //--------------------------------------------
+    // --------------------------------------------
     // ARCA importacion de conceptos
-    //---------------------------------------------
+    // ---------------------------------------------
     Route::get('arca/importar', [ArcaImportarController::class, 'index'])
         ->name('arca.importar');
 
@@ -290,14 +287,14 @@ Route::middleware('auth')->group(function () {
     // Importaciones
     Route::get('/arca/importar/exportar-ok', [ArcaImportarController::class, 'exportarOk'])->name('arca.importar.exportarOk');
     Route::get('/arca/importar/exportar-err', [ArcaImportarController::class, 'exportarErr'])->name('arca.importar.exportarErr');
-    
+
     Route::get('/arca/importar/resumen', [ArcaImportarController::class, 'resumenLiq'])->name('arca.importar.resumen');
     Route::get('/arca/importar/resumen/export-xlsx', [ArcaImportarController::class, 'resumenLiqExportXlsx'])->name('arca.importar.resumen.export.xlsx');
     Route::get('/arca/import-resultados', [ArcaImportarController::class, 'resultadosImport'])->name('arca.import.resultados');
 
-    //--------------------------------------------
+    // --------------------------------------------
     // Importacion de liquidaciones (BASEDAT)
-    //---------------------------------------------
+    // ---------------------------------------------
     Route::get('basedat/importar', [LiquidacionImportarController::class, 'index'])
         ->name('basedat.importar');
 
@@ -314,15 +311,15 @@ Route::middleware('auth')->group(function () {
     // Importaciones
     Route::get('/basedat/importar/exportar-ok', [LiquidacionImportarController::class, 'exportarOk'])->name('basedat.importar.exportarOk');
     Route::get('/basedat/importar/exportar-err', [LiquidacionImportarController::class, 'exportarErr'])->name('basedat.importar.exportarErr');
-    
+
     Route::get('/basedat/importar/resumen', [LiquidacionImportarController::class, 'resumenLiq'])->name('basedat.importar.resumen');
     Route::get('/basedat/importar/resumen/export-xlsx', [LiquidacionImportarController::class, 'resumenLiqExportXlsx'])->name('basedat.importar.resumen.export.xlsx');
 
     Route::get('/basedat/import-resultados', [LiquidacionImportarController::class, 'resultadosImport'])->name('basedat.import.resultados');
 
-    //--------------------------------------------
+    // --------------------------------------------
     // Libro de Sueldo Digital (LSD)
-    //---------------------------------------------
+    // ---------------------------------------------
     Route::prefix('lsd')->name('lsd.')->group(function () {
         Route::get('/generar', [LsdController::class, 'generar'])->name('generar');
         Route::post('/generar-emision', [LsdController::class, 'generarEmision'])->name('generar.emision');
@@ -338,33 +335,103 @@ Route::middleware('auth')->group(function () {
         Route::delete('/emision/{id}', [LsdController::class, 'eliminar'])->name('emision.eliminar');
     });
 
-    //--------------------------------------------
+    // --------------------------------------------
     // SICOSS: Importes a detraer (Ley 27.430)
-    //---------------------------------------------
+    // ---------------------------------------------
     Route::resource('sicoss/importes-detraer', LsdImporteDetraerController::class)
         ->parameters(['importes-detraer' => 'importe'])
         ->names('sicoss.importes-detraer')
         ->except(['show']);
 
-    //--------------------------------------------
+    // --------------------------------------------
     // SICOSS: Topes máximos de base imponible para aportes (BI 1/4/5)
-    //---------------------------------------------
+    // ---------------------------------------------
     Route::resource('sicoss/topes', LsdTopeController::class)
         ->parameters(['topes' => 'tope'])
         ->names('sicoss.topes')
         ->except(['show']);
 
-    //--------------------------------------------
+    // --------------------------------------------
+    // MOTOR DE CÁLCULO (Zonda Sueldos) — módulo hexagonal en app/Motor
+    // Regla: rutas literales ANTES de cada Route::resource para que {id} no las capture.
+    // ---------------------------------------------
+    Route::prefix('motor')->name('motor.')->group(function () {
+        // Simulador e integridad
+        Route::get('/simulador', [\App\Http\Controllers\Motor\SimuladorController::class, 'index'])->name('simulador.index');
+        Route::post('/simulador/simular', [\App\Http\Controllers\Motor\SimuladorController::class, 'simular'])->name('simulador.simular');
+        Route::get('/integridad', [\App\Http\Controllers\Motor\IntegridadController::class, 'index'])->name('integridad.index');
+
+        // Importaciones desde el legacy (botones)
+        Route::post('/importar/catalogos-sicoss', [\App\Http\Controllers\Motor\ImportacionesController::class, 'catalogosSicoss'])->name('importar.catalogos-sicoss');
+        Route::post('/importar/incidencias-arca', [\App\Http\Controllers\Motor\ImportacionesController::class, 'incidenciasArca'])->name('importar.incidencias-arca');
+
+        // Conceptos (versionado)
+        Route::post('/conceptos/{concepto}/validar', [\App\Http\Controllers\Motor\ConceptosController::class, 'validar'])->name('conceptos.validar');
+        Route::post('/conceptos/{concepto}/publicar', [\App\Http\Controllers\Motor\ConceptosController::class, 'publicar'])->name('conceptos.publicar');
+        Route::get('/conceptos/{concepto}/versiones', [\App\Http\Controllers\Motor\ConceptosController::class, 'versiones'])->name('conceptos.versiones');
+        Route::get('/conceptos/{concepto}/diff', [\App\Http\Controllers\Motor\ConceptosController::class, 'diff'])->name('conceptos.diff');
+        Route::resource('conceptos', \App\Http\Controllers\Motor\ConceptosController::class)->parameters(['conceptos' => 'concepto'])->except(['show']);
+
+        // Bases de Zonda e incidencias ARCA
+        Route::resource('bases-zonda', \App\Http\Controllers\Motor\BasesZondaController::class)->parameters(['bases-zonda' => 'base'])->except(['show']);
+        Route::get('/incidencias-arca', [\App\Http\Controllers\Motor\IncidenciasArcaController::class, 'index'])->name('incidencias-arca.index');
+        Route::post('/incidencias-arca/celda', [\App\Http\Controllers\Motor\IncidenciasArcaController::class, 'celda'])->name('incidencias-arca.celda');
+
+        // Parámetros y valores
+        Route::post('/parametros/{parametro}/valores', [\App\Http\Controllers\Motor\ParametrosController::class, 'guardarValor'])->name('parametros.valores.store');
+        Route::delete('/parametros/{parametro}/valores/{valor}', [\App\Http\Controllers\Motor\ParametrosController::class, 'eliminarValor'])->name('parametros.valores.destroy');
+        Route::resource('parametros', \App\Http\Controllers\Motor\ParametrosController::class)->parameters(['parametros' => 'parametro'])->except(['show']);
+
+        // Escalas: básicos, modelos de antigüedad/vacaciones, asignaciones por convenio
+        Route::resource('escalas/basicos', \App\Http\Controllers\Motor\Escalas\BasicosController::class)->parameters(['basicos' => 'basico'])->names('escalas.basicos')->except(['show']);
+        Route::resource('escalas/antiguedad', \App\Http\Controllers\Motor\Escalas\ModelosAntiguedadController::class)->parameters(['antiguedad' => 'modelo'])->names('escalas.antiguedad')->except(['show']);
+        Route::resource('escalas/vacaciones', \App\Http\Controllers\Motor\Escalas\ModelosVacacionesController::class)->parameters(['vacaciones' => 'modelo'])->names('escalas.vacaciones')->except(['show']);
+        Route::resource('escalas/asignaciones', \App\Http\Controllers\Motor\Escalas\AsignacionesController::class)->parameters(['asignaciones' => 'asignacion'])->names('escalas.asignaciones')->except(['show']);
+
+        // Normativa ARCA: portada + 14 catálogos (genérico)
+        Route::get('/normativa', [\App\Http\Controllers\Motor\NormativaController::class, 'index'])->name('normativa.index');
+        foreach ([
+            'bases-arca' => [\App\Http\Controllers\Motor\Normativa\BasesArcaController::class, true],
+            'subsistemas' => [\App\Http\Controllers\Motor\Normativa\SubsistemasController::class, true],
+            'aplicaciones' => [\App\Http\Controllers\Motor\Normativa\SubsistemaAplicacionController::class, true],
+            'encuadramientos-patronales' => [\App\Http\Controllers\Motor\Normativa\EncuadramientosPatronalesController::class, true],
+            'alicuotas-contribuciones' => [\App\Http\Controllers\Motor\Normativa\AlicuotasContribucionesController::class, false],
+            'alicuotas-aportes' => [\App\Http\Controllers\Motor\Normativa\AlicuotasAportesController::class, false],
+            'topes' => [\App\Http\Controllers\Motor\Normativa\TopesController::class, false],
+            'regimenes' => [\App\Http\Controllers\Motor\Normativa\RegimenesController::class, true],
+            'condiciones' => [\App\Http\Controllers\Motor\Normativa\CondicionesArcaController::class, false],
+            'modalidades' => [\App\Http\Controllers\Motor\Normativa\ModalidadesArcaController::class, false],
+            'situaciones' => [\App\Http\Controllers\Motor\Normativa\SituacionesRevistaController::class, false],
+            'actividades' => [\App\Http\Controllers\Motor\Normativa\ActividadesArcaController::class, false],
+            'localidades' => [\App\Http\Controllers\Motor\Normativa\LocalidadesArcaController::class, false],
+            'componentes-tope' => [\App\Http\Controllers\Motor\Normativa\ComponentesTopeController::class, true],
+        ] as $slug => [$controlador, $cerrado]) {
+            $r = Route::resource("normativa/{$slug}", $controlador)->parameters([$slug => 'item'])->names("normativa.{$slug}");
+            // los catálogos cerrados no admiten alta ni borrado: la restricción vive en la ruta, no solo en la UI
+            $cerrado ? $r->only(['index', 'edit', 'update']) : $r->except(['show']);
+        }
+
+        // Relaciones laborales canónicas, encuadramiento de empresas, mapeo de novedades
+        Route::post('/relaciones/sincronizar', [\App\Http\Controllers\Motor\RelacionesLaboralesController::class, 'sincronizar'])->name('relaciones.sincronizar');
+        Route::post('/relaciones/normalizar-novedades', [\App\Http\Controllers\Motor\RelacionesLaboralesController::class, 'normalizarNovedades'])->name('relaciones.normalizar-novedades');
+        Route::get('/relaciones', [\App\Http\Controllers\Motor\RelacionesLaboralesController::class, 'index'])->name('relaciones.index');
+        Route::get('/relaciones/{relacion}', [\App\Http\Controllers\Motor\RelacionesLaboralesController::class, 'show'])->name('relaciones.show');
+        Route::put('/relaciones/{relacion}', [\App\Http\Controllers\Motor\RelacionesLaboralesController::class, 'update'])->name('relaciones.update');
+        Route::resource('encuadramientos', \App\Http\Controllers\Motor\EncuadramientosController::class)->parameters(['encuadramientos' => 'encuadramiento'])->except(['show']);
+        Route::resource('novedades-mapeo', \App\Http\Controllers\Motor\NovedadesMapeoController::class)->parameters(['novedades-mapeo' => 'mapeo'])->except(['show']);
+    });
+
+    // --------------------------------------------
     // Config: Parametrizaciones (rangos sue089s)
-    //---------------------------------------------
+    // ---------------------------------------------
     Route::resource('config/parametros', ParametrosController::class)
         ->parameters(['parametros' => 'parametro'])
         ->names('config.parametros')
         ->except(['show']);
 
-    //--------------------------------------------
+    // --------------------------------------------
     // ARCA: Conceptos (CRUD tabla conceptosarcas)
-    //---------------------------------------------
+    // ---------------------------------------------
     Route::get('arca/conceptos/search', [ConceptosArcaController::class, 'search'])
         ->name('arca.conceptos.search');
     Route::get('arca/conceptos/first', [ConceptosArcaController::class, 'first'])
@@ -379,9 +446,9 @@ Route::middleware('auth')->group(function () {
         ->parameters(['conceptos' => 'concepto'])
         ->names('arca.conceptos');
 
-    //--------------------------------------------
+    // --------------------------------------------
     // Liquidación: Períodos
-    //---------------------------------------------
+    // ---------------------------------------------
     Route::get('liquidacion/periodos/search', [PeriodosController::class, 'search'])
         ->name('liquidacion.periodos.search');
 
@@ -413,14 +480,14 @@ Route::middleware('auth')->group(function () {
         ->parameters(['periodos' => 'periodo'])
         ->except(['index', 'create', 'edit', 'show'])
         ->names([
-            'store'   => 'liquidacion.periodos.store',
-            'update'  => 'liquidacion.periodos.update',
+            'store' => 'liquidacion.periodos.store',
+            'update' => 'liquidacion.periodos.update',
             'destroy' => 'liquidacion.periodos.destroy',
         ]);
 
-    //--------------------------------------------
+    // --------------------------------------------
     // Liquidación: Conceptos
-    //---------------------------------------------
+    // ---------------------------------------------
     Route::get('liquidacion/conceptos/proximoCodigo', [ConceptosLiquidacionController::class, 'obtenerProximoCodigo'])
         ->name('liquidacion.conceptos.proximoCodigo');
 
@@ -458,16 +525,16 @@ Route::middleware('auth')->group(function () {
 
     Route::resource('liquidacion/conceptos', ConceptosLiquidacionController::class)
         ->parameters(['conceptos' => 'concepto'])
-        ->except(['index','create','edit','show'])
+        ->except(['index', 'create', 'edit', 'show'])
         ->names([
-            'store'   => 'liquidacion.conceptos.store',
-            'update'  => 'liquidacion.conceptos.update',
+            'store' => 'liquidacion.conceptos.store',
+            'update' => 'liquidacion.conceptos.update',
             'destroy' => 'liquidacion.conceptos.destroy',
         ]);
 
-    //--------------------------------------------
+    // --------------------------------------------
     // Liquidación Individual
-    //---------------------------------------------
+    // ---------------------------------------------
     Route::get('liquidacion/individual', [LiquidacionIndividualController::class, 'index'])
         ->name('liquidacion.individual.index');
     Route::get('liquidacion/individual/lista/{periodo}', [LiquidacionIndividualController::class, 'lista'])
@@ -483,9 +550,9 @@ Route::middleware('auth')->group(function () {
     Route::get('liquidacion/correcciones', [LiquidacionCorreccionesController::class, 'index'])
         ->name('liquidacion.correcciones.index');
 
-    //--------------------------------------------
+    // --------------------------------------------
     // Grupos Empresarios (Sue086)
-    //---------------------------------------------
+    // ---------------------------------------------
     Route::get('grupos-empresarios/search', [GruposEmpresariosController::class, 'search'])
         ->name('grupos.empresarios.search');
 
@@ -505,9 +572,9 @@ Route::middleware('auth')->group(function () {
         ->parameters(['grupos-empresarios' => 'grupo'])
         ->names('grupos.empresarios');
 
-    //---------------------------------------------
+    // ---------------------------------------------
     // Catálogos de RR.HH. (ABM bajo "Grupo empresario")
-    //---------------------------------------------
+    // ---------------------------------------------
 
     // Centros de costo (Sue030)
     Route::get('centros-costo/search', [CentrosCostoController::class, 'search'])->name('centros.costo.search');

@@ -12,7 +12,7 @@ class HandleInertiaRequests extends Middleware
      *
      * @var string
      */
-    protected $rootView = 'layouts/legajos';        //'guest';
+    protected $rootView = 'layouts/legajos';        // 'guest';
 
     /**
      * Determine the current asset version.
@@ -34,6 +34,11 @@ class HandleInertiaRequests extends Middleware
             'auth' => [
                 'user' => $request->user(),
             ],
+            'flash' => [
+                'success' => fn () => $request->session()->get('success'),
+                'error' => fn () => $request->session()->get('error'),
+                'warning' => fn () => $request->session()->get('warning'),
+            ],
         ];
     }
 
@@ -44,7 +49,7 @@ class HandleInertiaRequests extends Middleware
         // Por ejemplo, si la ruta coincide con "admin.*", usa la plantilla 'admin.blade.php'.
         // De lo contrario, usa la plantilla por defecto 'app.blade.php'.
 
-        //dd(session('active'));
+        // dd(session('active'));
         $active = session('active');
 
         // Pasar datos a la vista de layout
@@ -112,9 +117,14 @@ class HandleInertiaRequests extends Middleware
             return 'layouts/legajos';
         }
 
+        // Motor de cálculo
+        if ($request->is('motor*')) {
+            return 'layouts/legajos';
+        }
+
         // Layout por defecto
 
-        //return 'layouts/legajos';
+        // return 'layouts/legajos';
         return 'guest';
     }
 }

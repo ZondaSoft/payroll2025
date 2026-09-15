@@ -264,6 +264,51 @@
             </li>
 
             <!-- Forms & Tables -->
+            <!-- Motor de Cálculo -->
+            <li class="menu-header mt-5">
+              <span class="menu-header-text" data-i18n="Motor de cálculo">Motor de cálculo</span>
+            </li>
+            <li class="menu-item {{ request()->is('motor/*') ? 'active open' : '' }}">
+              <a href="javascript:void(0);" class="menu-link menu-toggle">
+                <i class="menu-icon tf-icons ri-calculator-line"></i>
+                <div data-i18n="Motor de cálculo">Motor de cálculo</div>
+              </a>
+              <ul class="menu-sub">
+                <li class="menu-item {{ request()->routeIs('motor.simulador.*') ? 'active' : '' }}">
+                  <a href="{{ route('motor.simulador.index') }}" class="menu-link"><div data-i18n="Simulador">Simulador</div></a>
+                </li>
+                <li class="menu-item {{ request()->routeIs('motor.integridad.*') ? 'active' : '' }}">
+                  <a href="{{ route('motor.integridad.index') }}" class="menu-link"><div data-i18n="Integridad">Integridad</div></a>
+                </li>
+                <li class="menu-item {{ request()->routeIs('motor.conceptos.*') ? 'active' : '' }}">
+                  <a href="{{ route('motor.conceptos.index') }}" class="menu-link"><div data-i18n="Conceptos">Conceptos</div></a>
+                </li>
+                <li class="menu-item {{ request()->routeIs('motor.bases-zonda.*') ? 'active' : '' }}">
+                  <a href="{{ route('motor.bases-zonda.index') }}" class="menu-link"><div data-i18n="Bases de Zonda">Bases de Zonda</div></a>
+                </li>
+                <li class="menu-item {{ request()->routeIs('motor.incidencias-arca.*') ? 'active' : '' }}">
+                  <a href="{{ route('motor.incidencias-arca.index') }}" class="menu-link"><div data-i18n="Incidencias ARCA">Incidencias ARCA</div></a>
+                </li>
+                <li class="menu-item {{ request()->routeIs('motor.parametros.*') ? 'active' : '' }}">
+                  <a href="{{ route('motor.parametros.index') }}" class="menu-link"><div data-i18n="Parámetros">Parámetros</div></a>
+                </li>
+                <li class="menu-item {{ request()->routeIs('motor.escalas.*') ? 'active' : '' }}">
+                  <a href="{{ route('motor.escalas.basicos.index') }}" class="menu-link"><div data-i18n="Escalas y básicos">Escalas y básicos</div></a>
+                </li>
+                <li class="menu-item {{ request()->routeIs('motor.normativa.*') ? 'active' : '' }}">
+                  <a href="{{ route('motor.normativa.index') }}" class="menu-link"><div data-i18n="Normativa ARCA">Normativa ARCA</div></a>
+                </li>
+                <li class="menu-item {{ request()->routeIs('motor.relaciones.*') ? 'active' : '' }}">
+                  <a href="{{ route('motor.relaciones.index') }}" class="menu-link"><div data-i18n="Relaciones laborales">Relaciones laborales</div></a>
+                </li>
+                <li class="menu-item {{ request()->routeIs('motor.encuadramientos.*') ? 'active' : '' }}">
+                  <a href="{{ route('motor.encuadramientos.index') }}" class="menu-link"><div data-i18n="Encuadramiento empresas">Encuadramiento empresas</div></a>
+                </li>
+                <li class="menu-item {{ request()->routeIs('motor.novedades-mapeo.*') ? 'active' : '' }}">
+                  <a href="{{ route('motor.novedades-mapeo.index') }}" class="menu-link"><div data-i18n="Mapeo de novedades">Mapeo de novedades</div></a>
+                </li>
+              </ul>
+            </li>
             <li class="menu-header mt-5">
               <span class="menu-header-text" data-i18n="Informes">Informes</span>
             </li>
