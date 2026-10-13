@@ -4,7 +4,6 @@ namespace App\Motor\Infraestructura\EnMemoria;
 
 use App\Motor\Aplicacion\Puertos\RepositorioAplicabilidad;
 use App\Motor\Dominio\Entidades\ReglaAplicabilidad;
-use App\Motor\Dominio\Enums\TipoAmbito;
 
 final class AplicabilidadEnMemoria implements RepositorioAplicabilidad
 {
@@ -21,7 +20,7 @@ final class AplicabilidadEnMemoria implements RepositorioAplicabilidad
     public function guardar(ReglaAplicabilidad $r, ?int $usuarioId = null): ReglaAplicabilidad
     {
         $n = new ReglaAplicabilidad($r->id ?? $this->nuevoId(), $r->codigoConcepto, $r->ambito, $r->idConvenio, $r->idCategoria, $r->idEmpresa, $r->relacionLaboralId,
-            $r->accion, $r->vigencia, $r->estadoValidacion, $r->ambito === TipoAmbito::Categoria ? 'CATEGORIA_CONCEPTO' : 'APLICABILIDAD');
+            $r->accion, $r->vigencia, $r->estadoValidacion, 'APLICABILIDAD');
         $this->reglas = $this->reemplazar($this->reglas, $n);
 
         return $n;

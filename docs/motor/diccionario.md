@@ -1,5 +1,11 @@
 # Diccionario técnico del Motor (fuente: Zonda_Especificacion_Tecnica_Tablas_2026-08-30.xlsx)
 
+> ⚠️ **Documenta el modelo v1, el de la entrega del 30/08.** El modelo vigente es el
+> **DBML v2** del Excel funcional v5: ver [`modelo_v2.md`](modelo_v2.md) para las tablas
+> nuevas, las columnas que cambiaron de lugar y los datos que reemplazaron a este seed.
+> Esta referencia se conserva porque sigue describiendo el núcleo de las 35 tablas
+> originales, que el v2 no modificó.
+
 Generado por `database/seeders/motor/herramientas/generar_datos.py`. Fuente única para migraciones, modelos y entidades.
 Tabla física = `motor_` + nombre en minúsculas. Las desviaciones aplicadas se listan en el plan (§11).
 

@@ -215,7 +215,7 @@ class ConceptosController extends Controller
                 'modulos' => ['MOTOR_GENERAL', 'SEGURIDAD_SOCIAL', 'OBRA_SOCIAL', 'ART', 'SCVO', 'SINDICATO', 'CONVENIO', 'GANANCIAS', 'OTRO'],
                 'clasificaciones' => ['REMUNERACION', 'ADICIONAL', 'HORAS_EXTRAS', 'VIATICOS', 'AUSENTISMO', 'LICENCIA', 'DESCUENTO', 'CONTRIBUCION', 'INFORMATIVO', 'PENDIENTE_CLASIFICAR'],
                 'parametros' => MotorParametro::query()->orderBy('codigo')->get(['codigo', 'descripcion'])->map(fn ($p) => ['value' => $p->codigo, 'label' => "{$p->codigo} — {$p->descripcion}"])->all(),
-                'novedades' => MotorTipoNovedad::query()->orderBy('codigo')->get(['codigo', 'descripcion', 'unidad'])->map(fn ($n) => ['value' => $n->codigo, 'label' => "{$n->codigo} — {$n->descripcion} ({$n->unidad})"])->all(),
+                'novedades' => MotorTipoNovedad::query()->orderBy('codigo')->get(['codigo', 'descripcion', 'unidad'])->map(fn ($n) => ['value' => $n->codigo, 'label' => "{$n->codigo} — {$n->descripcion} (".($n->unidad ?? 'unidad pendiente').')'])->all(),
                 'bases_zonda' => array_map(fn ($b) => ['value' => $b->codigo, 'label' => "{$b->codigo} — {$b->nombre}", 'activo' => $b->activo], $this->basesZonda->todas()),
                 'bases_arca' => DB::table('motor_bases_arca')->orderBy('id_base')->get(['codigo_base', 'descripcion'])->map(fn ($b) => ['value' => $b->codigo_base, 'label' => "{$b->codigo_base} — {$b->descripcion}"])->all(),
                 'aplicaciones' => array_map(fn ($a) => ['clave' => $a->clave(), 'subsistema' => $a->codigoSubsistema, 'tipo' => $a->tipoAplicacion->value, 'base' => $a->codigoBase, 'columna' => $a->columnaLsd, 'activo' => $a->activo], $aplicaciones),

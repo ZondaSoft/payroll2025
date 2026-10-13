@@ -8,6 +8,8 @@ enum TipoRegla: string
     case Sustitutivo = 'SUSTITUTIVO';
     case Adicional = 'ADICIONAL';
     case Destino = 'DESTINO';
+    /** Reemplaza un subsistema completo por otro destino con su propio porcentaje (RENATRE 1,5 % en lugar de FNE). */
+    case SustitucionSubsistema = 'SUSTITUCION_SUBSISTEMA';
 
     public function etiqueta(): string
     {
@@ -16,6 +18,7 @@ enum TipoRegla: string
             self::Sustitutivo => 'Sustitutivo',
             self::Adicional => 'Adicional',
             self::Destino => 'Destino',
+            self::SustitucionSubsistema => 'Sustitución de subsistema',
         };
     }
 

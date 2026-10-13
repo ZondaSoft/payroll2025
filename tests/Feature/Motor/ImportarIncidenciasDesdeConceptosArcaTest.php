@@ -24,22 +24,32 @@ final class ImportarIncidenciasDesdeConceptosArcaTest extends TestCase
         DB::table('conceptosarcas')->insert(['id_empresa' => 1, 'codigo_afip' => 110000, 'aportes_sipa' => 1, 'contribuciones_sipa' => 1, 'aportes_inssjyp' => 1, 'contribuciones_inssjyp' => 1,
             'aportes_obra_social' => 1, 'contribuciones_obra_social' => 1, 'aportes_fsr' => 1, 'contribuciones_fsr' => 1, 'aportes_renatea' => 0, 'contribuciones_renatea' => 0,
             'contribuciones_aaff' => 1, 'contribuciones_fne' => 1, 'contribuciones_lrt' => 1]);
-        $pendientesAntes = DB::table('motor_concepto_incidencia_arca')->where('codigo_concepto', 'BASICO')->where('incidencia', 'PENDIENTE')->count();
-        $decididasAntes = DB::table('motor_concepto_incidencia_arca')->where('codigo_concepto', 'BASICO')->whereIn('incidencia', ['S', 'N'])->get()->keyBy('id_subsistema_aplicacion');
+
+        // El Excel v5 trae las 507 incidencias decididas, así que para probar que el
+        // import COMPLETA lo pendiente hay que volver a abrir una: se elige la de
+        // RENATRE/APORTE, que en el legacy viene en 0 y debe resolverse como N.
+        $renatreAporte = (int) DB::table('motor_subsistema_aplicacion')
+            ->join('motor_subsistemas', 'motor_subsistemas.id_subsistema', '=', 'motor_subsistema_aplicacion.id_subsistema')
+            ->where('motor_subsistemas.codigo', 'RENATRE')->where('tipo_aplicacion', 'APORTE')
+            ->value('motor_subsistema_aplicacion.id_subsistema_aplicacion');
+        DB::table('motor_concepto_incidencia_arca')->where('codigo_concepto', 'BASICO')
+            ->where('id_subsistema_aplicacion', $renatreAporte)
+            ->update(['incidencia' => 'PENDIENTE', 'estado_validacion' => 'SIN_CONFIRMAR']);
+
+        $decididasAntes = DB::table('motor_concepto_incidencia_arca')->where('codigo_concepto', 'BASICO')
+            ->whereIn('incidencia', ['S', 'N'])->get()->keyBy('id_subsistema_aplicacion');
 
         $r = app(ImportarIncidenciasDesdeConceptosArca::class)->ejecutar();
 
         self::assertSame(1, $r['conceptos_con_codigo_afip']);
-        self::assertSame($pendientesAntes, $r['actualizadas']);
+        self::assertSame(1, $r['actualizadas'], 'sólo la que estaba PENDIENTE');
         self::assertSame(0, DB::table('motor_concepto_incidencia_arca')->where('codigo_concepto', 'BASICO')->where('incidencia', 'PENDIENTE')->count());
+        // RENATEA (0 en el legacy) → RENATRE N en el motor
+        self::assertSame('N', DB::table('motor_concepto_incidencia_arca')->where('codigo_concepto', 'BASICO')
+            ->where('id_subsistema_aplicacion', $renatreAporte)->value('incidencia'));
         foreach ($decididasAntes as $id => $fila) {
             self::assertSame($fila->incidencia, DB::table('motor_concepto_incidencia_arca')->where('codigo_concepto', 'BASICO')->where('id_subsistema_aplicacion', $id)->value('incidencia'), 'una S/N decidida no se pisa');
         }
-        // RENATEA (0 en legacy) → RENATRE N en el motor
-        $renatre = DB::table('motor_concepto_incidencia_arca')->join('motor_subsistema_aplicacion', 'motor_subsistema_aplicacion.id_subsistema_aplicacion', '=', 'motor_concepto_incidencia_arca.id_subsistema_aplicacion')
-            ->join('motor_subsistemas', 'motor_subsistemas.id_subsistema', '=', 'motor_subsistema_aplicacion.id_subsistema')
-            ->where('codigo_concepto', 'BASICO')->where('motor_subsistemas.codigo', 'RENATRE')->pluck('incidencia')->unique()->all();
-        self::assertSame(['N'], $renatre);
     }
 
     public function test_importa_catalogos_sicoss_sin_pisar(): void

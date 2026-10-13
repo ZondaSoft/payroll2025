@@ -8,7 +8,8 @@ final readonly class TipoNovedad
         public int $id,
         public string $codigo,
         public string $descripcion,
-        public string $unidad,
+        /** NULL cuando el origen la declara PENDIENTE_UNIDAD: el motor bloquea antes de suponerla. */
+        public ?string $unidad,
         public bool $activo = true,
     ) {}
 }

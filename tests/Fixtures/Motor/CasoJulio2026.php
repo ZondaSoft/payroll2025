@@ -169,15 +169,15 @@ final class CasoJulio2026
         $v = self::vig('2020-01-01');
 
         return [
-            new RegimenContributivo(1, 'GENERAL', 'Régimen general', TipoRegla::Base, $e, null, 'SEGURIDAD_SOCIAL', 'REM_2', null, 10, $v, $estado),
-            new RegimenContributivo(2, 'TRANSP_CARGAS', 'Conductor de transporte de cargas', TipoRegla::Adicional, $e, Porcentaje::deFraccion('0.02'), 'SIPA', 'REM_2', null, 30, $v, $estado),
-            new RegimenContributivo(3, 'TRANSP_PASAJEROS', 'Transporte de pasajeros', TipoRegla::Adicional, $e, Porcentaje::deFraccion('0.02'), 'SIPA', 'REM_2', null, 30, $v, $estado),
-            new RegimenContributivo(4, 'CONSTRUCCION', 'Construcción', TipoRegla::Adicional, $e, Porcentaje::deFraccion('0.05'), 'SIPA', 'REM_2', null, 30, $v, $estado),
-            new RegimenContributivo(5, 'AGRARIO', 'Agrario', TipoRegla::Adicional, $e, Porcentaje::deFraccion('0.02'), 'SIPA', 'REM_2', null, 30, $v, $estado),
-            new RegimenContributivo(6, 'RURAL_RENATRE', 'RENATRE', TipoRegla::Destino, $e, Porcentaje::deFraccion('0.015'), 'RENATRE', 'REM_3', null, 40, $v, EstadoValidacion::SinDato),
-            new RegimenContributivo(7, 'RIFL', 'RIFL Ley 27.802', TipoRegla::Sustitutivo, $e, Porcentaje::deFraccion('0.05'), 'SIPA+INSSJP+AAFF+FNE', 'REM_2', 48, 20, self::vig('2026-05-01'), $estado),
-            new RegimenContributivo(8, 'DOCENTE', 'Docente', TipoRegla::Adicional, $t, Porcentaje::deFraccion('0.02'), 'SIPA', 'REM_6', null, 30, $v, $estado),
-            new RegimenContributivo(9, 'INVESTIGADOR', 'Investigador', TipoRegla::Adicional, $t, Porcentaje::deFraccion('0.02'), 'SIPA', 'REM_6', null, 30, $v, $estado),
+            new RegimenContributivo(1, 'GENERAL', 'Régimen general', TipoRegla::Base, $e, null, 'SEGURIDAD_SOCIAL', null, 'REM_2', null, 10, $v, $estado),
+            new RegimenContributivo(2, 'TRANSP_CARGAS', 'Conductor de transporte de cargas', TipoRegla::Adicional, $e, Porcentaje::deFraccion('0.02'), 'SIPA', null, 'REM_2', null, 30, $v, $estado),
+            new RegimenContributivo(3, 'TRANSP_PASAJEROS', 'Transporte de pasajeros', TipoRegla::Adicional, $e, Porcentaje::deFraccion('0.02'), 'SIPA', null, 'REM_2', null, 30, $v, $estado),
+            new RegimenContributivo(4, 'CONSTRUCCION', 'Construcción', TipoRegla::Adicional, $e, Porcentaje::deFraccion('0.05'), 'SIPA', null, 'REM_2', null, 30, $v, $estado),
+            new RegimenContributivo(5, 'AGRARIO', 'Agrario', TipoRegla::Adicional, $e, Porcentaje::deFraccion('0.02'), 'SIPA', null, 'REM_2', null, 30, $v, $estado),
+            new RegimenContributivo(6, 'RURAL_RENATRE', 'RENATRE', TipoRegla::SustitucionSubsistema, $e, Porcentaje::deFraccion('0.015'), 'RENATRE', 'FNE', 'REM_3', null, 40, $v, EstadoValidacion::SinDato),
+            new RegimenContributivo(7, 'RIFL', 'RIFL Ley 27.802', TipoRegla::Sustitutivo, $e, Porcentaje::deFraccion('0.05'), 'SIPA+INSSJP+AAFF+FNE', null, 'REM_2', 48, 20, self::vig('2026-05-01'), $estado),
+            new RegimenContributivo(8, 'DOCENTE', 'Docente', TipoRegla::Adicional, $t, Porcentaje::deFraccion('0.02'), 'SIPA', null, 'REM_6', null, 30, $v, $estado),
+            new RegimenContributivo(9, 'INVESTIGADOR', 'Investigador', TipoRegla::Adicional, $t, Porcentaje::deFraccion('0.02'), 'SIPA', null, 'REM_6', null, 30, $v, $estado),
         ];
     }
 

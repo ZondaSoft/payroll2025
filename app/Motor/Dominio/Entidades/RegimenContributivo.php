@@ -18,6 +18,8 @@ final readonly class RegimenContributivo
         public SujetoObligado $sujetoObligado,
         public ?Porcentaje $porcentaje,
         public ?string $destino,
+        /** Subsistema que el régimen reemplaza por completo (tipo_regla SUSTITUCION_SUBSISTEMA). */
+        public ?string $reemplazaSubsistema,
         public string $baseAplicable,
         public ?int $duracionMeses,
         public int $ordenAplicacion,

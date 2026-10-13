@@ -67,10 +67,7 @@ final class SimularLiquidacionTest extends TestCase
         $ahora = now();
         DB::table('motor_basicos')->insert(['id_categoria' => 300, 'codigo_categoria' => '0106', 'vigencia_desde' => '2026-07-01', 'importe_basico' => '1312961.90', 'moneda' => 'ARS', 'estado_validacion' => 'SIN_CONFIRMAR', 'created_at' => $ahora, 'updated_at' => $ahora]);
         DB::table('motor_empresa_encuadramiento')->insert(['empresa_id' => 6, 'encuadramiento' => 'B', 'vigencia_desde' => '2026-01-01', 'estado_validacion' => 'SIN_CONFIRMAR', 'created_at' => $ahora, 'updated_at' => $ahora]);
-        // El seed del Excel trae los topes de REM_1 y REM_5 pero no el MÁXIMO de REM_4 (base de
-        // aportes de obra social, también topeable): sin él la regla B bloquea, así que se carga
-        // igual que lo haría el usuario desde la pantalla de topes.
-        DB::table('motor_topes_minimos')->insert(['codigo' => 'TOP-TEST-REM4', 'periodo' => '2026-07', 'codigo_base' => 'REM_4', 'tipo_tope' => 'MAXIMO', 'componente' => 'MENSUAL', 'importe' => '4509567.41', 'estado_validacion' => 'SIN_CONFIRMAR', 'created_at' => $ahora, 'updated_at' => $ahora]);
+        // El tope máximo de REM_4 ya viene del Excel v5 (TOP-008): no hace falta cargarlo acá.
         // el convenio real 9 (código 3) necesita modelo de antigüedad para ANTIG
         DB::table('motor_convenio_modelo_antiguedad')->insert(['id_convenio' => 9, 'id_modelo_antiguedad' => 1, 'vigencia_desde' => '2026-07-01', 'estado_validacion' => 'SIN_CONFIRMAR', 'created_at' => $ahora, 'updated_at' => $ahora]);
         // parámetros del convenio 371/03 para convenio real 9

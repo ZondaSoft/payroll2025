@@ -36,7 +36,7 @@ class NovedadesMapeoController extends Controller
         }
 
         return Inertia::render('Motor/NovedadesMapeo/Index', ['mapeos' => $mapeos, 'sin_mapear' => $sinMapear, 'resumen_if' => $this->ifNovedades->resumenEstados(),
-            'tipos' => array_map(fn ($t) => ['value' => $t->codigo, 'label' => "{$t->codigo} — {$t->descripcion} ({$t->unidad})", 'unidad' => $t->unidad], $this->tipos->todos()),
+            'tipos' => array_map(fn ($t) => ['value' => $t->codigo, 'label' => "{$t->codigo} — {$t->descripcion} (".($t->unidad ?? 'unidad pendiente').')', 'unidad' => $t->unidad], $this->tipos->todos()),
             'columnas' => self::COLUMNAS, 'catalogo_legacy' => array_map(fn ($cod, $det) => ['value' => $cod, 'label' => "{$cod} — {$det}", 'usos' => $usados[$cod] ?? 0], array_keys($catalogo), $catalogo)]);
     }
 
@@ -94,7 +94,7 @@ class NovedadesMapeoController extends Controller
 
     private function opcionesTipos(): array
     {
-        return array_map(fn ($t) => ['value' => $t->codigo, 'label' => "{$t->codigo} — {$t->descripcion} ({$t->unidad})", 'unidad' => $t->unidad], $this->tipos->todos());
+        return array_map(fn ($t) => ['value' => $t->codigo, 'label' => "{$t->codigo} — {$t->descripcion} (".($t->unidad ?? 'unidad pendiente').')', 'unidad' => $t->unidad], $this->tipos->todos());
     }
 
     private function catalogoOpciones(): array

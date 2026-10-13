@@ -99,6 +99,14 @@ final class ResolutorRegimenes
                 case TipoRegla::Adicional:
                     $lineas[$r->codigo] = ['subsistema' => $destinos[0], 'base' => $r->baseAplicable, 'porcentaje' => $r->porcentaje ?? Porcentaje::cero(), 'regla' => 'ADICIONAL', 'regimen' => $r->codigo, 'destino' => $r->destino];
                     break;
+                case TipoRegla::SustitucionSubsistema:
+                    // reemplaza por completo el subsistema nombrado: su línea sale y entra
+                    // una propia con el porcentaje del régimen (RENATRE 1,5 % por FNE)
+                    if ($r->reemplazaSubsistema !== null) {
+                        unset($lineas[$r->reemplazaSubsistema]);
+                    }
+                    $lineas[$r->codigo] = ['subsistema' => $destinos[0], 'base' => $r->baseAplicable, 'porcentaje' => $r->porcentaje ?? Porcentaje::cero(), 'regla' => 'SUSTITUCION_SUBSISTEMA', 'regimen' => $r->codigo, 'destino' => $r->destino];
+                    break;
                 case TipoRegla::Destino:
                     // cambia el destinatario sin sumar: se informa como línea propia con su %, descontándolo del subsistema de origen si existe
                     $lineas[$r->codigo] = ['subsistema' => $destinos[0], 'base' => $r->baseAplicable, 'porcentaje' => $r->porcentaje ?? Porcentaje::cero(), 'regla' => 'DESTINO', 'regimen' => $r->codigo, 'destino' => $r->destino];

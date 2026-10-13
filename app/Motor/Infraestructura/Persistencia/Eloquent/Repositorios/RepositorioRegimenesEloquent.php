@@ -32,7 +32,7 @@ final class RepositorioRegimenesEloquent implements RepositorioRegimenes
     {
         return new RegimenContributivo(
             (int) $f->id_regimen, $f->codigo, $f->descripcion, TipoRegla::from($f->tipo_regla), SujetoObligado::from($f->sujeto_obligado),
-            Mapeos::porcentaje($f->porcentaje), $f->destino, $f->base_aplicable, $f->duracion_meses === null ? null : (int) $f->duracion_meses,
+            Mapeos::porcentaje($f->porcentaje), $f->destino, $f->reemplaza_subsistema, $f->base_aplicable, $f->duracion_meses === null ? null : (int) $f->duracion_meses,
             (int) $f->orden_aplicacion, Mapeos::vigencia($f), Mapeos::estado($f),
         );
     }

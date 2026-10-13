@@ -1,0 +1,16 @@
+<?php
+
+// Generado por generar_datos_v5.py desde el Excel funcional v5 (DBML v2). No editar a mano.
+// Hoja TOPES_MINIMOS — 9 filas.
+
+return [
+    ['id_tope' => 'TOP-001', 'periodo' => '2026-06-01', 'codigo_base' => 'REM_1', 'tipo_tope' => 'MAXIMO', 'componente' => 'MENSUAL', 'importe' => '4414652.38', 'estado_validacion' => 'SIN_CONFIRMAR', 'fuente_normativa' => 'Base imponible máxima junio 2026; fuera del caso patrón actual.', 'proporcional_dias' => 'N'],
+    ['id_tope' => 'TOP-003', 'periodo' => '2026-07-01', 'codigo_base' => 'REM_1', 'tipo_tope' => 'MAXIMO', 'componente' => 'MENSUAL', 'importe' => '4509567.41', 'estado_validacion' => 'CONFIRMADO', 'fuente_normativa' => 'https://www.arca.gob.ar/declaracionenlinea/actualizacion-versiones/version47-8-actualizacion.asp', 'proporcional_dias' => 'S'],
+    ['id_tope' => 'TOP-005', 'periodo' => '2026-07-01', 'codigo_base' => 'REM_5', 'tipo_tope' => 'MAXIMO', 'componente' => 'MENSUAL', 'importe' => '4509567.41', 'estado_validacion' => 'CONFIRMADO', 'fuente_normativa' => 'https://www.arca.gob.ar/declaracionenlinea/actualizacion-versiones/version47-8-actualizacion.asp', 'proporcional_dias' => 'S'],
+    ['id_tope' => 'TOP-008', 'periodo' => '2026-07-01', 'codigo_base' => 'REM_4', 'tipo_tope' => 'MAXIMO', 'componente' => 'MENSUAL', 'importe' => '4509567.41', 'estado_validacion' => 'CONFIRMADO', 'fuente_normativa' => 'ARCA G18 + https://www.arca.gob.ar/declaracionenlinea/actualizacion-versiones/version47-8-actualizacion.asp', 'proporcional_dias' => 'S'],
+    ['id_tope' => 'TOP-009', 'periodo' => '2026-07-01', 'codigo_base' => 'REM_10', 'tipo_tope' => 'MINIMO', 'componente' => 'MENSUAL', 'importe' => '138757.9', 'estado_validacion' => 'CONFIRMADO', 'fuente_normativa' => 'ARCA G18 + https://www.arca.gob.ar/declaracionenlinea/actualizacion-versiones/version47-8-actualizacion.asp', 'proporcional_dias' => 'N'],
+    ['id_tope' => 'TOP-AUG-MAX-REM_1', 'periodo' => '2026-08-01', 'codigo_base' => 'REM_1', 'tipo_tope' => 'MAXIMO', 'componente' => 'MENSUAL', 'importe' => '4594798.23', 'estado_validacion' => 'CONFIRMADO', 'fuente_normativa' => 'https://www.arca.gob.ar/declaracionenlinea/actualizacion-versiones/version47-8-actualizacion.asp', 'proporcional_dias' => 'S'],
+    ['id_tope' => 'TOP-AUG-MAX-REM_4', 'periodo' => '2026-08-01', 'codigo_base' => 'REM_4', 'tipo_tope' => 'MAXIMO', 'componente' => 'MENSUAL', 'importe' => '4594798.23', 'estado_validacion' => 'CONFIRMADO', 'fuente_normativa' => 'ARCA G18 + https://www.arca.gob.ar/declaracionenlinea/actualizacion-versiones/version47-8-actualizacion.asp', 'proporcional_dias' => 'S'],
+    ['id_tope' => 'TOP-AUG-MAX-REM_5', 'periodo' => '2026-08-01', 'codigo_base' => 'REM_5', 'tipo_tope' => 'MAXIMO', 'componente' => 'MENSUAL', 'importe' => '4594798.23', 'estado_validacion' => 'CONFIRMADO', 'fuente_normativa' => 'https://www.arca.gob.ar/declaracionenlinea/actualizacion-versiones/version47-8-actualizacion.asp', 'proporcional_dias' => 'S'],
+    ['id_tope' => 'TOP-AUG-MIN-REM10', 'periodo' => '2026-08-01', 'codigo_base' => 'REM_10', 'tipo_tope' => 'MINIMO', 'componente' => 'MENSUAL', 'importe' => '141380.42', 'estado_validacion' => 'CONFIRMADO', 'fuente_normativa' => 'ARCA G18 + https://www.arca.gob.ar/declaracionenlinea/actualizacion-versiones/version47-8-actualizacion.asp', 'proporcional_dias' => 'N'],
+];

@@ -2,7 +2,9 @@
 
 Módulo `app/Motor/` (arquitectura hexagonal) + controladores en `app/Http/Controllers/Motor/` + páginas en `resources/js/Pages/Motor/`. Menú lateral **Motor de cálculo** (`resources/views/layouts/legajos.blade.php`).
 
-Especificación de origen: `Zonda_Guia_Practica_Tablas_y_Relaciones.md`, `Zonda_Especificacion_Tecnica_Tablas_2026-08-30.xlsx`, `Zonda_Motor_Calculo_2026-08-30.xlsx`, `mockup_conceptos_zonda_7_9_3.html`. Diccionario de las 41 tablas `motor_*`: [`diccionario.md`](diccionario.md).
+Especificación de origen: `Zonda_Guia_Practica_Tablas_y_Relaciones.md`, `Zonda_Especificacion_Tecnica_Tablas_2026-08-30.xlsx`, `Zonda_Motor_Calculo_2026-08-30.xlsx`, `mockup_conceptos_zonda_7_9_3.html`. Diccionario de las tablas `motor_*`: [`diccionario.md`](diccionario.md).
+
+**El modelo vigente es el DBML v2 del Excel funcional v5** (61 tablas, Etapa 3A cerrada y conciliada contra F.931): qué cambió, qué desbloquea y qué quedó pendiente está en [`modelo_v2.md`](modelo_v2.md).
 
 ## 1. Puesta en marcha (una sola vez por entorno)
 
@@ -19,8 +21,11 @@ php artisan migrate                                   # crea 41 tablas motor_* y
 # 2. Catálogos ARCA desde las tablas SICOSS ya cargadas (insertOrIgnore: no pisa lo del Excel)
 php artisan db:seed --class=MotorCatalogosSicossSeeder   # o: php artisan motor:importar-catalogos-sicoss
 
-# 3. Primera versión publicada de los 37 conceptos (idempotente por hash)
+# 3. Primera versión publicada de los 40 conceptos (idempotente por hash)
 php artisan db:seed --class=MotorVersionesInicialesSeeder
+
+# 3-bis. Fórmulas DSL del Excel funcional v5 sobre esas versiones (ver modelo_v2.md)
+php artisan db:seed --class=MotorFormulasV5Seeder
 
 # 4. Relaciones laborales canónicas desde sue001s (idempotente; por empresa o todas)
 php artisan motor:sincronizar-relaciones 05 --periodo=2026-07
