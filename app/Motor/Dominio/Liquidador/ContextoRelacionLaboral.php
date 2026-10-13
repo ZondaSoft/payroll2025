@@ -37,6 +37,20 @@ final class ContextoRelacionLaboral
         public readonly int $diasLiquidados = 30,
         public readonly BigDecimal|string $factorJornada = '1',
         public readonly string $condicionSindical = 'NO_INFORMADO',
+        /**
+         * Importe a detraer de la Ley 27.430. NULL = no corresponde informar REM_10;
+         * cero = REM_10 se informa en cero (ARCA G18); un importe = REM_2 menos ese valor.
+         */
+        public readonly ?string $importeDetraer = null,
+        /**
+         * Diferenciales de base ajenos a la matriz de conceptos, por código de base:
+         * ['REM_4' => ['OS_TIEMPO_PARCIAL' => '993241.10']]. Los calcula el módulo
+         * responsable (obra social por jornada parcial, art. 92 ter LCT + ARCA G18);
+         * el motor los recibe resueltos y los suma antes de los topes.
+         *
+         * @var array<string, array<string, string>>
+         */
+        public readonly array $diferencialesBase = [],
     ) {
         foreach ($novedades as $n) {
             $this->novedadesPorCodigo[$n->codigoNovedad][] = $n;

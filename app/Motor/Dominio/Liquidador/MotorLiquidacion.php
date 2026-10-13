@@ -29,6 +29,7 @@ use App\Motor\Dominio\Servicios\ResolutorElegibilidad;
 use App\Motor\Dominio\Servicios\ResolutorParametros;
 use App\Motor\Dominio\Servicios\ResolutorRegimenes;
 use App\Motor\Dominio\Servicios\ResolutorTopes;
+use App\Motor\Dominio\ValorObjetos\Importe;
 
 /**
  * Orquestador de la liquidación de UNA relación laboral en un período (orden del
@@ -203,6 +204,21 @@ final class MotorLiquidacion
             $liq->etapas['bases_arca'] = 'BLOQUEADA';
         }
 
+        // 5-bis) diferenciales de base ajenos a la matriz de conceptos: los resuelve el
+        // módulo responsable (obra social por jornada parcial) y entran a la base ANTES
+        // de los topes, porque lo topeable es bruto + diferencial.
+        foreach ($ctx->diferencialesBase as $codigoBase => $reglas) {
+            $base = $liq->basesArca[$codigoBase] ?? null;
+            if ($base === null) {
+                $liq->agregarAviso(new Aviso('DIFERENCIAL_SIN_BASE', "Diferencial para {$codigoBase}: la base no fue construida en esta corrida.", 'motor_reglas_base_diferencial_arca'));
+
+                continue;
+            }
+            foreach ($reglas as $codigoRegla => $importe) {
+                $base->agregarDiferencial(Importe::de((string) $importe), (string) $codigoRegla);
+            }
+        }
+
         // 6) topes (por base topeable, componente MENSUAL en esta fase)
         $topes = new ResolutorTopes($periodo->topes, $gate);
         foreach ($liq->basesArca as $codigoBase => $base) {
@@ -224,6 +240,39 @@ final class MotorLiquidacion
             }
         }
         $liq->etapas['topes'] ??= 'OK';
+
+        // 6-bis) REM_10 no sale de la matriz: se deriva de REM_2 menos el importe a
+        // detraer de la Ley 27.430 (ARCA G18). Con detracción cero se informa en cero;
+        // con detracción se aplica además su propio tope, que es el piso previsional.
+        if ($ctx->importeDetraer !== null) {
+            $rem2 = $liq->basesArca['REM_2'] ?? null;
+            if ($rem2 === null) {
+                $liq->agregarBloqueo(new Bloqueo(CodigoBloqueo::BaseNoConstruida, 'REM_10 no se puede derivar: REM_2 no fue construida.', 'bases_arca', 'motor_bases_arca'));
+            } else {
+                $detraer = Importe::de($ctx->importeDetraer);
+                $rem10 = new BaseImponibleResultado('REM_10');
+                if ($detraer->esCero()) {
+                    $rem10->derivar(Importe::cero(), 'ARCA G18: con detracción cero REM_10 se informa en cero.');
+                } else {
+                    $rem10->derivar($rem2->importeAplicado->menos($detraer), 'ARCA G18: REM_10 = REM_2 - detracción, con piso mínimo previsional.');
+                    $def10 = $periodo->baseArca('REM_10');
+                    if ($def10 !== null) {
+                        try {
+                            $t = $topes->aplicar($def10, $rem10->importeAntesAjustes, ComponenteTope::Mensual);
+                            foreach ($t['avisos'] as $a) {
+                                $liq->agregarAviso($a);
+                            }
+                            if (! $t['importe']->igualA($rem10->importeAntesAjustes)) {
+                                $rem10->aplicarTope($t['importe'], $t['minimo']?->codigo ?? $t['maximo']?->codigo ?? '?', $t['importe']->igualA($t['minimo']->importe ?? Importe::cero()) ? 'MINIMO' : 'MAXIMO');
+                            }
+                        } catch (MotorBloqueado $e) {
+                            $liq->agregarBloqueo(Bloqueo::desde($e, 'topes'));
+                        }
+                    }
+                }
+                $liq->basesArca['REM_10'] = $rem10;
+            }
+        }
 
         // 7) aportes personales (MODULO_SISTEMA con sujeto TRABAJADOR): alícuota por condición × base topeada
         $alicuotas = new ResolutorAlicuotas($periodo->alicuotasAportes, $gate);
@@ -276,13 +325,20 @@ final class MotorLiquidacion
             foreach ($r['avisos'] as $a) {
                 $liq->agregarAviso($a);
             }
+            // Cuando REM_10 está calculada, las contribuciones generales y el régimen
+            // sustitutivo se liquidan sobre ella y no sobre la base nominal de su
+            // alícuota: REM_10 es la base ya neta del importe a detraer (ARCA G18).
+            // Los adicionales y las sustituciones de subsistema conservan su propia base.
+            $rem10Calculada = isset($liq->basesArca['REM_10']) && $ctx->importeDetraer !== null;
             foreach ($r['lineas'] as $l) {
-                $base = $liq->basesArca[$l['base']] ?? null;
+                $codigoBase = $rem10Calculada && in_array($l['regla'], ['BASE', 'SUSTITUTIVO'], true) ? 'REM_10' : $l['base'];
+                $base = $liq->basesArca[$codigoBase] ?? null;
                 if ($base === null) {
-                    $liq->agregarBloqueo(new Bloqueo(CodigoBloqueo::AlicuotaAusente, "Contribución {$l['subsistema']}: la base {$l['base']} no fue construida.", 'contribuciones', 'motor_bases_arca'));
+                    $liq->agregarBloqueo(new Bloqueo(CodigoBloqueo::AlicuotaAusente, "Contribución {$l['subsistema']}: la base {$codigoBase} no fue construida.", 'contribuciones', 'motor_bases_arca'));
 
                     continue;
                 }
+                $l['base'] = $codigoBase;
                 $concepto = $this->conceptoContribucionPara($activados, $l['subsistema']);
                 $liq->contribuciones[] = new LineaContribucion($concepto ?? 'CONT_'.$l['subsistema'], $l['subsistema'], $l['base'], $base->importeAplicado, $l['porcentaje'],
                     $l['porcentaje']->aplicarA($base->importeAplicado)->redondeado(2), $l['regla'], $l['regimen'], $ctx->encuadramiento->encuadramiento, $l['destino']);

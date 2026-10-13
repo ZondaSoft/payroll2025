@@ -60,6 +60,31 @@ Principio de la persistencia: **lo liquidado se congela**. La versión de fórmu
 4. **Unidades pendientes**: COMIDA y VIAT_ESP llegan sin unidad (`PENDIENTE_UNIDAD`). La columna pasó a aceptar NULL en lugar de asignarles una: el motor bloquea antes de suponerla.
 5. **Parámetros retirados**: `PORC_TITULO` se unificó en `ADTIT` (P-9), `HS_TOLERANCIA_HORARIA` y `PORC_PLUS_PLURALIDAD` pasaron a `VALCAT` (F-1) y los `RECARGO_*` eran propuestas hoy resueltas como literales justificados. Baja lógica, no borrado. Los técnicos `REDONDEO_DECIMALES`, `DIVISOR_DIAS` y `HORAS_MES_REFERENCIA` siguen activos: su equivalente v2 son `VAR(DIVJOR)` y `VAR(HMJORN)` de alcance convenio, y la sustitución es parte del port del DSL.
 
+## 6-bis. Etapa 3A contrastada contra el motor de Oscar (2026-10-13)
+
+El instructivo `instructivo-daniel.html` trae `sim/motor_contributivo.js`, que no estaba en GitHub: es la Etapa 3A **ejecutable**. Contrastado contra la implementación propia, aparecieron cinco diferencias. Tres ya están aplicadas:
+
+1. **REM_10 es una base DERIVADA, no sale de la matriz.** `REM_10 = REM_2 − importe a detraer (Ley 27.430)`, con el piso mínimo previsional como tope. Y con detracción **cero** no es que no se informe: **se informa en cero** (ARCA G18). Implementado en `MotorLiquidacion` (etapa 6-bis) y en `BaseImponibleResultado::derivar()`.
+2. **Las contribuciones de seguridad social se liquidan sobre REM_10**, no sobre la base nominal de cada alícuota, cuando REM_10 está calculada. Aplica a las líneas generales y al régimen sustitutivo; los adicionales y las sustituciones de subsistema conservan su propia base.
+3. **Los diferenciales de base entran antes de los topes**: lo topeable es bruto + diferencial. El motor los recibe resueltos por el módulo responsable (`ContextoRelacionLaboral::$diferencialesBase`), no los calcula: el diferencial de obra social por jornada parcial es del módulo de OS (art. 92 ter LCT + ARCA G18).
+
+Dos quedan pendientes y están registradas como divergencia deliberada:
+
+4. **Topes sin registro.** El motor de Oscar no topea si no hay registro para (período, base, componente) y sigue adelante; la implementación propia mantiene la **regla B** del Excel funcional — base topeable sin tope parametrizado **bloquea** — porque la spec escrita es explícita: *"el motor no debe suponer ni arrastrar un tope que no esté expresamente parametrizado"*. Con los topes del v5 cargados (REM_1/4/5/10 para 07 y 08/2026) ninguna de las dos posturas cambia el resultado. **A confirmar con Oscar.**
+5. **Consistencia entre subsistemas**: si dos aplicaciones componen la misma REM_n con importes distintos, su motor bloquea con `BASE_ARCA_INCONSISTENTE_ENTRE_SUBSISTEMAS`. Todavía no está implementado.
+
+El caso de control **EMP-028** (fila anonimizada del F.931 de agosto 2026, empleado de tiempo parcial) quedó como test de aceptación en `tests/Unit/Motor/Etapa3aEmp028Test.php` y cierra exacto: REM_4 = REM_8 = 1.575.554,29 (582.313,19 + 993.241,10 de diferencial), REM_10 = 578.811,35 (582.313,19 − 3.501,84) y las cuatro contribuciones del encuadramiento B sobre REM_10 — SIPA 62.337,98 · INSSJP 9.203,10 · AAFF 27.204,13 · FNE 5.440,83.
+
+Las columnas de obra social del control quedaron explicadas, y confirman dónde está la frontera entre módulos. El 3 % de aporte y el 6 % de contribución de OS se declaran **descompuestos**, con el Fondo Solidario de Redistribución separado:
+
+| Columna del control | Importe | Composición |
+|---|---|---|
+| `ap_ss` | 88.613,84 | SIPA 11 % de REM_1 (64.054,45) + INSSJP 3 % de REM_5 (17.469,40) + **FSR 0,45 % de REM_4** (7.089,99) |
+| `ap_os` | 40.176,63 | OS **2,55 %** de REM_4 — el 3 % neto del 0,45 % que va al FSR |
+| `cont_os` | 80.353,27 | OS **5,1 %** de REM_8 — el 6 % neto del 0,9 % del FSR |
+
+O sea que el FSR del trabajador se informa dentro de los aportes de seguridad social, no con la obra social. El motor no calcula ninguna de las tres: OS y FSR tienen `modulo_responsable = OBRA_SOCIAL` y las resuelve ese módulo, que todavía no existe — el liquidador las deja registradas como no ejecutadas con ese motivo, que es el comportamiento correcto.
+
 ## 7. Cómo se regenera
 
 ```bash

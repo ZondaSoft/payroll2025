@@ -26,6 +26,8 @@ enum CodigoBloqueo: string
     case AlicuotaAusente = 'ALICUOTA_AUSENTE';
     case RegimenSinBase = 'REGIMEN_SIN_BASE';
     case BaseZondaInexistente = 'BASE_ZONDA_INEXISTENTE';
+    /** Una base ARCA que otra etapa necesita no quedó construida en la corrida. */
+    case BaseNoConstruida = 'BASE_NO_CALCULADA';
     case JornadaSinDato = 'JORNADA_SIN_DATO';
     case ConfiguracionInvalida = 'CONFIGURACION_INVALIDA';
     case PeriodicidadDesconocida = 'PERIODICIDAD_DESCONOCIDA';
