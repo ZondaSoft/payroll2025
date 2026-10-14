@@ -26,6 +26,7 @@ final readonly class Variable
         public ?string $unidad,
         public string $origen,
         public bool $activo = true,
+        public ?string $observaciones = null,
     ) {}
 
     /** Las que se cargan como valor por ámbito; el resto las resuelve el contexto. */

@@ -283,6 +283,15 @@
                 <li class="menu-item {{ request()->routeIs('motor.conceptos.*') ? 'active' : '' }}">
                   <a href="{{ route('motor.conceptos.index') }}" class="menu-link"><div data-i18n="Conceptos">Conceptos</div></a>
                 </li>
+                <li class="menu-item {{ request()->routeIs('motor.formulas.*') ? 'active' : '' }}">
+                  <a href="{{ route('motor.formulas.index') }}" class="menu-link"><div data-i18n="Fórmulas">Fórmulas</div></a>
+                </li>
+                <li class="menu-item {{ request()->routeIs('motor.perfiles.*') ? 'active' : '' }}">
+                  <a href="{{ route('motor.perfiles.index') }}" class="menu-link"><div data-i18n="Perfiles">Perfiles</div></a>
+                </li>
+                <li class="menu-item {{ request()->routeIs('motor.variables.*') ? 'active' : '' }}">
+                  <a href="{{ route('motor.variables.index') }}" class="menu-link"><div data-i18n="Variables">Variables</div></a>
+                </li>
                 <li class="menu-item {{ request()->routeIs('motor.bases-zonda.*') ? 'active' : '' }}">
                   <a href="{{ route('motor.bases-zonda.index') }}" class="menu-link"><div data-i18n="Bases de Zonda">Bases de Zonda</div></a>
                 </li>

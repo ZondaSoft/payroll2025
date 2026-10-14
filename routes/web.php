@@ -359,11 +359,28 @@ Route::middleware('auth')->group(function () {
         // Simulador e integridad
         Route::get('/simulador', [\App\Http\Controllers\Motor\SimuladorController::class, 'index'])->name('simulador.index');
         Route::post('/simulador/simular', [\App\Http\Controllers\Motor\SimuladorController::class, 'simular'])->name('simulador.simular');
+        Route::post('/simulador/haberes', [\App\Http\Controllers\Motor\SimuladorController::class, 'haberes'])->name('simulador.haberes');
         Route::get('/integridad', [\App\Http\Controllers\Motor\IntegridadController::class, 'index'])->name('integridad.index');
 
         // Importaciones desde el legacy (botones)
         Route::post('/importar/catalogos-sicoss', [\App\Http\Controllers\Motor\ImportacionesController::class, 'catalogosSicoss'])->name('importar.catalogos-sicoss');
         Route::post('/importar/incidencias-arca', [\App\Http\Controllers\Motor\ImportacionesController::class, 'incidenciasArca'])->name('importar.incidencias-arca');
+
+        // Fórmulas: editor con validación dimensional en vivo y publicación por vigencia
+        Route::get('/formulas', [\App\Http\Controllers\Motor\FormulasController::class, 'index'])->name('formulas.index');
+        Route::get('/formulas/catalogo', [\App\Http\Controllers\Motor\FormulasController::class, 'catalogo'])->name('formulas.catalogo');
+        Route::post('/formulas/analizar', [\App\Http\Controllers\Motor\FormulasController::class, 'analizar'])->name('formulas.analizar');
+        Route::post('/formulas/publicar', [\App\Http\Controllers\Motor\FormulasController::class, 'publicar'])->name('formulas.publicar');
+
+        // Perfiles de liquidación: aplicabilidad + variante por ámbito
+        Route::post('/perfiles/{perfil}/reglas', [\App\Http\Controllers\Motor\PerfilesController::class, 'guardarRegla'])->name('perfiles.reglas.store');
+        Route::delete('/perfiles/{perfil}/reglas/{regla}', [\App\Http\Controllers\Motor\PerfilesController::class, 'eliminarRegla'])->name('perfiles.reglas.destroy');
+        Route::resource('perfiles', \App\Http\Controllers\Motor\PerfilesController::class)->parameters(['perfiles' => 'perfil'])->except(['show']);
+
+        // Variables del DSL y sus valores por convenio (DIVJOR, HMJORN…)
+        Route::post('/variables/{variable}/valores', [\App\Http\Controllers\Motor\VariablesController::class, 'guardarValor'])->name('variables.valores.store');
+        Route::delete('/variables/{variable}/valores/{valor}', [\App\Http\Controllers\Motor\VariablesController::class, 'eliminarValor'])->name('variables.valores.destroy');
+        Route::resource('variables', \App\Http\Controllers\Motor\VariablesController::class)->parameters(['variables' => 'variable'])->except(['show']);
 
         // Conceptos (versionado)
         Route::post('/conceptos/{concepto}/validar', [\App\Http\Controllers\Motor\ConceptosController::class, 'validar'])->name('conceptos.validar');

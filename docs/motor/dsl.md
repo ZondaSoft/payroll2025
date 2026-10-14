@@ -208,6 +208,28 @@ y por lo tanto depende de que los conceptos ya tengan la suya. El orden es
 `MotorVersionesInicialesSeeder` → `MotorFormulasV5Seeder` → ese seeder, y hay que reaplicarlo cada vez
 que se vuelve a sembrar desde el Excel, porque el seeder del v5 borra y reinserta todas las versiones.
 
+## Las pantallas
+
+| Pantalla | Ruta | Qué resuelve |
+|---|---|---|
+| Fórmulas | `/motor/formulas` | Editor de las cuatro expresiones con **validación dimensional en vivo** (`POST motor/formulas/analizar`), novedades declaradas, literales justificados y publicación por vigencia |
+| Perfiles | `/motor/perfiles` | La matriz `aplica` + variante + motivo por ámbito, con detección de `PERFIL_AMBIGUO` antes de liquidar |
+| Variables | `/motor/variables` | Los divisores del convenio. Es lo que bloqueaba poner un convenio nuevo en marcha: `DIVJOR` y `HMJORN` sólo se cargaban por seeder |
+| Simulador | `/motor/simulador` → *Calcular haberes* | La traza de cada importe y el orden que resolvió el grafo |
+
+El editor corre el **mismo** `ValidadorVersion` que la publicación, en los dos modos: editando muestra
+los avisos de migración y la unidad sin declarar como advertencias, y al publicar los convierte en
+bloqueos. El botón de publicar se habilita sólo cuando la validación pasa en modo PUBLICACION.
+
+Tres cosas que las pantallas no dejan hacer, porque el motor después no podría ejecutarlas:
+
+- **incluir un concepto en un perfil sin variante** — el motor no podría elegir fórmula
+  (`ERROR_CONFIGURACION`), y por eso el formulario ofrece las variantes publicadas en vez de pedir que
+  se recuerden de memoria;
+- **excluirlo sin motivo** — el motivo se copia al recibo y es lo que explica por qué el concepto no está;
+- **cargar un valor para una variable que resuelve el contexto** (`BASCAT`, `HSPACT`, `DIASLIQ`,
+  `DIASEFE`) — se guardaría y no se leería nunca.
+
 ## Lo que falta
 
 1. **Las contingencias pagas** (enfermedad, accidente, vacaciones, licencia paga) y el módulo de

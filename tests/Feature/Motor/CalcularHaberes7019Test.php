@@ -141,6 +141,43 @@ final class CalcularHaberes7019Test extends TestCase
         self::assertSame('BASE_BLOQUEADA', $e->concepto('HE50')->codigoError);
     }
 
+    public function test_el_simulador_devuelve_la_traza_y_el_orden_del_grafo(): void
+    {
+        $usuario = \App\Models\User::query()->create([
+            'name' => 'Test', 'email' => 'simulador@example.com', 'password' => bcrypt('secret'),
+        ]);
+
+        $r = $this->actingAs($usuario)->postJson(route('motor.simulador.haberes'), [
+            'relacion_laboral_id' => EscenarioLibro::RL_7019,
+            'periodo' => '2026-07',
+            'dias_liquidados' => 30,
+        ])->assertOk()->json();
+
+        // Las preguntas del gate: qué dio, de dónde salió, de qué depende y en qué orden.
+        $he50 = collect($r['conceptos'])->firstWhere('codigo', 'HE50');
+        self::assertSame('CALCULADO', $he50['estado']);
+        self::assertSame('118020.33103950000', $he50['importe']);
+        self::assertSame([
+            'NOV(HE_50) = 9.5000',
+            'BASE(BASE_HORA_NORMAL) = 1656425.6988',
+            'VAR(HMJORN) = 200.000000',
+        ], $he50['traza']);
+
+        $base = collect($r['bases'])->firstWhere('codigo', 'BASE_HORA_NORMAL');
+        self::assertSame('OK', $base['estado']);
+        self::assertEqualsCanonicalizing(['BASICO', 'ASIST', 'ANTIG'], array_keys($base['incluidos']));
+        // Cada exclusión viaja con su causa: el recibo puede explicar qué no está y por qué.
+        self::assertSame('no aplica', $base['excluidos']['MANFON']);
+        self::assertSame('no aplica', $base['excluidos']['AD562']);
+
+        // El orden no está declarado: lo deriva el grafo.
+        $orden = array_column($r['orden'], 'codigo');
+        self::assertLessThan(array_search('HE50', $orden, true), array_search('BASE_HORA_NORMAL', $orden, true));
+        // El subtotal del recibo: 1.973.217,11
+        self::assertSame('1973217.11369550000', $r['neto']);
+        self::assertSame(0, $r['resumen']['bloqueados']);
+    }
+
     public function test_el_221_del_40_89_usa_la_otra_variante_del_basico(): void
     {
         $e = $this->correr(EscenarioLibro::RL_221);

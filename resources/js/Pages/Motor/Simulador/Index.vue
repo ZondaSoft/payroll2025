@@ -15,6 +15,32 @@ const cargando = ref(false)
 const resultado = ref(null)
 const abiertas = ref({})
 
+// Haberes calculados con las fórmulas publicadas: la traza de cada importe y el
+// orden que resolvió el grafo. Es lo que responde «de dónde salió este número».
+const haberes = ref(null)
+const cargandoHaberes = ref(false)
+const diasEfectivos = ref('')
+const trazaAbierta = ref({})
+const calcularHaberes = async () => {
+  if (!form.relacion_laboral_id) {
+    Swal.fire({ icon: 'warning', title: 'Faltan datos', text: 'Elegí la relación laboral a simular.', confirmButtonText: 'Entendido' })
+    return
+  }
+  cargandoHaberes.value = true
+  haberes.value = null
+  try {
+    const { data } = await axios.post(route('motor.simulador.haberes'), {
+      relacion_laboral_id: form.relacion_laboral_id, periodo: form.periodo,
+      dias_liquidados: form.dias_liquidados, dias_efectivos: diasEfectivos.value || null,
+    })
+    haberes.value = data
+  } catch (e) {
+    const errores = e.response?.data?.errors
+    Swal.fire({ icon: 'error', title: 'No se pudo calcular', html: errores ? Object.values(errores).flat().join('<br>') : e.response?.data?.message || e.message })
+  } finally { cargandoHaberes.value = false }
+}
+const estadoConceptoClase = (e) => ({ CALCULADO: 'bg-label-success', NO_APLICA: 'bg-label-secondary', BLOQUEADO: 'bg-label-danger', NO_MODELADO: 'bg-label-warning' }[e] ?? 'bg-label-secondary')
+
 const simular = async () => {
   if (!form.relacion_laboral_id) {
     Swal.fire({ icon: 'warning', title: 'Faltan datos', text: 'Elegí la relación laboral a simular.', confirmButtonText: 'Entendido' })
@@ -71,6 +97,101 @@ const porEtapa = computed(() => {
                 <span v-else><span class="spinner-border spinner-border-sm me-2"></span>Calculando…</span>
               </button>
             </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="card mb-4">
+        <div class="card-header d-flex justify-content-between align-items-center">
+          <div>
+            <h5 class="card-title mb-1">Haberes con las fórmulas publicadas</h5>
+            <p class="mb-0 text-muted small">Evalúa las <code>expr_*</code> de cada versión vigente, en el orden que deriva el grafo de las dependencias. Muestra la traza de cada importe: qué entró, qué dio y de qué depende.</p>
+          </div>
+          <div class="d-flex align-items-end gap-2">
+            <div><label class="form-label small mb-1">Días efectivos</label><input v-model="diasEfectivos" type="number" min="0" max="31" class="form-control form-control-sm" style="width: 110px" :placeholder="String(form.dias_liquidados)" /></div>
+            <button type="button" class="btn btn-outline-primary" :disabled="cargandoHaberes" @click="calcularHaberes">
+              <span v-if="!cargandoHaberes"><i class="ri-function-line me-1"></i> Calcular haberes</span>
+              <span v-else><span class="spinner-border spinner-border-sm me-2"></span>Calculando…</span>
+            </button>
+          </div>
+        </div>
+        <div v-if="haberes" class="card-body">
+          <div class="d-flex flex-wrap gap-3 align-items-center mb-4">
+            <span class="badge bg-label-success">{{ haberes.resumen.calculados }} calculados</span>
+            <span class="badge bg-label-secondary">{{ haberes.resumen.no_aplican }} no aplican</span>
+            <span v-if="haberes.resumen.bloqueados" class="badge bg-label-danger">{{ haberes.resumen.bloqueados }} bloqueados</span>
+            <span v-if="haberes.resumen.no_modelados" class="badge bg-label-warning">{{ haberes.resumen.no_modelados }} sin fórmula</span>
+            <span class="badge bg-label-info">{{ haberes.resumen.bases_ok }} bases armadas</span>
+            <span v-if="haberes.resumen.bases_bloqueadas" class="badge bg-label-danger">{{ haberes.resumen.bases_bloqueadas }} bases bloqueadas</span>
+            <div class="ms-auto"><small class="text-muted d-block">Neto de lo que impacta</small><b class="font-monospace">{{ importe(haberes.neto) }}</b></div>
+          </div>
+
+          <h6 class="mb-2">Conceptos</h6>
+          <div class="table-responsive mb-4"><table class="table table-sm align-middle">
+            <thead class="table-light"><tr><th>Concepto</th><th>Variante</th><th>Estado</th><th class="text-end">Cantidad</th><th class="text-end">Valor unitario</th><th class="text-end">Importe</th><th></th></tr></thead>
+            <tbody>
+              <template v-for="c in haberes.conceptos" :key="c.codigo">
+                <tr>
+                  <td class="font-monospace fw-bold">{{ c.codigo }}</td>
+                  <td><span v-if="c.variante" class="badge bg-label-info font-monospace">{{ c.variante }}</span></td>
+                  <td>
+                    <span class="badge" :class="estadoConceptoClase(c.estado)">{{ c.estado }}</span>
+                    <code v-if="c.codigo_error" class="small text-danger ms-1">{{ c.codigo_error }}</code>
+                  </td>
+                  <td class="text-end font-monospace small">{{ c.cantidad }}</td>
+                  <td class="text-end font-monospace small">{{ c.valor_unitario }}</td>
+                  <td class="text-end font-monospace" :class="{ 'text-danger': c.factor_signo < 0 }">{{ c.importe ? importe(c.importe) : '' }}</td>
+                  <td class="text-end">
+                    <button v-if="c.traza.length || c.motivo" type="button" class="btn btn-link p-0 small" @click="trazaAbierta[c.codigo] = !trazaAbierta[c.codigo]">
+                      <i :class="trazaAbierta[c.codigo] ? 'ri-arrow-up-s-line' : 'ri-arrow-down-s-line'"></i> traza
+                    </button>
+                  </td>
+                </tr>
+                <tr v-if="trazaAbierta[c.codigo]" class="table-light">
+                  <td colspan="7" class="small">
+                    <div v-if="c.motivo" class="mb-2"><b>Motivo:</b> {{ c.motivo }}</div>
+                    <div v-if="c.traza.length">
+                      <b>De dónde salió:</b>
+                      <ul class="mb-0 font-monospace">
+                        <li v-for="(t, i) in c.traza" :key="i">{{ t }}</li>
+                      </ul>
+                    </div>
+                    <div v-if="c.importe_bruto && c.importe_bruto !== c.importe" class="mt-2 text-muted">
+                      Bruto antes del redondeo de la versión: <span class="font-monospace">{{ c.importe_bruto }}</span>
+                      <span v-if="!c.impacta_neto" class="badge bg-label-secondary ms-2">no impacta el neto</span>
+                    </div>
+                  </td>
+                </tr>
+              </template>
+            </tbody>
+          </table></div>
+
+          <h6 class="mb-2">Bases de Zonda</h6>
+          <div class="table-responsive mb-4"><table class="table table-sm align-middle">
+            <thead class="table-light"><tr><th>Base</th><th>Estado</th><th class="text-end">Importe</th><th>Integrantes</th><th>Excluidos</th></tr></thead>
+            <tbody>
+              <tr v-for="b in haberes.bases" :key="b.codigo">
+                <td class="font-monospace fw-bold">{{ b.codigo }}</td>
+                <td><span class="badge" :class="b.estado === 'OK' ? 'bg-label-success' : 'bg-label-danger'">{{ b.estado }}</span></td>
+                <td class="text-end font-monospace">{{ b.importe ? importe(b.importe) : '' }}</td>
+                <td class="small">
+                  <span v-for="(imp, cod) in b.incluidos" :key="cod" class="badge bg-label-secondary me-1 mb-1 font-monospace" :title="imp">{{ cod }}</span>
+                </td>
+                <td class="small text-muted">
+                  <div v-if="b.motivo" class="text-danger">{{ b.motivo }}</div>
+                  <span v-for="(m, cod) in b.excluidos" :key="cod" class="d-block">{{ cod }}: {{ m }}</span>
+                </td>
+              </tr>
+            </tbody>
+          </table></div>
+
+          <h6 class="mb-2">Orden de cálculo</h6>
+          <p class="text-muted small">No está declarado en ninguna parte: lo deriva el grafo de las dependencias <code>CONC</code>/<code>BASE</code>/<code>MOD</code>. Agregar un concepto que consuma una base nueva reordena la corrida sin tocar código.</p>
+          <div class="d-flex flex-wrap gap-1 align-items-center">
+            <template v-for="(n, i) in haberes.orden" :key="n.nodo">
+              <i v-if="i" class="ri-arrow-right-s-line text-muted"></i>
+              <span class="badge font-monospace" :class="n.tipo === 'BASE' ? 'bg-label-primary' : 'bg-label-dark'">{{ n.codigo }}</span>
+            </template>
           </div>
         </div>
       </div>

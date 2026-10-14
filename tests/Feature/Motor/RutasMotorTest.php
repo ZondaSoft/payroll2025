@@ -23,6 +23,7 @@ final class RutasMotorTest extends TestCase
     {
         $user = User::query()->create(['name' => 'Test', 'email' => 'test@example.com', 'password' => bcrypt('secret')]);
         $rutas = ['motor.simulador.index', 'motor.integridad.index', 'motor.conceptos.index', 'motor.bases-zonda.index', 'motor.incidencias-arca.index',
+            'motor.formulas.index', 'motor.perfiles.index', 'motor.perfiles.create', 'motor.variables.index', 'motor.variables.create',
             'motor.parametros.index', 'motor.escalas.basicos.index', 'motor.escalas.antiguedad.index', 'motor.escalas.vacaciones.index', 'motor.escalas.asignaciones.index',
             'motor.normativa.index', 'motor.normativa.bases-arca.index', 'motor.normativa.topes.index', 'motor.normativa.alicuotas-contribuciones.index',
             'motor.relaciones.index', 'motor.encuadramientos.index', 'motor.novedades-mapeo.index'];

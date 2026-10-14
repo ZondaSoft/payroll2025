@@ -27,6 +27,17 @@ php artisan db:seed --class=MotorVersionesInicialesSeeder
 # 3-bis. Fórmulas DSL del Excel funcional v5 sobre esas versiones (ver modelo_v2.md)
 php artisan db:seed --class=MotorFormulasV5Seeder
 
+# 3-ter. Reglas de los libros docentes 08/2026 (ausencias, proporcionalidad, redondeo).
+#        SIEMPRE después del seeder anterior, que borra y reinserta todas las versiones.
+php artisan db:seed --class=MotorReglasLibroDocenteSeeder
+
+# 3-quater. Divisores del convenio → pantalla "Variables" (DIVJOR, HMJORN, HSJORN, HDJORN).
+#           Sin ellos no hay feriado trabajado ni hora extra que se pueda calcular.
+
+# 3-quinquies. Perfiles de liquidación → pantalla "Perfiles": qué cobra cada ámbito y
+#              con qué variante. Sin una regla que lo alcance, un concepto queda
+#              bloqueado con PERFIL_SIN_REGLA.
+
 # 4. Relaciones laborales canónicas desde sue001s (idempotente; por empresa o todas)
 php artisan motor:sincronizar-relaciones 05 --periodo=2026-07
 
@@ -49,7 +60,24 @@ Después de 5–7, el simulador (`/motor/simulador`) puede liquidar en entorno *
 | Normalizar novedades | Relaciones laborales → *Normalizar novedades* (o `motor:normalizar-novedades AAAA-MM`) | Traduce `sue028s` a `motor_novedades`. Lo sin mapeo queda `SIN_MAPEO` en `motor_if_novedad_origen` y bloquea en PRODUCCION. |
 | Cargar básicos / topes del período | Escalas y básicos · Normativa ARCA → Topes | Sin básico vigente: `BASICO_SIN_IMPORTE`. Sin tope del período para REM_1/4/5: `TOPE_SIN_PARAMETRIZACION` (no se arrastra el anterior). |
 | Simular | Simulador | Devuelve haberes, bases Zonda, bases ARCA 1‑10, aportes, contribuciones, avisos, **bloqueos** y traza. No persiste. |
+| Ver los haberes con fórmulas | Simulador → *Calcular haberes* | Evalúa las `expr_*` vigentes: cada importe con su traza (qué entró, qué dio), las bases con sus integrantes y excluidos, y el **orden que resolvió el grafo**. Los *días efectivos* son aparte de los liquidados: con una inasistencia el básico va por 30 y la tolerancia por 29. |
 | Revisar integridad | Integridad | Conceptos mínimos, circularidades, incidencias PENDIENTE, registros SIN_DATO/SIN_CONFIRMAR, códigos sin mapear, legajos sin relación, conceptos sin versión. |
+
+## 2-bis. Las pantallas del motor
+
+| Pantalla | Para qué | Lo que no deja hacer |
+|---|---|---|
+| **Fórmulas** | Ver todas las versiones vigentes con la unidad de su importe y publicar una versión nueva desde el editor, con **validación dimensional en vivo** | Publicar una versión que no pasa `ValidadorVersion`: importe que no devuelve ARS, novedad usada sin declarar (o declarada sin usar), literal sin justificar, unidad de cantidad que no coincide |
+| **Perfiles** | La matriz de conceptos por ámbito: `aplica` + **variante** + motivo. Avisa las ambigüedades antes de liquidar | Incluir un concepto sin variante (el motor no podría elegir fórmula), excluirlo sin motivo (el recibo no podría explicarlo), pedir una variante que el concepto no publica, o solapar dos reglas del mismo concepto (RT‑007) |
+| **Variables** | Los divisores del convenio (`DIVJOR`, `HMJORN`, `HSJORN`, `HDJORN`) y cualquier `VAR()` que se cargue por ámbito | Cargar valor para una variable que resuelve el contexto (`BASCAT`, `HSPACT`, `DIASLIQ`, `DIASEFE`): no se leería nunca. Tampoco solapar vigencias en el mismo ámbito |
+
+El editor de fórmulas usa la **misma** validación que corre al publicar, no una aproximación para la
+pantalla: lo que sale en verde en modo «Al publicar» es exactamente lo que el motor va a aceptar. El
+selector de modo muestra la diferencia del contrato — editando, los avisos de migración y la unidad sin
+declarar son advertencias; al publicar bloquean.
+
+Una versión vigente **nunca se edita**: el editor abre una copia y publica una versión nueva con su
+vigencia, cerrando la anterior el día previo. Lo liquidado con la vieja tiene que poder reproducirse.
 
 ## 3. Conceptos: borrador → validar → publicar
 

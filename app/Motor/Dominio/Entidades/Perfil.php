@@ -40,6 +40,7 @@ final readonly class Perfil
         public ?int $idConvenio = null,
         public bool $activo = true,
         public array $conceptos = [],
+        public ?string $observaciones = null,
     ) {}
 
     public function precedencia(): int
