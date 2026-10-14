@@ -27,7 +27,7 @@ use Brick\Math\BigDecimal;
 final class ResolvedorDominio implements ResolvedorDsl
 {
     /** Variables que resuelve el contexto del trabajador, no la tabla de valores. */
-    public const DEL_CONTEXTO = ['BASCAT', 'HSPACT', 'DIASLIQ', 'ANTANIO'];
+    public const DEL_CONTEXTO = ['BASCAT', 'HSPACT', 'DIASLIQ', 'DIASEFE', 'ANTANIO'];
 
     /** @var array<string, list<ValorCategoriaConcepto>> */
     private array $valcatPorConcepto = [];
@@ -68,6 +68,7 @@ final class ResolvedorDominio implements ResolvedorDsl
             'BASCAT' => $this->sinBloqueo('VAR_SIN_VALOR', fn () => $this->basico->resolver($this->ctx)->valor),
             'HSPACT' => $this->horasPactadas(),
             'DIASLIQ' => BigDecimal::of($this->ctx->diasLiquidados),
+            'DIASEFE' => BigDecimal::of($this->ctx->diasEfectivos()),
             'ANTANIO' => BigDecimal::of($this->ctx->aniosAntiguedad()),
             default => $this->sinBloqueo('VAR_SIN_VALOR', fn () => $this->variables->resolver($codigo, $this->ctx)),
         }];

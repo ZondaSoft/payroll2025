@@ -34,14 +34,20 @@ final class CalcularHaberes
         private readonly GateValidacion $gate,
     ) {}
 
-    public function ejecutar(int $relacionLaboralId, Periodo $periodo, int $diasLiquidados = 30): EstadoCorrida
-    {
+    public function ejecutar(
+        int $relacionLaboralId,
+        Periodo $periodo,
+        int $diasLiquidados = 30,
+        ?int $diasEfectivos = null,
+    ): EstadoCorrida {
         $rl = $this->relaciones->porId($relacionLaboralId);
         if ($rl === null) {
             throw new RuntimeException("La relación laboral #{$relacionLaboralId} no existe.");
         }
 
-        return $this->paraContexto($this->armador->armar($rl, $periodo, $diasLiquidados));
+        return $this->paraContexto($this->armador->armar(
+            $rl, $periodo, $diasLiquidados, diasEfectivos: $diasEfectivos
+        ));
     }
 
     /** Variante para quien ya tiene el contexto armado (el liquidador completo). */

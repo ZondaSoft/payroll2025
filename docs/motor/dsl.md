@@ -165,10 +165,56 @@ declara su regla de agregación. Es el test que encuentra los huecos de configur
 liquidación: así apareció que `PLUSPLUR` y `TOLHOR` estaban publicados sin la declaración de
 `motor_categoria_concepto` que sus `VALCAT()` necesitan.
 
+## Las reglas de los libros docentes (agosto 2026)
+
+Los libros docentes de Oscar traen 33 casos que explican una regla cada uno, y las reglas son las que el
+motor no tenía. Entran como **versiones nuevas con vigencia 08/2026**, que conviven con las de 07/2026
+sin reemplazarlas: los casos del 7019 y del 221 siguen liquidando con las versiones de julio, al
+centavo. Eso es para lo que existe el versionado — una regla nueva no reescribe la historia.
+
+| Regla | Cómo se expresa |
+|---|---|
+| **El básico se prorratea** sólo por días de vínculo reales y por contingencias pagas | versión 2 del `BASICO`: `… * VAR(DIASLIQ) / PARAM(DIVISOR_DIAS)`. Con 30/30 el factor es 1 y el importe no cambia |
+| Los adicionales salen del **básico ya proporcionado** | ya salía así: `CONC(BASICO) * PARAM(…)` |
+| **Una ausencia no paga no achica el básico** | conceptos `INASIS`, `SUSPEN`, `SINGOCE`: HABER con signo DEBITO, `NOV(…) * BASE(BASE_HORA_NORMAL) / PARAM(DIVISOR_DIAS)`. Haber remunerativo **negativo**, nunca en la columna de descuentos |
+| La base diaria de la ausencia excluye el premio que la propia falta hizo perder | sale solo: `ASIST` ya devolvió cero y entra en la base con ese importe. No se descuenta dos veces |
+| **La inasistencia y la suspensión** hacen perder el premio asistencia; la licencia sin goce **no** | versión 3 de `ASIST`, con `PARAM(SUSP_MAX)` propio: quien discuta el criterio cambia el tope, no la fórmula |
+| **La tolerancia horaria** se prorratea por días efectivamente prestados | versión 2 de `TOLHOR`: `VALCAT(TOLHOR) * VAR(DIASEFE) / PARAM(DIVISOR_DIAS)`. Cierra P‑7 |
+| **Día de la actividad** con recargo del 100 % | concepto `DIAACT`, mismo cálculo que el feriado trabajado: pagar una jornada entera además del mensual, con el divisor de jornales del convenio |
+| Cada línea del recibo **redondea a dos decimales** y las bases suman los importes ya redondeados | `regla_redondeo_version = DECIMAL` en las versiones de 08/2026. Es la política que cierra P‑7 |
+
+`VAR(DIASLIQ)` y `VAR(DIASEFE)` son dos cosas distintas y la diferencia es el corazón del criterio: con
+una inasistencia injustificada el básico se paga por **30** días (la falta se expone aparte) y la
+tolerancia horaria se prorratea por **29**. Los dos son datos de entrada de la liquidación, no
+inferencias del motor.
+
+`tests/Feature/Motor/LibroDocente371Test.php` liquida nueve casos del libro del 371/03 (Operario de
+Playa, 14 años, básico 1.350.389,10), al centavo:
+
+| Caso | Lo que verifica | Línea distintiva |
+|---|---|---|
+| P01 Normal | mes completo | BASE_HORA_NORMAL 1.944.560,31 · TOLHOR 9 h |
+| P02 Ingreso 16/08 | alta real → proporcional | BASICO 675.194,55 · TOLHOR 4,5 h |
+| P03 Egreso 20/08 | baja real → proporcional | BASICO 900.259,40 · TOLHOR 6 h |
+| P04 Inasistencia 1 día | mes completo + línea negativa + premio perdido | ASIST 0,00 · INASIS −61.217,64 · TOLHOR 8,7 h |
+| P05 Suspensión 3 días | ídem, con su propio tope | SUSPEN −183.652,92 · TOLHOR 8,1 h |
+| P07 Sin goce 11 días | el premio **se mantiene** | SINGOCE −713.005,45 (base diaria mayor) |
+| P11 Horas extra 8+4 | hora normal sobre la base | HE50 116.673,62 · HE100 77.782,41 |
+| P12 Feriado trabajado | divisor de jornales | FERTRAB 77.782,41 |
+| P13 Día de la actividad | recargo 100 % | DIAACT 77.782,41 |
+
+Las reglas se cargan con `MotorReglasLibroDocenteSeeder`, que **no** es una migración: publica versiones
+y por lo tanto depende de que los conceptos ya tengan la suya. El orden es
+`MotorVersionesInicialesSeeder` → `MotorFormulasV5Seeder` → ese seeder, y hay que reaplicarlo cada vez
+que se vuelve a sembrar desde el Excel, porque el seeder del v5 borra y reinserta todas las versiones.
+
 ## Lo que falta
 
-1. **Los módulos del tramo 3**: promedios de variables de seis meses (`MOD_HISTORICO_INSUFICIENTE` sin
-   historia suficiente), contingencias con su divisor, ILT y SAC sobre ILT.
+1. **Las contingencias pagas** (enfermedad, accidente, vacaciones, licencia paga) y el módulo de
+   promedios de variables de seis meses que necesitan: su base diaria suma el promedio del semestre a
+   los fijos del **mes completo**, y eso requiere liquidaciones persistidas. Sin historia suficiente el
+   módulo tiene que bloquear con `MOD_HISTORICO_INSUFICIENTE`, nunca devolver cero. Son los casos P06,
+   P08, P09 y P10 del libro, más el ILT y el SAC sobre ILT.
 2. **Las pantallas**: el editor de fórmulas con validación dimensional en vivo, el ABM de perfiles y
    variantes, y el ABM de variables — hoy `DIVJOR` y `HMJORN` sólo se cargan por seeder, y eso es lo
    que bloquea poner un convenio nuevo en marcha.

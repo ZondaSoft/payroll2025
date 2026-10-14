@@ -51,10 +51,26 @@ final class ContextoRelacionLaboral
          * @var array<string, array<string, string>>
          */
         public readonly array $diferencialesBase = [],
+        /**
+         * Días efectivamente prestados: el vínculo menos **todas** las ausencias, las
+         * pagas y las no pagas. Es distinto de $diasLiquidados, que son los días por
+         * los que se paga el básico.
+         *
+         * La diferencia la pone el libro docente: con una inasistencia injustificada el
+         * básico se sigue pagando por 30 días (la ausencia se expone como línea
+         * negativa) pero la tolerancia horaria se prorratea por 29. NULL = igual a
+         * $diasLiquidados.
+         */
+        public readonly ?int $diasEfectivos = null,
     ) {
         foreach ($novedades as $n) {
             $this->novedadesPorCodigo[$n->codigoNovedad][] = $n;
         }
+    }
+
+    public function diasEfectivos(): int
+    {
+        return $this->diasEfectivos ?? $this->diasLiquidados;
     }
 
     public function aniosAntiguedad(): int

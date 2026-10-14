@@ -43,6 +43,7 @@ final class ArmadorContextoRelacion
         int $diasLiquidados = 30,
         string|float $factorJornada = '1',
         string $condicionSindical = 'NO_INFORMADO',
+        ?int $diasEfectivos = null,
     ): ContextoRelacionLaboral {
         $fecha = $periodo->ultimoDia();
         $cat = $rl->categoriaVigenteA($fecha);
@@ -65,7 +66,7 @@ final class ArmadorContextoRelacion
             $rl, $fecha, $cat?->idCategoria, $cat?->codigoCategoria, $convenio?->id, $convenio?->codigo,
             $this->jornadas->porId($legajo?->jornadaId), $enc, $modelo,
             $this->novedades->porPeriodoYRelaciones($periodo, [$rl->id])[$rl->id] ?? [],
-            $diasLiquidados, $factorJornada, $condicionSindical,
+            $diasLiquidados, $factorJornada, $condicionSindical, diasEfectivos: $diasEfectivos,
         );
         $ctx->avisos = $avisos;
 
