@@ -52,17 +52,20 @@ final readonly class Dimension
             return self::indeterminada();
         }
 
+        // Los símbolos ($ y %) son los que escribe el ABM del catálogo; se aceptan
+        // como sinónimos de lectura para que una unidad declarada no se interprete
+        // como «sin declarar», que es un estado muy distinto.
         return match ($unidad) {
-            'ARS' => self::base('ARS'),
+            'ARS', '$', 'PESOS' => self::base('ARS'),
             'HORAS' => self::base('HORAS'),
             'DIAS' => self::base('DIAS'),
             'KM' => self::base('KM'),
             'UNIDADES', 'CANTIDAD' => self::base('UNIDADES'),
-            'NUMERIC', 'PORCENTAJE', 'COEFICIENTE' => self::escalar(),
+            'NUMERIC', 'PORCENTAJE', 'COEFICIENTE', '%', 'DECIMALES' => self::escalar(),
             'ARS/KM' => self::base('ARS')->dividido(self::base('KM')),
-            'ARS/HORA' => self::base('ARS')->dividido(self::base('HORAS')),
-            'ARS/DIA' => self::base('ARS')->dividido(self::base('DIAS')),
-            'ARS/UNIDAD' => self::base('ARS')->dividido(self::base('UNIDADES')),
+            'ARS/HORA', 'ARS/HORAS' => self::base('ARS')->dividido(self::base('HORAS')),
+            'ARS/DIA', 'ARS/DIAS' => self::base('ARS')->dividido(self::base('DIAS')),
+            'ARS/UNIDAD', 'ARS/UNIDADES' => self::base('ARS')->dividido(self::base('UNIDADES')),
             default => self::indeterminada(),
         };
     }

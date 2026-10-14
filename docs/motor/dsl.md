@@ -20,6 +20,16 @@ Las fórmulas son **datos versionados**: viven en las columnas `expr_*` de `moto
 | `ResolvedorDsl` | puerto: qué le pregunta el evaluador al mundo (`PARAM`, `NOV`, `VAR`, `VALCAT`, `CONC`, `BASE`, `MOD`) |
 | `BloqueoDsl` | el evaluador no pudo producir un número, con el código del contrato |
 | `TrazaFormula` | de dónde salió cada valor: la respuesta a "por qué este importe" |
+| `VersionFormula` | la parte ejecutable de una versión: las cuatro expresiones, su unidad, su redondeo y sus novedades declaradas |
+| `ValidadorVersion` | la puerta de publicación: valida la versión completa en modo `PUBLICACION` o `EDICION` |
+| `GrafoCalculo` | deriva el orden de cálculo de las dependencias y detecta ciclos |
+| `EvaluadorConcepto` | la secuencia del §6 para un concepto: aplicabilidad → novedades → módulo → condición → cantidad → valor → importe → cierre |
+| `BaseConstruida` | una base de Zonda armada con los conceptos ya calculados |
+| `EstadoCorrida` | lo que se va calculando: conceptos resueltos, bases armadas y el orden que resolvió el grafo |
+| `ResolvedorConEstado` | sirve `CONC` y `BASE` desde la corrida en curso y delega el resto |
+| `CorridaFormulas` | el orquestador: elige versión por variante, recorre el grafo, arma bases y evalúa conceptos |
+| `DecisionPerfil` | lo que el perfil decidió sobre un concepto: si aplica, con qué variante, o por qué bloquea |
+| `ResolvedorDominio` | traduce cada referencia del DSL al dato del trabajador (fuera de `Formulas`: usa los resolutores del dominio) |
 
 ## Reglas que el port preserva
 
@@ -38,7 +48,10 @@ El evaluador de referencia usa coma flotante; este port usa **`BigDecimal` con e
 
 ## Verificación
 
-`tests/Unit/Motor/Formulas/` — 66 tests. Los importes esperados son los de los recibos de 07/2026 que Oscar cerró al centavo, y el port los reproduce desde la misma expresión DSL:
+`tests/Unit/Motor/Formulas/` — 122 tests (parser 32, analizador 21, evaluador 13, validador de versión 20,
+grafo 8, evaluador de concepto 16, corrida 12) más 12 de `ResolutorPerfiles`. Los importes esperados son
+los de los recibos de 07/2026 que Oscar cerró al centavo, y el port los reproduce desde la misma
+expresión DSL:
 
 | Fórmula | Expresión | Resultado |
 |---|---|---|
@@ -50,10 +63,81 @@ El evaluador de referencia usa coma flotante; este port usa **`BigDecimal` con e
 | FERTRAB | `CANT * VALUNI` sobre `BASE(BASE_HORA_NORMAL) / VAR(DIVJOR)` | 107.464,7613 |
 | KMREC | `CANT * VALUNI` con `PARAM(TARIFA_KM)` | 208.105,7031 |
 
+## De la expresión a la liquidación
+
+El orden de cálculo **ya no es el de las etapas del liquidador**: lo deriva `GrafoCalculo` de las
+dependencias que declara cada fórmula. No existe ninguna columna `orden_calculo`, y agregar un concepto
+que consuma una base nueva reordena la corrida sin tocar código.
+
+```
+versiones vigentes ─┐
+perfiles del        ├─→ ResolutorPerfiles ─→ decisión por concepto (aplica + variante)
+trabajador          │
+                    └─→ GrafoCalculo ─→ orden (C:… y B:…)
+                                          │
+        ResolvedorDominio ──┐             ▼
+        (PARAM/NOV/VAR/     ├──→ CorridaFormulas ─→ EstadoCorrida
+         VALCAT/MOD)        │      · B:… → BaseConstruida::armar()
+        ResolvedorConEstado ┘      · C:… → EvaluadorConcepto::evaluar()
+        (CONC/BASE)
+```
+
+**De dónde sale cada referencia** (`ResolvedorDominio`):
+
+| Referencia | Fuente | Lo que *no* es |
+|---|---|---|
+| `PARAM(COD)` | `ResolutorParametros`, precedencia por ámbito | el alcance CATEGORIA lo retiró el v2: ese valor es `VALCAT` |
+| `NOV(COD)` | `motor_novedades` del período | una novedad ausente no es cero salvo que la versión la declare `OPCIONAL` |
+| `VAR(BASCAT)` | `motor_basicos` por categoría y vigencia | no sale de `sue001s.bruto` |
+| `VAR(HSPACT)` | jornada pactada de la relación | no se infiere de la categoría ni del convenio; en larga distancia no existe |
+| `VAR(HMJORN)`, `VAR(DIVJOR)`, `VAR(HSJORN)`, `VAR(HDJORN)` | `motor_valores_variable` por convenio | no se derivan uno del otro (P‑10‑b): el 371/03 tiene 25 y 200, el 40/89 tiene 24 y 192 |
+| `VAR(DIASLIQ)`, `VAR(ANTANIO)` | contexto del período y antigüedad de la relación | — |
+| `VALCAT(COD)` | `motor_categoria_concepto` + su vigencia | — |
+| `CONC`, `BASE` | estado de la corrida, en el orden del grafo | — |
+| `MOD(COD)` | `RegistroModulos`; hoy `ANTIGUEDAD.PORCENTAJE` | lo que no está registrado no se puede invocar |
+
+**Los perfiles deciden dos cosas a la vez** (`ResolutorPerfiles`): si el concepto corresponde y con qué
+variante se liquida. La precedencia es TRABAJADOR(1) → EMPRESA(2) → CATEGORIA(3) → CONVENIO(4) →
+GENERAL(5), y un nivel que no declara el concepto no vota. Tres diferencias con el
+`ResolutorAplicabilidad` que reemplaza:
+
+- la regla ganadora aporta **la variante**, que es lo que permite que `BASICO` elija entre
+  `JORNADA_PACTADA` y `LARGA_DISTANCIA`;
+- dos reglas contradictorias del mismo nivel dan `PERFIL_AMBIGUO` y bloquean **ese concepto**, no la
+  liquidación entera;
+- que ningún perfil se pronuncie da `PERFIL_SIN_REGLA` en vez de omitir el concepto en silencio.
+
+**Una base no se arma «con lo que haya»**: un integrante `NO_APLICA` se excluye con su motivo, pero uno
+bloqueado bloquea la base, y con ella todo lo que la consuma. Es lo que hace que una configuración
+incompleta se note en vez de producir un recibo verosímil y equivocado.
+
+## Verificación de punta a punta
+
+`tests/Feature/Motor/CalcularHaberes7019Test.php` liquida el legajo 7019 desde las tablas del motor:
+fórmulas publicadas en `motor_concepto_versiones`, perfiles en `motor_perfil`, divisores en
+`motor_valores_variable` y básico en `motor_basicos`. Los importes son los del recibo de 07/2026:
+
+| Concepto | Importe |
+|---|---|
+| BASICO (JORNADA_PACTADA) | 1.335.827,18 |
+| ANTIG (8 años × 2 %) | 213.732,3488 |
+| ASIST (redondeo DECIMAL) | 106.866,17 |
+| HE50 (9,5 h) | 118.020,3310 |
+| HE100 (12 h) | 198.771,0839 |
+| **BASE_HORA_NORMAL** | **1.656.425,6988** |
+| Subtotal remunerativo | 1.973.217,11 |
+
+`BASE_HORA_NORMAL` es el valor que fija el criterio: sale de sumar el **ASIST ya redondeado** a dos
+decimales y de excluir MANFON, que este legajo no cobra (regla de nivel TRABAJADOR). Con el ASIST sin
+redondear daría 1.656.425,7032 y las horas extras cerrarían mal.
+
 ## Lo que falta
 
-El port cubre el lenguaje: leer, validar y ejecutar una expresión. Para que el motor liquide con estas fórmulas en lugar de las estrategias tipadas faltan tres piezas, que son el frente siguiente:
-
-1. **`validarVersion()`** — las validaciones de publicación: novedad usada sin declarar y declarada sin usar, literales sin justificar, unidades sin declarar, coherencia de método y componentes.
-2. **El grafo topológico** — hoy el orden de cálculo lo fija el liquidador por etapas; el contrato lo deriva de las dependencias (`CONC`, `BASE`, `MOD`) y rechaza ciclos.
-3. **La integración**: una estrategia que lea las `expr_*` de la versión vigente y evalúe con un resolvedor sobre el dominio real, en lugar de las estrategias tipadas.
+1. **Los módulos del tramo 3**: promedios de variables de seis meses (`MOD_HISTORICO_INSUFICIENTE` sin
+   historia suficiente), contingencias con su divisor, ILT y SAC sobre ILT.
+2. **Las pantallas**: el editor de fórmulas con validación dimensional en vivo, el ABM de perfiles y
+   variantes, y el ABM de variables — hoy `DIVJOR` y `HMJORN` sólo se cargan por seeder, y eso es lo
+   que bloquea poner un convenio nuevo en marcha.
+3. **`INASIS_MAX` y `LLEGTAR_MAX`**: la versión 2 de ASIST los referencia y el libro v5 no los declara.
+   Se crearon **sin valor** (migración `000008`): hasta que alguien confirme el tope del convenio, el
+   motor bloquea ASIST con `PARAMETRO_SIN_VALOR` en vez de decidir por el CCT.

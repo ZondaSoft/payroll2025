@@ -32,6 +32,16 @@ class MotorServiceProvider extends ServiceProvider
 
         $this->app->singleton(Reloj::class, RelojSistema::class);
 
+        // El gate lee el entorno de la configuración: en PRODUCCION sólo un dato
+        // CONFIRMADO habilita el cálculo.
+        $this->app->bind(\App\Motor\Dominio\Servicios\GateValidacion::class,
+            fn ($app) => new \App\Motor\Dominio\Servicios\GateValidacion($app->make(ConfiguracionMotor::class)->entorno));
+
+        // Los módulos del DSL (MOD()) son los registrados acá: lo que no está en el
+        // registro no se puede invocar desde una fórmula.
+        $this->app->singleton(\App\Motor\Dominio\Modulos\RegistroModulos::class,
+            fn () => \App\Motor\Dominio\Modulos\RegistroModulos::porDefecto());
+
         // Los bindings puerto → repositorio/adaptador se registran en registrarPersistencia()
         // y registrarAdaptadoresLegacy() (fase F2).
         $this->registrarPersistencia();
@@ -54,6 +64,7 @@ class MotorServiceProvider extends ServiceProvider
             'RepositorioTopes', 'RepositorioRegimenes', 'RepositorioEncuadramientos', 'RepositorioParametros', 'RepositorioModelosAntiguedad',
             'RepositorioModelosVacaciones', 'RepositorioBasicos', 'RepositorioBasesZonda', 'RepositorioIncidenciasArca', 'RepositorioAplicabilidad',
             'RepositorioRelacionesLaborales', 'RepositorioIfRelacionOrigen', 'RepositorioNovedades', 'RepositorioIfNovedadOrigen', 'RepositorioTiposNovedad',
+            'RepositorioFormulas', 'RepositorioPerfiles', 'RepositorioVariables', 'RepositorioValoresCategoria',
         ] as $puerto) {
             $this->app->bind('App\\Motor\\Aplicacion\\Puertos\\'.$puerto, $ns.$puerto.'Eloquent');
         }

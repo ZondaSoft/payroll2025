@@ -13,7 +13,8 @@ final class RepositorioTiposNovedadEloquent implements RepositorioTiposNovedad
 {
     public function todos(): array
     {
-        return MotorTipoNovedad::query()->orderBy('codigo')->get()->map(fn ($f) => new TipoNovedad((int) $f->id_tipo_novedad, $f->codigo, $f->descripcion, $f->unidad, (bool) $f->activo))->all();
+        return MotorTipoNovedad::query()->orderBy('codigo')->get()->map(fn ($f) => new TipoNovedad((int) $f->id_tipo_novedad, $f->codigo, $f->descripcion, $f->unidad,
+            (bool) $f->activo, $f->regla_agregacion, $f->tipo_valor))->all();
     }
 
     public function mapeos(bool $soloActivos = true): array

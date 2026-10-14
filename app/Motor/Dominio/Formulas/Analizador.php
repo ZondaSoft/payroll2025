@@ -105,6 +105,12 @@ final class Analizador
                 $r->problema('DSL_SINTAXIS_INVALIDA', 'VALUNI solo puede usarse en la expresión de importe');
             }
 
+            // La dimensión real del valor unitario se conoce al analizar su propia
+            // expresión y se reinyecta acá; puede ser compuesta (ARS/HORAS).
+            if ($ctx->dimensionValor !== null) {
+                return $ctx->dimensionValor;
+            }
+
             return $ctx->unidadValor !== null ? Dimension::deUnidad($ctx->unidadValor) : Dimension::escalar();
         }
 

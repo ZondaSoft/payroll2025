@@ -7,6 +7,15 @@ enum CodigoBloqueo: string
     case ParametroSinValor = 'PARAMETRO_SIN_VALOR';
     case ParametroEmpate = 'PARAMETRO_EMPATE';
     case ParametroTecnicoAusente = 'PARAMETRO_TECNICO_AUSENTE';
+    /** VAR() del DSL sin valor vigente, o con dos valores del mismo nivel. */
+    case VariableSinValor = 'VARIABLE_SIN_VALOR';
+    /** VALCAT() sin valor para la categoría del trabajador. */
+    case ValorCategoriaAusente = 'VALCAT_SIN_VALOR';
+    /** El perfil no eligió variante, o dos perfiles del mismo nivel se contradicen. */
+    case PerfilSinRegla = 'PERFIL_SIN_REGLA';
+    case PerfilAmbiguo = 'PERFIL_AMBIGUO';
+    /** MOD() invocado sobre un módulo que no está registrado o está inactivo. */
+    case ModuloSinResultado = 'MOD_SIN_RESULTADO';
     case BasicoSinImporte = 'BASICO_SIN_IMPORTE';
     case BasicoAmbiguo = 'BASICO_AMBIGUO';
     case TopeSinParametrizacion = 'TOPE_SIN_PARAMETRIZACION';
@@ -38,6 +47,11 @@ enum CodigoBloqueo: string
             self::ParametroSinValor => 'Parámetro sin valor vigente',
             self::ParametroEmpate => 'Empate de parámetro en el mismo nivel',
             self::ParametroTecnicoAusente => 'Parámetro técnico del motor ausente',
+            self::VariableSinValor => 'Variable del DSL sin valor vigente',
+            self::ValorCategoriaAusente => 'Valor por categoría ausente',
+            self::PerfilSinRegla => 'Ningún perfil se pronuncia sobre el concepto',
+            self::PerfilAmbiguo => 'Dos perfiles del mismo nivel se contradicen',
+            self::ModuloSinResultado => 'Módulo sin resultado',
             self::BasicoSinImporte => 'Categoría sin básico vigente',
             self::BasicoAmbiguo => 'Más de un básico vigente',
             self::TopeSinParametrizacion => 'Falta parametrización de tope',

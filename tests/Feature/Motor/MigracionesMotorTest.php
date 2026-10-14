@@ -41,7 +41,9 @@ final class MigracionesMotorTest extends TestCase
             'motor_modalidades_arca' => 4, 'motor_situaciones_revista_arca' => 4,
             'motor_alicuotas_contribuciones' => 8, 'motor_alicuotas_aportes' => 4, 'motor_topes_minimos' => 9,
             'motor_regimenes_contributivos' => 9, 'motor_regimen_distribucion' => 4,
-            'motor_reglas_base_diferencial_arca' => 2, 'motor_parametros' => 22,
+            // 22 del libro v5 + INASIS_MAX y LLEGTAR_MAX, que la fórmula publicada de
+            // ASIST referencia y el libro no declaraba.
+            'motor_reglas_base_diferencial_arca' => 2, 'motor_parametros' => 24,
             'motor_modelos_antiguedad' => 2, 'motor_antiguedad_tramos' => 31, 'motor_modelos_vacaciones' => 1,
             'motor_vacaciones_tramos' => 4, 'motor_tipos_novedad' => 15, 'motor_bases_zonda' => 5,
             'motor_conceptos' => 40, 'motor_base_zonda_incidencia' => 185, 'motor_concepto_incidencia_arca' => 507,
