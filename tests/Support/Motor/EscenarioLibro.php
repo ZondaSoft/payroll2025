@@ -27,6 +27,11 @@ final class EscenarioLibro
 
     public const CATEGORIA_221 = 412;
 
+    /** Categorías de taller: las únicas con plus por pluralidad y tolerancia horaria. */
+    public const CATEGORIA_TALLER_371 = 413;
+
+    public const CATEGORIA_TALLER_4089 = 414;
+
     public const EMPRESA = 6;
 
     public const RL_7019 = 18;
@@ -45,6 +50,7 @@ final class EscenarioLibro
         self::valoresDeParametros();
         self::basicos();
         self::modeloDeAntiguedad();
+        self::valoresPorCategoria();
         self::perfiles();
     }
 
@@ -60,6 +66,8 @@ final class EscenarioLibro
         DB::table('sue006s')->insertOrIgnore([
             ['id' => self::CATEGORIA_7019, 'codigo' => '0089', 'detalle' => 'Operario Int. y Anexo', 'cod_conve' => '4'],
             ['id' => self::CATEGORIA_221, 'codigo' => '0201', 'detalle' => 'Conductor de primera', 'cod_conve' => '2'],
+            ['id' => self::CATEGORIA_TALLER_371, 'codigo' => '0103', 'detalle' => 'Operario de playa', 'cod_conve' => '4'],
+            ['id' => self::CATEGORIA_TALLER_4089, 'codigo' => '0203', 'detalle' => 'Mecánico de taller', 'cod_conve' => '2'],
         ]);
         // Jornada de 48 horas semanales: es la que hace que BASICO con variante
         // JORNADA_PACTADA no prorratee (HSPACT 48 / HSJORN 48 = 1).
@@ -106,9 +114,9 @@ final class EscenarioLibro
             ['HSJORN', self::CONVENIO_371, '48', 'CCT 371/03 — jornada completa semanal'],
             ['HDJORN', self::CONVENIO_371, '8', 'CCT 371/03 — horas diarias de la jornada'],
             ['DIVJOR', self::CONVENIO_4089, '24', 'CCT 40/89 ítem 6.1.6 — jornales del mes'],
-            ['HMJORN', self::CONVENIO_4089, '192', 'CCT 40/89 — horas mensuales de la jornada'],
-            ['HSJORN', self::CONVENIO_4089, '48', 'CCT 40/89 — jornada completa semanal'],
-            ['HDJORN', self::CONVENIO_4089, '8', 'CCT 40/89 — horas diarias de la jornada'],
+            ['HMJORN', self::CONVENIO_4089, '192', 'CCT 40/89 — horas mensuales de la jornada (JOR_44)'],
+            ['HSJORN', self::CONVENIO_4089, '44', 'CCT 40/89 — jornada completa semanal (JOR_44)'],
+            ['HDJORN', self::CONVENIO_4089, '8', 'CCT 40/89 — horas diarias de la jornada (JOR_44)'],
         ] as [$codigo, $convenio, $valor, $fuente]) {
             DB::table('motor_valores_variable')->insertOrIgnore([
                 'codigo' => $codigo, 'alcance' => 'CONVENIO', 'id_convenio' => $convenio, 'valor' => $valor,
@@ -187,6 +195,39 @@ final class EscenarioLibro
     }
 
     /**
+     * VALCAT: los conceptos cuyo valor depende de la categoría, con el valor de las
+     * categorías que lo tienen.
+     *
+     * Son los dos casos del libro: la tolerancia horaria del 371/03 (9 horas en
+     * Operario de Playa) y el plus por pluralidad del 40/89 (25 % en las categorías
+     * de taller). Ni el 7019 ni el 221 los cobran, y por eso el perfil los excluye:
+     * el valor existe para otras categorías, no para la de ellos.
+     */
+    private static function valoresPorCategoria(): void
+    {
+        $ahora = now()->toDateTimeString();
+        foreach ([
+            ['TOLHOR', self::CATEGORIA_TALLER_371, 'CANTIDAD', 'HORAS', '9', 'Escala 371/03 — tolerancia horaria de Operario de Playa'],
+            ['PLUSPLUR', self::CATEGORIA_TALLER_4089, 'PORCENTAJE', 'PORCENTAJE', '0.25', 'Escala 40/89 — columna % Plus x Pluralidad'],
+        ] as [$concepto, $categoria, $tipoValor, $unidad, $valor, $fuente]) {
+            $id = DB::table('motor_categoria_concepto')
+                ->where('id_categoria', $categoria)->where('codigo_concepto', $concepto)->value('id_categoria_concepto');
+            if ($id === null) {
+                $id = DB::table('motor_categoria_concepto')->insertGetId([
+                    'id_categoria' => $categoria, 'codigo_concepto' => $concepto, 'tipo_valor' => $tipoValor,
+                    'unidad_valor' => $unidad, 'activo' => true, 'estado_validacion' => 'CONFIRMADO',
+                    'created_at' => $ahora, 'updated_at' => $ahora,
+                ], 'id_categoria_concepto');
+            }
+            DB::table('motor_categoria_concepto_vigencia')->insertOrIgnore([
+                'id_categoria_concepto' => $id, 'valor' => $valor, 'vigencia_desde' => '2026-07-01',
+                'estado_validacion' => 'CONFIRMADO', 'fuente' => $fuente,
+                'created_at' => $ahora, 'updated_at' => $ahora,
+            ]);
+        }
+    }
+
+    /**
      * Los perfiles del v5, con el detalle que decide el caso: el 7019 no cobra
      * manejo de fondos (regla de nivel TRABAJADOR) y el acuerdo 5/6/2 es del 40/89.
      */
@@ -223,7 +264,7 @@ final class EscenarioLibro
                 ['relacion_laboral_id' => self::RL_7019], [
                     'MANFON' => [false, null, 'El legajo no tiene manejo de fondos.'],
                     'ADTIT' => [false, null, 'El legajo no acredita título habilitante.'],
-                    'TOLHOR' => [false, null, 'Sin tolerancia horaria cargada para la categoría.'],
+                    'TOLHOR' => [false, null, 'La tolerancia horaria es de las categorías de playa (0103).'],
                 ]],
             ['CCT_40_89', 'Convenio CCT 40/89 — Camioneros', 'CONVENIO', 4,
                 ['id_convenio' => self::CONVENIO_4089], [
@@ -234,13 +275,18 @@ final class EscenarioLibro
                     'CTRLCD' => [true, 'UNICA', null],
                     'PERMFRA' => [true, 'UNICA', null],
                     'PERMFRB' => [true, 'UNICA', null],
+                    // La categoría 201 tiene pernoctada en la escala; el período no trae
+                    // la novedad, así que queda NO_APLICA por falta de novedad y no por
+                    // falta de regla. La diferencia se ve en el recibo.
                     'PERNOCT' => [true, 'UNICA', null],
                     'VIATKM' => [true, 'UNICA', null],
                     'AD562' => [true, 'UNICA', null],
                     'ACDSIND562' => [true, 'UNICA', null],
                     'ADICNR20' => [true, 'UNICA', null],
-                    'FERTRAB' => [true, 'UNICA', null],
+                    'FERTRAB' => [true, 'UNICA', 'P-10: se calcula con BASE_HORA_NORMAL / VAR(DIVJOR).'],
                     'FERTRABHS' => [true, 'UNICA', null],
+                    'COMIDA' => [false, null, 'La categoría 201 no tiene valor de comida en la escala: es del taller.'],
+                    'VIATESP' => [false, null, 'La categoría 201 no tiene viático especial en la escala: es del taller.'],
                     // H-4: en larga distancia las horas extras no corresponden. Es una
                     // exclusión estructural del perfil, no una novedad que falta.
                     'HE50' => [false, null, 'En larga distancia las horas extras no corresponden (H-4).'],
@@ -250,7 +296,9 @@ final class EscenarioLibro
                     'TOLHOR' => [false, null, 'Tolerancia horaria: concepto del CCT 371/03.'],
                     'ADTIT' => [false, null, 'Adicional por título: concepto del CCT 371/03.'],
                     'ACTAFUT' => [false, null, 'Acta futura: no corresponde a este convenio.'],
-                    'PLUSPLUR' => [false, null, 'Sin valor por categoría cargado para este legajo.'],
+                    // VALCAT(PLUSPLUR) tiene alcance categorías 203/204/205 (taller); la 201
+                    // no está entre ellas.
+                    'PLUSPLUR' => [false, null, 'El plus por pluralidad es de las categorías de taller (203/204/205).'],
                 ]],
         ];
 
@@ -272,6 +320,17 @@ final class EscenarioLibro
             }
         }
     }
+
+    /** Las novedades de 07/2026 del legajo 221, como las declara sim/config_221.json. */
+    public const NOVEDADES_221 = [
+        'KM_REM' => '2454',
+        'KM_SAB_DOM' => '1261',
+        'CTRL_CARGA_DESC' => '6',
+        'PERM_FR_B' => '3',
+        'KM_VIAT_NR' => '11900',
+        'PERM_FR_A' => '3',
+        'FERIADO_CANT' => '1',
+    ];
 
     /** Novedades del período para una relación: código => cantidad. */
     public static function novedades(int $relacionLaboralId, string $periodo, array $novedades): void

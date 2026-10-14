@@ -4,6 +4,7 @@ namespace App\Motor\Infraestructura\Persistencia\Eloquent\Repositorios;
 
 use App\Motor\Aplicacion\Puertos\RepositorioValoresCategoria;
 use App\Motor\Dominio\Entidades\ValorCategoriaConcepto;
+use App\Motor\Infraestructura\Persistencia\Eloquent\Modelos\MotorCategoriaConcepto;
 use App\Motor\Infraestructura\Persistencia\Eloquent\Modelos\MotorCategoriaConceptoVigencia;
 use Brick\Math\BigDecimal;
 use DateTimeImmutable;
@@ -14,6 +15,13 @@ use DateTimeImmutable;
  */
 final class RepositorioValoresCategoriaEloquent implements RepositorioValoresCategoria
 {
+    public function conceptosDeclarados(): array
+    {
+        return MotorCategoriaConcepto::query()->where('activo', true)
+            ->orderBy('codigo_concepto')->get(['codigo_concepto', 'unidad_valor'])
+            ->mapWithKeys(fn ($f) => [$f->codigo_concepto => $f->unidad_valor])->all();
+    }
+
     public function vigentes(DateTimeImmutable $fecha): array
     {
         $q = MotorCategoriaConceptoVigencia::query()

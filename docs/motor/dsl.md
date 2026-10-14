@@ -131,6 +131,40 @@ fórmulas publicadas en `motor_concepto_versiones`, perfiles en `motor_perfil`, 
 decimales y de excluir MANFON, que este legajo no cobra (regla de nivel TRABAJADOR). Con el ASIST sin
 redondear daría 1.656.425,7032 y las horas extras cerrarían mal.
 
+`tests/Feature/Motor/CalcularHaberes221Test.php` liquida el legajo 221 del CCT 40/89 (chofer de larga
+distancia) **con el mismo motor y sin una línea de código distinta**: 12 líneas, 4 bases y tres niveles
+de dependencia encadenados (el acuerdo sindical depende de su base, la antigüedad de la suya —que
+incluye el acuerdo— y el feriado de la hora normal, que incluye la antigüedad).
+
+| Concepto | Importe | | Base | Importe |
+|---|---|---|---|---|
+| BASICO (LARGA_DISTANCIA) | 1.060.010,29 | | BASE_ACUERDO_5_6_2 | 776.994,1764 |
+| KMREC (2.454 km) | 208.105,7031 | | BASE_ANTIGUEDAD | 2.204.405,3597 |
+| KMSABDOM (1.261 km × 2) | 213.872,2833 | | BASE_HORA_NORMAL | 2.579.154,2708 |
+| AD562 (20 % s/ básico) | 212.002,058 | | BASE_NO_REMUNERATIVA | 1.180.878,135 |
+| CTRLCD (6 × 44.167,10) | 265.002,60 | | | |
+| PERMFRB (3 × 30.004,53) | 90.013,59 | | **Subtotal remunerativo** | **2.686.619,0321** |
+| ACDSIND562 (20 % s/ base) | 155.398,8353 | | **Subtotal no remunerativo** | **1.417.053,762** |
+| ANTIG (17 años × 1 %) | 374.748,9111 | | | |
+| FERTRAB (1 día ÷ 24) | 107.464,7613 | | | |
+| VIATKM (11.900 km) | 1.009.151,535 | | | |
+| PERMFRA (3 × 57.242,20) | 171.726,60 | | | |
+| ADICNR20 (20 % s/ base NR) | 236.175,627 | | | |
+
+Lo que el caso prueba más allá de los importes: el mismo `BASICO` toma la otra variante
+(`LARGA_DISTANCIA`, sin prorrateo por jornada) porque lo dice el perfil; `DIVJOR` vale 24 y no 25;
+`HE50`/`HE100` quedan `NO_APLICA` por **exclusión estructural del perfil** (H‑4: en larga distancia la
+compensación es KMREC, no horas extras), mientras `PERNOCT` queda `NO_APLICA` por **falta de novedad** —
+el concepto está habilitado y ese mes no hubo pernoctadas. Son dos ausencias con causas distintas y el
+recibo las distingue.
+
+`tests/Feature/Motor/ValidacionFormulasPublicadasTest.php` pasa **todas** las versiones publicadas por
+la puerta de publicación contra el catálogo real: cada importe devuelve ARS, ninguna fórmula se
+autorreferencia ni consume una base que integra, el grafo completo no tiene ciclos y toda novedad
+declara su regla de agregación. Es el test que encuentra los huecos de configuración antes que una
+liquidación: así apareció que `PLUSPLUR` y `TOLHOR` estaban publicados sin la declaración de
+`motor_categoria_concepto` que sus `VALCAT()` necesitan.
+
 ## Lo que falta
 
 1. **Los módulos del tramo 3**: promedios de variables de seis meses (`MOD_HISTORICO_INSUFICIENTE` sin

@@ -12,7 +12,6 @@ use App\Motor\Dominio\Entidades\Concepto;
 use App\Motor\Dominio\Entidades\IncidenciaBaseZonda;
 use App\Motor\Dominio\Entidades\Parametro;
 use App\Motor\Dominio\Entidades\TipoNovedad;
-use App\Motor\Dominio\Entidades\ValorCategoriaConcepto;
 use App\Motor\Dominio\Entidades\Variable;
 use App\Motor\Dominio\Formulas\CatalogoDsl;
 use App\Motor\Dominio\Modulos\RegistroModulos;
@@ -50,7 +49,7 @@ final class FabricaCatalogoDsl
                 fn (TipoNovedad $n) => ['unidad' => $n->unidad, 'regla_agregacion' => $n->reglaAgregacion]),
             variables: $this->porCodigo($this->variables->catalogo(),
                 fn (Variable $v) => $v->codigo, fn (Variable $v) => ['unidad' => $v->unidad]),
-            valcat: $this->valcatDeclarado($fecha),
+            valcat: $this->valcatDeclarado(),
             bases: $this->basesConIntegrantes($fecha),
             modulos: $this->modulos->paraCatalogo(),
         );
@@ -72,14 +71,17 @@ final class FabricaCatalogoDsl
      * La unidad de VALCAT es la del concepto, no la de la categoría: el mismo
      * VALCAT(TOLHOR) son horas en todas las categorías que lo tengan.
      *
+     * Sale de la declaración y no de los valores vigentes: que una categoría no
+     * tenga valor cargado no vuelve inexistente la referencia — son dos problemas
+     * distintos y el motor los informa distinto.
+     *
      * @return array<string, array{unidad?: ?string}>
      */
-    private function valcatDeclarado(DateTimeImmutable $fecha): array
+    private function valcatDeclarado(): array
     {
         $out = [];
-        foreach ($this->valoresCategoria->vigentes($fecha) as $v) {
-            /** @var ValorCategoriaConcepto $v */
-            $out[$v->codigoConcepto] ??= ['unidad' => $v->unidad];
+        foreach ($this->valoresCategoria->conceptosDeclarados() as $codigo => $unidad) {
+            $out[$codigo] = ['unidad' => $unidad];
         }
 
         return $out;

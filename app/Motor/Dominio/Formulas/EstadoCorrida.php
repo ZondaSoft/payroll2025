@@ -39,6 +39,26 @@ final class EstadoCorrida
         return $total;
     }
 
+    /**
+     * Suma los conceptos calculados de un grupo. Los subtotales del recibo —
+     * remunerativo, no remunerativo, descuentos — son grupos de conceptos, y
+     * agruparlos es de quien conoce la naturaleza de cada uno, no del DSL.
+     *
+     * @param  list<string>  $codigos
+     */
+    public function sumaDe(array $codigos): BigDecimal
+    {
+        $total = BigDecimal::zero();
+        foreach ($codigos as $codigo) {
+            $r = $this->conceptos[$codigo] ?? null;
+            if ($r !== null && $r->esCalculado()) {
+                $total = $total->plus($r->importeResultado);
+            }
+        }
+
+        return $total;
+    }
+
     /** @return array<string, ResultadoConcepto> */
     public function porEstado(string $estado): array
     {
