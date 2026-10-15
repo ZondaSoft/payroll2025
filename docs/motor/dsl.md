@@ -1,6 +1,6 @@
 # DSL v1.1 — port a PHP
 
-`app/Motor/Dominio/Formulas/` es el port del lenguaje de fórmulas de Zonda. La fuente es **`src/dsl_v11.js` tal como viene en el instructivo** (SHA‑256 `d074418d9320381bd4925422350ca9f62e7fe6a9e703e873731b0003e5c13ce1`), no la copia de `okat0566/motor-zonda` en GitHub, que quedó atrás: **F‑2/P‑6 eliminó `NOV(COD, CANT)`** y ahora `NOV()` acepta exactamente un código, porque la novedad tiene un único valor tipado y su obligatoriedad vive en la versión (`CONCEPTO_VERSION_NOVEDAD`).
+`app/Motor/Dominio/Formulas/` es el port del lenguaje de fórmulas de Zonda. La fuente es **`src/dsl_v11.js` tal como viene en el instructivo** (SHA‑256 `d074418d9320381bd4925422350ca9f62e7fe6a9e703e873731b0003e5c13ce1`), que es el mismo archivo de la rama `feature/instructivo-interactivo-daniel` (PR #10) de `okat0566/motor-zonda`; la copia de `main` quedó atrás: **F‑2/P‑6 eliminó `NOV(COD, CANT)`** y ahora `NOV()` acepta exactamente un código, porque la novedad tiene un único valor tipado y su obligatoriedad vive en la versión (`CONCEPTO_VERSION_NOVEDAD`).
 
 ## Por qué un DSL y no código PHP
 
