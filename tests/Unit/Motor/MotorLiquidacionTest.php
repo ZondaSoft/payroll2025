@@ -127,8 +127,10 @@ final class MotorLiquidacionTest extends TestCase
         $ctx = F::contexto(F::relacionAguirre(), 1, F::modeloAntiguedadEscala(), []);
         $liq = (new MotorLiquidacion)->liquidar($periodo, $ctx, $valores, $basicos);
 
+        // Una incidencia que no es S ni N no se resuelve: la base queda BLOQUEADA y sin importe.
         $codigos = array_map(fn ($b) => $b->codigo, $liq->bloqueos);
-        self::assertContains(CodigoBloqueo::IncidenciaPendiente, $codigos);
+        self::assertContains(CodigoBloqueo::BaseBloqueada, $codigos);
+        self::assertSame('INCIDENCIA_NO_RESUELTA', $liq->basesArca['REM_1']->codigoError);
         self::assertSame('BLOQUEADA', $liq->etapas['bases_arca']);
         self::assertNotEmpty($liq->haberes, 'los haberes se calcularon igual');
     }

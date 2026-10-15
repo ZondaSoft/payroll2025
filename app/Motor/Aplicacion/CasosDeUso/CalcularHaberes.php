@@ -50,17 +50,21 @@ final class CalcularHaberes
         ));
     }
 
-    /** Variante para quien ya tiene el contexto armado (el liquidador completo). */
-    public function paraContexto(ContextoRelacionLaboral $ctx): EstadoCorrida
+    /**
+     * Variante para quien ya tiene el contexto armado (el liquidador completo). El
+     * simulador pasa su propio gate: el entorno lo elige quien simula, no la config.
+     */
+    public function paraContexto(ContextoRelacionLaboral $ctx, ?GateValidacion $gate = null): EstadoCorrida
     {
         $fecha = $ctx->fechaResolucion;
+        $gate ??= $this->gate;
 
         return $this->calculador->calcular(
             $ctx,
-            new ResolutorParametros($this->parametros->valoresVigentes($fecha, $this->armador->ambitos($ctx)), $this->gate),
+            new ResolutorParametros($this->parametros->valoresVigentes($fecha, $this->armador->ambitos($ctx)), $gate),
             new ResolutorBasico(
                 $ctx->idCategoria === null ? [] : $this->basicos->porCategorias([$ctx->idCategoria], $fecha),
-                $this->gate,
+                $gate,
             ),
         );
     }

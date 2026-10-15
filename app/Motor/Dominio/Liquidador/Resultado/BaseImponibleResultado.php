@@ -34,6 +34,21 @@ final class BaseImponibleResultado
 
     public ?string $detalleDerivacion = null;
 
+    /** CALCULADA o BLOQUEADA. Una base bloqueada no tiene importe: nunca vale 0 por defecto (PE-2). */
+    public string $estado = 'CALCULADA';
+
+    /** Código del primer bloqueo: el del concepto bloqueado que la integra, INCIDENCIA_AUSENTE, etc. */
+    public ?string $codigoError = null;
+
+    public ?string $motivoBloqueo = null;
+
+    /**
+     * Traza S/N por concepto (LIQUIDACION_BASE_ARCA_DETALLE): conserva también los N.
+     *
+     * @var list<array{codigo_concepto: string, incidencia: string, importe_concepto: string, importe_incluido: string}>
+     */
+    public array $detalle = [];
+
     public function __construct(public readonly string $codigoBase, public readonly string $componente = 'MENSUAL')
     {
         $this->importeAntesAjustes = Importe::cero();
@@ -75,6 +90,30 @@ final class BaseImponibleResultado
         $this->excluidos[$codigoConcepto] = $motivo;
     }
 
+    /** Bloquea la base con su primera causa; las siguientes no la reemplazan. */
+    public function bloquear(string $codigoError, string $motivo): void
+    {
+        if ($this->estado === 'BLOQUEADA') {
+            return;
+        }
+        $this->estado = 'BLOQUEADA';
+        $this->codigoError = $codigoError;
+        $this->motivoBloqueo = $motivo;
+    }
+
+    public function estaBloqueada(): bool
+    {
+        return $this->estado === 'BLOQUEADA';
+    }
+
+    public function registrarDetalle(string $codigoConcepto, string $incidencia, Importe $importeConcepto, Importe $importeIncluido): void
+    {
+        $this->detalle[] = [
+            'codigo_concepto' => $codigoConcepto, 'incidencia' => $incidencia,
+            'importe_concepto' => (string) $importeConcepto->valor, 'importe_incluido' => (string) $importeIncluido->valor,
+        ];
+    }
+
     public function aplicarTope(Importe $importeTopeado, string $codigoTope, string $tipo): void
     {
         $this->ajusteTope = $importeTopeado->menos($this->importeAntesAjustes);
@@ -89,10 +128,13 @@ final class BaseImponibleResultado
         return [
             'codigo_base' => $this->codigoBase, 'componente' => $this->componente,
             'origen_calculo' => $this->origenCalculo, 'detalle_derivacion' => $this->detalleDerivacion,
-            'importe_antes_ajustes' => $this->importeAntesAjustes->aTexto(2), 'importe_diferencial' => $this->importeDiferencial->aTexto(2),
+            'estado' => $this->estado, 'codigo_error' => $this->codigoError, 'motivo_bloqueo' => $this->motivoBloqueo,
+            'importe_antes_ajustes' => $this->estaBloqueada() ? null : $this->importeAntesAjustes->aTexto(2), 'importe_diferencial' => $this->importeDiferencial->aTexto(2),
             'ajuste_tope' => $this->ajusteTope->aTexto(2),
-            'importe_aplicado' => $this->importeAplicado->aTexto(2), 'tope_aplicado' => $this->topeAplicado, 'tipo_tope' => $this->tipoTopeAplicado,
+            'importe_aplicado' => $this->estaBloqueada() ? null : $this->importeAplicado->aTexto(2),
+            'importe_exacto' => $this->estaBloqueada() ? null : (string) $this->importeAplicado->valor, 'tope_aplicado' => $this->topeAplicado, 'tipo_tope' => $this->tipoTopeAplicado,
             'incluidos' => $this->incluidos, 'excluidos' => $this->excluidos, 'diferenciales' => $this->diferenciales,
+            'detalle' => $this->detalle,
         ];
     }
 }

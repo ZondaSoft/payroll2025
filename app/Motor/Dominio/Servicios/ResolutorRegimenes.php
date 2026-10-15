@@ -87,6 +87,11 @@ final class ResolutorRegimenes
             if ($aviso !== null) {
                 $avisos[] = $aviso;
             }
+            // Un régimen que corresponde y no tiene porcentaje no se liquida en cero:
+            // la configuración está incompleta (instructivo §30, régimen rural sin alícuota).
+            if ($r->porcentaje === null) {
+                throw MotorBloqueado::porque(CodigoBloqueo::AlicuotaAusente, "Régimen {$r->codigo} ({$r->tipoRegla->value}) aplicable sin porcentaje: configuración incompleta.", "motor_regimenes_contributivos:{$r->codigo}", 'porcentaje');
+            }
             $destinos = array_map('trim', explode('+', (string) $r->destino));
             switch ($r->tipoRegla) {
                 case TipoRegla::Sustitutivo:
@@ -94,10 +99,10 @@ final class ResolutorRegimenes
                     foreach ($destinos as $d) {
                         unset($lineas[$d]);
                     }
-                    $lineas[$r->codigo] = ['subsistema' => $destinos[0], 'base' => $r->baseAplicable, 'porcentaje' => $r->porcentaje ?? Porcentaje::cero(), 'regla' => 'SUSTITUTIVO', 'regimen' => $r->codigo, 'destino' => $r->destino];
+                    $lineas[$r->codigo] = ['subsistema' => $destinos[0], 'base' => $r->baseAplicable, 'porcentaje' => $r->porcentaje, 'regla' => 'SUSTITUTIVO', 'regimen' => $r->codigo, 'destino' => $r->destino];
                     break;
                 case TipoRegla::Adicional:
-                    $lineas[$r->codigo] = ['subsistema' => $destinos[0], 'base' => $r->baseAplicable, 'porcentaje' => $r->porcentaje ?? Porcentaje::cero(), 'regla' => 'ADICIONAL', 'regimen' => $r->codigo, 'destino' => $r->destino];
+                    $lineas[$r->codigo] = ['subsistema' => $destinos[0], 'base' => $r->baseAplicable, 'porcentaje' => $r->porcentaje, 'regla' => 'ADICIONAL', 'regimen' => $r->codigo, 'destino' => $r->destino];
                     break;
                 case TipoRegla::SustitucionSubsistema:
                     // reemplaza por completo el subsistema nombrado: su línea sale y entra
@@ -105,11 +110,11 @@ final class ResolutorRegimenes
                     if ($r->reemplazaSubsistema !== null) {
                         unset($lineas[$r->reemplazaSubsistema]);
                     }
-                    $lineas[$r->codigo] = ['subsistema' => $destinos[0], 'base' => $r->baseAplicable, 'porcentaje' => $r->porcentaje ?? Porcentaje::cero(), 'regla' => 'SUSTITUCION_SUBSISTEMA', 'regimen' => $r->codigo, 'destino' => $r->destino];
+                    $lineas[$r->codigo] = ['subsistema' => $destinos[0], 'base' => $r->baseAplicable, 'porcentaje' => $r->porcentaje, 'regla' => 'SUSTITUCION_SUBSISTEMA', 'regimen' => $r->codigo, 'destino' => $r->destino];
                     break;
                 case TipoRegla::Destino:
                     // cambia el destinatario sin sumar: se informa como línea propia con su %, descontándolo del subsistema de origen si existe
-                    $lineas[$r->codigo] = ['subsistema' => $destinos[0], 'base' => $r->baseAplicable, 'porcentaje' => $r->porcentaje ?? Porcentaje::cero(), 'regla' => 'DESTINO', 'regimen' => $r->codigo, 'destino' => $r->destino];
+                    $lineas[$r->codigo] = ['subsistema' => $destinos[0], 'base' => $r->baseAplicable, 'porcentaje' => $r->porcentaje, 'regla' => 'DESTINO', 'regimen' => $r->codigo, 'destino' => $r->destino];
                     break;
                 default:
                     break;

@@ -263,10 +263,16 @@ const porEtapa = computed(() => {
                   <tbody>
                     <tr v-for="(b, k) in resultado.bases_arca" :key="k">
                       <td><b>{{ k }}</b><a href="#" class="ms-1 small" @click.prevent="toggle('b' + k)">detalle</a>
-                        <div v-if="abiertas['b' + k]" class="small text-muted">incluye: {{ Object.keys(b.incluidos).join(', ') || '—' }}<br />excluye: {{ Object.entries(b.excluidos).map(([c, m]) => `${c} (${m})`).join(', ') || '—' }}</div></td>
-                      <td class="text-end">{{ importe(b.importe_antes_ajustes) }}</td>
-                      <td class="text-end" :class="{ 'text-danger': Number(b.ajuste_tope) < 0 }">{{ Number(b.ajuste_tope) ? importe(b.ajuste_tope) : '' }}<small v-if="b.tope_aplicado" class="d-block text-muted">{{ b.tope_aplicado }}</small></td>
-                      <td class="text-end fw-bold">{{ importe(b.importe_aplicado) }}</td>
+                        <span v-if="b.estado === 'BLOQUEADA'" class="badge bg-label-danger ms-1">{{ b.codigo_error }}</span>
+                        <div v-if="abiertas['b' + k]" class="small text-muted"><template v-if="b.estado === 'BLOQUEADA'"><span class="text-danger">{{ b.motivo_bloqueo }}</span><br /></template>incluye: {{ Object.keys(b.incluidos).join(', ') || '—' }}<br />excluye: {{ Object.entries(b.excluidos).map(([c, m]) => `${c} (${m})`).join(', ') || '—' }}</div></td>
+                      <template v-if="b.estado === 'BLOQUEADA'">
+                        <td colspan="3" class="text-end text-danger small">Bloqueada: sin importe</td>
+                      </template>
+                      <template v-else>
+                        <td class="text-end">{{ importe(b.importe_antes_ajustes) }}</td>
+                        <td class="text-end" :class="{ 'text-danger': Number(b.ajuste_tope) < 0 }">{{ Number(b.ajuste_tope) ? importe(b.ajuste_tope) : '' }}<small v-if="b.tope_aplicado" class="d-block text-muted">{{ b.tope_aplicado }}</small></td>
+                        <td class="text-end fw-bold">{{ importe(b.importe_aplicado) }}</td>
+                      </template>
                     </tr>
                     <tr v-if="!Object.keys(resultado.bases_arca).length"><td colspan="4" class="text-center text-muted py-3">Sin bases (etapa bloqueada u omitida).</td></tr>
                   </tbody>
