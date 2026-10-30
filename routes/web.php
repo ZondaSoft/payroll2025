@@ -6,6 +6,7 @@ use App\Http\Controllers\CategoriasController;
 use App\Http\Controllers\CentrosCostoController;
 use App\Http\Controllers\ConceptosArcaController;
 use App\Http\Controllers\ConceptosLiquidacionController;
+use App\Http\Controllers\ConfigGeneralController;
 use App\Http\Controllers\ConveniosController;
 use App\Http\Controllers\CuadrillasController;
 use App\Http\Controllers\GruposEmpresariosController;
@@ -437,6 +438,13 @@ Route::middleware('auth')->group(function () {
         Route::resource('encuadramientos', \App\Http\Controllers\Motor\EncuadramientosController::class)->parameters(['encuadramientos' => 'encuadramiento'])->except(['show']);
         Route::resource('novedades-mapeo', \App\Http\Controllers\Motor\NovedadesMapeoController::class)->parameters(['novedades-mapeo' => 'mapeo'])->except(['show']);
     });
+
+    // --------------------------------------------
+    // Config: Parámetros generales (sue_config, registro único; solo ver y editar)
+    // ---------------------------------------------
+    Route::get('config', [ConfigGeneralController::class, 'index'])->name('config.general.index');
+    Route::get('config/editar', [ConfigGeneralController::class, 'edit'])->name('config.general.edit');
+    Route::patch('config', [ConfigGeneralController::class, 'update'])->name('config.general.update');
 
     // --------------------------------------------
     // Config: Parametrizaciones (rangos sue089s)

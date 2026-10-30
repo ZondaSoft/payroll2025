@@ -33,6 +33,7 @@ trait UsaEsquemaApp
                     'database/migrations/0001_01_01_000000_create_users_table.php',
                     'database/migrations/0001_01_01_000002_create_jobs_table.php',
                     'database/migrations/2025_12_11_173741_create_permission_tables.php',
+                    'database/migrations/2026_10_30_000001_create_sue_config_table.php',
                 ],
                 '--force' => true,
             ])->assertSuccessful();

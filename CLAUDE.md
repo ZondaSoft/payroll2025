@@ -119,6 +119,7 @@ GET|POST   /sicoss/*                      → Sicoss*Controller (8 submódulos)
 GET|POST   /arca/importar*                → ArcaImportarController
 GET|POST   /sicoss/importar*              → SicossImportarController
 GET|POST   /basedat/importar*             → LiquidacionImportarController
+GET|PATCH  /config                        → ConfigGeneralController (sue_config: parámetros generales, registro único)
 ```
 
 ## Flujos de negocio principales

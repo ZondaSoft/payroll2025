@@ -20,7 +20,7 @@ defineProps({
     },
     rutaCreate: {
         type: String,
-        required: true
+        default: null
     },
     rutaEdit: {
         type: String,
@@ -62,6 +62,16 @@ defineProps({
         type: String,
         default: 'Agregar'
     },
+    // Permite ocultar el botón de alta (ej. registros únicos como /config)
+    mostrarCrear: {
+        type: Boolean,
+        default: true
+    },
+    // Texto del botón de edición y del título en modo edición (ej. 'Editar')
+    textoModificar: {
+        type: String,
+        default: 'Modificar'
+    },
     mostrarModificar: {
         type: Boolean,
         default: true
@@ -86,7 +96,7 @@ defineEmits(['edit', 'delete', 'grabar', 'cancelar', 'contextmenu-crear']);
         </div>
         <!-- Sección de edición -->
         <div v-if="!agregar && edicion" class="d-flex flex-column justify-content-center">
-            <h4 class="mb-1">Modificar {{ titulo }}</h4>
+            <h4 class="mb-1">{{ textoModificar }} {{ titulo }}</h4>
         </div>
         <!-- Si ni agregar ni edicion están activados -->
         <div v-if="!agregar && !edicion" class="d-flex flex-column justify-content-center">
@@ -94,7 +104,7 @@ defineEmits(['edit', 'delete', 'grabar', 'cancelar', 'contextmenu-crear']);
         </div>
 
         <!-- Botones de navegación -->
-        <div class="d-flex flex-column justify-content-center" v-if="!agregar && !edicion && formId">
+        <div class="d-flex flex-column justify-content-center" v-if="!agregar && !edicion && formId && (rutaFirst || rutaPrevious || rutaNext || rutaLast || rutaSearch)">
             <div class="btn-group" role="group">
                 <Link
                     v-if="rutaFirst"
@@ -152,6 +162,7 @@ defineEmits(['edit', 'delete', 'grabar', 'cancelar', 'contextmenu-crear']);
         <!-- Botones de CRUD -->
         <div v-else class="d-flex align-content-center flex-wrap gap-4">
             <Link
+                v-if="mostrarCrear && rutaCreate"
                 :href="rutaCreate"
                 class="btn btn-info waves-effect waves-light"
                 @click="$emit('edit')"
@@ -163,7 +174,7 @@ defineEmits(['edit', 'delete', 'grabar', 'cancelar', 'contextmenu-crear']);
                 :href="rutaEdit"
                 class="btn btn-outline-secondary"
                 @click="$emit('edit')">
-                Modificar
+                {{ textoModificar }}
             </Link>
             <a v-if="mostrarBorrar"
                 type="button"
