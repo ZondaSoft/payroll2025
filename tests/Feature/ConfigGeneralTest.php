@@ -2,9 +2,9 @@
 
 namespace Tests\Feature;
 
+use App\Http\Middleware\HandleInertiaRequests;
 use App\Models\SueConfig;
 use App\Models\User;
-use Inertia\Inertia;
 use Inertia\Testing\AssertableInertia as Assert;
 use Tests\Support\UsaEsquemaApp;
 use Tests\TestCase;
@@ -18,8 +18,9 @@ class ConfigGeneralTest extends TestCase
         $user = User::factory()->create();
 
         // Con la cabecera X-Inertia la respuesta es JSON y no se renderiza el layout Blade.
+        // La versión debe ser la que calcula el middleware (hash del manifest de Vite), si no responde 409.
         $response = $this->actingAs($user)
-            ->withHeaders(['X-Inertia' => 'true', 'X-Inertia-Version' => Inertia::getVersion()])
+            ->withHeaders(['X-Inertia' => 'true', 'X-Inertia-Version' => $this->versionInertia()])
             ->get('/config');
 
         $response->assertOk()->assertInertia(fn (Assert $page) => $page
@@ -54,5 +55,11 @@ class ConfigGeneralTest extends TestCase
             ->assertSessionHasErrors('lsd_no_conceptos');
 
         self::assertFalse(SueConfig::actual()->lsd_no_conceptos);
+    }
+
+    /** La versión de assets que el middleware exige en X-Inertia-Version. */
+    private function versionInertia(): string
+    {
+        return (string) app(HandleInertiaRequests::class)->version(request());
     }
 }
