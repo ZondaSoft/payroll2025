@@ -183,6 +183,11 @@
                     <div data-i18n="Grupo empresario">Grupo empresario</div>
                   </a>
                 </li>
+                <li class="menu-item {{ $active==81?'active':' ' }}">
+                  <a href="/config" class="menu-link">
+                    <div data-i18n="Parámetros generales">Parámetros generales</div>
+                  </a>
+                </li>
               </ul>
               @can('workshop.task')
                 <ul class="menu-sub">

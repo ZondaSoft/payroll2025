@@ -1,0 +1,58 @@
+<?php
+
+namespace Tests\Feature;
+
+use App\Models\SueConfig;
+use App\Models\User;
+use Inertia\Inertia;
+use Inertia\Testing\AssertableInertia as Assert;
+use Tests\Support\UsaEsquemaApp;
+use Tests\TestCase;
+
+class ConfigGeneralTest extends TestCase
+{
+    use UsaEsquemaApp;
+
+    public function test_la_pantalla_muestra_el_registro_unico_de_parametros(): void
+    {
+        $user = User::factory()->create();
+
+        // Con la cabecera X-Inertia la respuesta es JSON y no se renderiza el layout Blade.
+        $response = $this->actingAs($user)
+            ->withHeaders(['X-Inertia' => 'true', 'X-Inertia-Version' => Inertia::getVersion()])
+            ->get('/config');
+
+        $response->assertOk()->assertInertia(fn (Assert $page) => $page
+            ->component('Config/Index')
+            ->where('edicion', false)
+            ->where('config.lsd_no_conceptos', false));
+
+        self::assertSame(1, SueConfig::count(), 'sue_config debe tener un único registro');
+    }
+
+    public function test_editar_guarda_el_flag_y_registra_el_usuario(): void
+    {
+        $user = User::factory()->create();
+
+        $response = $this->actingAs($user)->patch('/config', ['lsd_no_conceptos' => true]);
+
+        $response->assertSessionHasNoErrors()->assertRedirect('/config');
+
+        $config = SueConfig::actual();
+        self::assertTrue($config->lsd_no_conceptos);
+        self::assertSame($user->id, $config->usuario_id);
+        self::assertSame(1, SueConfig::count(), 'editar no debe crear un segundo registro');
+    }
+
+    public function test_rechaza_un_valor_no_booleano(): void
+    {
+        $user = User::factory()->create();
+
+        $this->actingAs($user)->from('/config/editar')
+            ->patch('/config', ['lsd_no_conceptos' => 'tal vez'])
+            ->assertRedirect('/config/editar')
+            ->assertSessionHasErrors('lsd_no_conceptos');
+
+        self::assertFalse(SueConfig::actual()->lsd_no_conceptos);
+    }
+}
