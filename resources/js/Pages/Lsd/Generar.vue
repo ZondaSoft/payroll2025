@@ -124,30 +124,7 @@ const generarEmision = async (opts = {}) => {
       }
       router.reload({ only: ['emisiones'] })
 
-      const excluidos = response.data.legajos_excluidos
-      const sacAuto = response.data.sac_autocompletado
-      if (Array.isArray(excluidos) && excluidos.length) {
-        // Se generó ignorando legajos con datos SICOSS incompletos: avisar cuáles quedaron afuera.
-        Swal.fire({
-          icon: 'warning',
-          title: 'Emisión generada (con legajos ignorados)',
-          html: `Se generó el archivo <b>excluyendo ${excluidos.length} legajo(s)</b> con datos SICOSS incompletos:<br><br>` +
-                `<span style="font-family:monospace;">${escapeHtml(excluidos.join(', '))}</span><br><br>` +
-                `Esos legajos <b>no se informan</b> en este LSD. Completá sus datos SICOSS y regenerá si corresponde.`,
-          confirmButtonText: 'Entendido',
-        })
-      } else if (Array.isArray(sacAuto) && sacAuto.length) {
-        // SAC sin días completado con 30 para que ARCA lo cuente en BI 1/4/5.
-        mostrarAvisoSacAutocompletado(sacAuto)
-      } else {
-        Swal.fire({
-          icon: 'success',
-          title: 'Emisión generada',
-          text: 'La emisión se generó exitosamente.',
-          timer: 2500,
-          showConfirmButton: false,
-        })
-      }
+      mostrarResumenGeneracion(response.data)
     }
   } catch (error) {
     const data = error.response?.data
@@ -448,25 +425,113 @@ const mostrarAdvertenciaAportes = (items) => {
 }
 
 // Aviso NO bloqueante: SAC (concepto ARCA 12xxxx) que venía sin días y se completó con 30 para
-// que ARCA lo incluya en las bases topeadas (BI 1/4/5). El archivo ya se generó y descargó.
-const mostrarAvisoSacAutocompletado = (items) => {
+// Diálogo final: todo lo que pasó durante la generación, en un solo lugar.
+//
+// Antes cada aviso se mostraba por separado y con un if/else-if, así que si había
+// legajos excluidos Y conceptos creados sólo se veía el primero. Acá se arman las
+// secciones que correspondan y se muestra un único resumen; si no pasó nada que
+// contar, queda el toast de éxito de siempre.
+const mostrarResumenGeneracion = (data) => {
   const tipoLiqNombre = (t) => ({ 1: 'Normal', 2: '1er Quincena', 3: '2da Quincena', 4: 'SAC', 5: 'Liq. Final', 6: 'DIF.HAB.' }[t] || '—')
-  const filas = items.map(i => `
-    <tr>
-      <td style="padding:4px 8px;border:1px solid #dee2e6;font-family:monospace;">${escapeHtml(i.legajo)}</td>
-      <td style="padding:4px 8px;border:1px solid #dee2e6;font-family:monospace;">${escapeHtml(i.cuil)}</td>
-      <td style="padding:4px 8px;border:1px solid #dee2e6;">${escapeHtml(i.nombre || '—')}</td>
-      <td style="padding:4px 8px;border:1px solid #dee2e6;">${escapeHtml(i.concepto)} · ${escapeHtml(i.descripcion || '')}</td>
-      <td style="padding:4px 8px;border:1px solid #dee2e6;text-align:center;">${escapeHtml(tipoLiqNombre(i.tipoliq))}</td>
-      <td style="padding:4px 8px;border:1px solid #dee2e6;text-align:right;">${escapeHtml(formatMoney(i.importe))}</td>
-    </tr>
-  `).join('')
+  const creados = Array.isArray(data.conceptos_generados) ? data.conceptos_generados : []
+  const excluidos = Array.isArray(data.legajos_excluidos) ? data.legajos_excluidos : []
+  const sacAuto = Array.isArray(data.sac_autocompletado) ? data.sac_autocompletado : []
 
-  const html = `
-    <div style="text-align:left;font-size:14px;">
-      <p style="margin-bottom:8px;">El archivo <strong>ya se generó y se descargó</strong>. Se detectaron conceptos de <strong>SAC sin días</strong> que ARCA excluiría de las bases imponibles topeadas (BI 1/4/5). Para que ARCA los cuente, se informaron con <strong>30 días</strong> (mes completo) en el archivo.</p>
-      <p style="margin-bottom:8px;color:#664d03;">Verificá en ARCA que la BI 1/4/5 quede correcta; si el prorrateo del tope de SAC pidiera otro valor de días, avisá.</p>
-      <div style="max-height:300px;overflow:auto;">
+  if (!creados.length && !excluidos.length && !sacAuto.length) {
+    Swal.fire({
+      icon: 'success',
+      title: 'Emisión generada',
+      text: 'La emisión se generó exitosamente.',
+      timer: 2500,
+      showConfirmButton: false,
+    })
+    return
+  }
+
+  const secciones = []
+  // Lo que hay que revisar después: un concepto creado sin código ARCA no se puede
+  // informar en el Reg 03, y sin tipo no se clasifica como H/NR/D.
+  const sinArca = creados.filter(c => !c.concepto_arca)
+  const sinTipo = creados.filter(c => !c.tipo)
+
+  if (creados.length) {
+    const filas = creados.map(c => `
+      <tr>
+        <td style="padding:4px 8px;border:1px solid #dee2e6;font-family:monospace;">${escapeHtml(c.concepto)}</td>
+        <td style="padding:4px 8px;border:1px solid #dee2e6;">${escapeHtml(c.descripcion || '—')}</td>
+        <td style="padding:4px 8px;border:1px solid #dee2e6;text-align:center;">${c.tipo ? escapeHtml(c.tipo) : '<span style="color:#dc3545;">sin tipo</span>'}</td>
+        <td style="padding:4px 8px;border:1px solid #dee2e6;text-align:center;font-family:monospace;">${c.concepto_arca ? escapeHtml(c.concepto_arca) : '<span style="color:#dc3545;">sin código</span>'}</td>
+        <td style="padding:4px 8px;border:1px solid #dee2e6;text-align:center;">${escapeHtml(String(c.veces ?? 0))}</td>
+        <td style="padding:4px 8px;border:1px solid #dee2e6;text-align:center;">${escapeHtml(String(c.legajos ?? 0))}</td>
+        <td style="padding:4px 8px;border:1px solid #dee2e6;text-align:right;">${escapeHtml(formatMoney(c.total ?? 0))}</td>
+      </tr>
+    `).join('')
+
+    const avisos = []
+    if (sinArca.length) {
+      avisos.push(`<b>${sinArca.length}</b> quedaron <b>sin código ARCA</b>: sin él no se pueden informar en el Reg 03 ` +
+                  `y ARCA rechazaría el archivo. Asignalo en Liquidación &gt; Conceptos o importá la parametrización en /arca/importar.`)
+    }
+    if (sinTipo.length) {
+      avisos.push(`<b>${sinTipo.length}</b> quedaron <b>sin tipo</b> porque su código no cae en ningún rango de parametrización ` +
+                  `(Config &gt; Parametrizaciones): revisá si corresponde H, NR o D.`)
+    }
+
+    secciones.push(`
+      <h6 style="margin:0 0 6px;">Conceptos dados de alta automáticamente (${creados.length})</h6>
+      <p style="margin:0 0 8px;color:#6c757d;font-size:13px;">
+        Estaban en la liquidación y no en el catálogo. Se crearon solos porque el parámetro
+        <code>LSD sin conceptos</code> está desactivado (Config &gt; Parámetros generales).
+      </p>
+      ${avisos.length ? `<div style="background:#fff3cd;border:1px solid #ffe69c;border-radius:4px;padding:8px;margin-bottom:8px;font-size:13px;">${avisos.join('<br>')}</div>` : ''}
+      <div style="max-height:260px;overflow:auto;">
+        <table style="width:100%;border-collapse:collapse;font-size:12px;">
+          <thead style="position:sticky;top:0;background:#f8f9fa;">
+            <tr>
+              <th style="padding:6px 8px;border:1px solid #dee2e6;text-align:left;">Código</th>
+              <th style="padding:6px 8px;border:1px solid #dee2e6;text-align:left;">Descripción</th>
+              <th style="padding:6px 8px;border:1px solid #dee2e6;text-align:center;">Tipo</th>
+              <th style="padding:6px 8px;border:1px solid #dee2e6;text-align:center;">Cód. ARCA</th>
+              <th style="padding:6px 8px;border:1px solid #dee2e6;text-align:center;">Veces</th>
+              <th style="padding:6px 8px;border:1px solid #dee2e6;text-align:center;">Legajos</th>
+              <th style="padding:6px 8px;border:1px solid #dee2e6;text-align:right;">Total importe</th>
+            </tr>
+          </thead>
+          <tbody>${filas}</tbody>
+        </table>
+      </div>
+    `)
+  }
+
+  if (excluidos.length) {
+    secciones.push(`
+      <h6 style="margin:0 0 6px;">Legajos excluidos (${excluidos.length})</h6>
+      <p style="margin:0 0 8px;color:#6c757d;font-size:13px;">
+        Tenían datos SICOSS incompletos y <b>no se informan</b> en este LSD. Completalos y regenerá si corresponde.
+      </p>
+      <div style="font-family:monospace;font-size:12px;word-break:break-all;">${escapeHtml(excluidos.join(', '))}</div>
+    `)
+  }
+
+  if (sacAuto.length) {
+    const filas = sacAuto.map(i => `
+      <tr>
+        <td style="padding:4px 8px;border:1px solid #dee2e6;font-family:monospace;">${escapeHtml(i.legajo)}</td>
+        <td style="padding:4px 8px;border:1px solid #dee2e6;font-family:monospace;">${escapeHtml(i.cuil)}</td>
+        <td style="padding:4px 8px;border:1px solid #dee2e6;">${escapeHtml(i.nombre || '—')}</td>
+        <td style="padding:4px 8px;border:1px solid #dee2e6;">${escapeHtml(i.descripcion || i.concepto || '—')}</td>
+        <td style="padding:4px 8px;border:1px solid #dee2e6;text-align:center;">${escapeHtml(tipoLiqNombre(i.tipoliq))}</td>
+        <td style="padding:4px 8px;border:1px solid #dee2e6;text-align:right;">${escapeHtml(formatMoney(i.importe))}</td>
+      </tr>
+    `).join('')
+
+    secciones.push(`
+      <h6 style="margin:0 0 6px;">SAC completado con días (${sacAuto.length})</h6>
+      <p style="margin:0 0 8px;color:#6c757d;font-size:13px;">
+        Conceptos de SAC <b>sin días</b> que ARCA excluiría de las bases topeadas (BI 1/4/5). Se informaron con
+        <b>30 días</b> (mes completo) para que las cuente. Verificá en ARCA que la BI 1/4/5 quede correcta.
+      </p>
+      <div style="max-height:220px;overflow:auto;">
         <table style="width:100%;border-collapse:collapse;font-size:12px;">
           <thead style="position:sticky;top:0;background:#f8f9fa;">
             <tr>
@@ -481,20 +546,24 @@ const mostrarAvisoSacAutocompletado = (items) => {
           <tbody>${filas}</tbody>
         </table>
       </div>
-    </div>
-  `
+    `)
+  }
+
+  // El archivo ya se generó y descargó: el resumen informa, no pide permiso.
+  const hayQueRevisar = sinArca.length > 0 || sinTipo.length > 0 || excluidos.length > 0
 
   Swal.fire({
-    icon: 'info',
-    title: 'Emisión generada — SAC completado con días',
-    html,
-    width: 900,
+    icon: hayQueRevisar ? 'warning' : 'info',
+    title: 'Emisión generada',
+    html: `<div style="text-align:left;font-size:14px;">
+      <p style="margin-bottom:12px;">El archivo <b>ya se generó y se descargó</b>. Esto es lo que pasó durante la generación:</p>
+      ${secciones.join('<hr style="margin:14px 0;border:0;border-top:1px solid #dee2e6;">')}
+    </div>`,
+    width: 920,
     confirmButtonText: 'Entendido',
   })
 }
 
-// Diálogo: empleados ACTIVOS sin liquidación en el período. Checkbox por legajo (tildado por
-// defecto) para elegir si se incluyen en el TXT con todas las bases en 0; lupa para abrir el legajo.
 const mostrarActivosSinLiquidacion = (items) => {
   const fmtFecha = (d) => {
     if (!d) return '—'

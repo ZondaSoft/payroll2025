@@ -28,6 +28,7 @@ trait UsaEsquemaApp
         if (BaseDeTests::$esquemaMontado !== 'app') {
             Schema::dropAllTables();
             EsquemaAppMinimo::crearTablasCompartidas();
+            EsquemaAppMinimo::crearCatalogoLiquidacion();
             $this->artisan('migrate', [
                 '--path' => [
                     'database/migrations/0001_01_01_000000_create_users_table.php',

@@ -10,6 +10,7 @@ use App\Models\LsdTope;
 use App\Models\Sue086;
 use App\Models\Sue100;
 use App\Models\Sue102;
+use App\Models\SueConfig;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Inertia\Inertia;
@@ -146,6 +147,10 @@ class LsdController extends Controller
 
             $periodoStr = $periodo->periodo;
 
+            // Conceptos creados solos durante esta generación (ver pre-check 1): quedan en la
+            // emisión y se muestran en el resumen final.
+            $conceptosGenerados = [];
+
             // Pre-check: conceptos huérfanos en sue090s que no existen en sue102s.
             // En modo 'RE' no se emiten Reg 02/03 (no aplica el chequeo).
             if ($identificadorEnvio === 'SJ') {
@@ -175,22 +180,52 @@ class LsdController extends Controller
                     ->get();
 
                 if ($huerfanos->isNotEmpty()) {
-                    return response()->json([
-                        'success' => false,
-                        'tipo_error' => 'conceptos_huerfanos',
-                        'message' => sprintf(
-                            'Se encontraron %d conceptos sin parametrizar en el catálogo (Liquidación > Conceptos). '.
-                            'ARCA puede rechazar el archivo. Dá de alta cada uno con su código ARCA antes de generar el LSD.',
-                            $huerfanos->count()
-                        ),
-                        'huerfanos' => $huerfanos->map(fn ($h) => [
-                            'concepto' => $h->concepto,
-                            'descripcion' => $h->descripcion ?? '',
-                            'veces' => (int) $h->veces,
-                            'legajos' => (int) $h->legajos,
-                            'total' => (float) $h->total,
-                        ])->values(),
-                    ], 422);
+                    // El parámetro general decide quién da de alta estos conceptos.
+                    //
+                    //   lsd_no_conceptos = true  → frena acá y los da de alta el usuario desde el
+                    //                              modal, que es donde puede revisar tipo y código ARCA.
+                    //   lsd_no_conceptos = false → se crean solos y la generación sigue. No es que el
+                    //                              dato deje de importar: el detalle de lo creado
+                    //                              viaja al resumen final y queda en la emisión.
+                    //
+                    // En los dos casos el pre-check 2 sigue después: un concepto creado sin
+                    // concepto_arca no se puede informar en el Reg 03 y ARCA rechazaría el archivo,
+                    // así que el alta automática resuelve la falta de catálogo, no la de código ARCA.
+                    if (SueConfig::actual()->lsd_no_conceptos) {
+                        return response()->json([
+                            'success' => false,
+                            'tipo_error' => 'conceptos_huerfanos',
+                            'message' => sprintf(
+                                'Se encontraron %d conceptos sin parametrizar en el catálogo (Liquidación > Conceptos). '.
+                                'ARCA puede rechazar el archivo. Dá de alta cada uno con su código ARCA antes de generar el LSD.',
+                                $huerfanos->count()
+                            ),
+                            'huerfanos' => $huerfanos->map(fn ($h) => [
+                                'concepto' => $h->concepto,
+                                'descripcion' => $h->descripcion ?? '',
+                                'veces' => (int) $h->veces,
+                                'legajos' => (int) $h->legajos,
+                                'total' => (float) $h->total,
+                            ])->values(),
+                        ], 422);
+                    }
+
+                    $alta = $this->altaDeConceptos(
+                        $huerfanos->map(fn ($h) => ['concepto' => $h->concepto, 'descripcion' => $h->descripcion ?? ''])->all(),
+                        $empresa->id,
+                    );
+                    // Al detalle del alta se le suma el uso que tenía cada concepto en la
+                    // liquidación: es lo que permite juzgar en el resumen si lo creado importa.
+                    $usoPorConcepto = $huerfanos->keyBy('concepto');
+                    $conceptosGenerados = array_map(function (array $c) use ($usoPorConcepto) {
+                        $uso = $usoPorConcepto[$c['concepto']] ?? null;
+
+                        return $c + [
+                            'veces' => $uso !== null ? (int) $uso->veces : 0,
+                            'legajos' => $uso !== null ? (int) $uso->legajos : 0,
+                            'total' => $uso !== null ? (float) $uso->total : 0.0,
+                        ];
+                    }, $alta['detalle']);
                 }
 
                 // Pre-check 2: conceptos usados que existen en sue102s pero sin concepto_arca.
@@ -446,6 +481,7 @@ class LsdController extends Controller
                 'periodo' => $periodoStr,
                 'cantidad_empleados' => $fileData['cantidad_empleados'] ?? 0,
                 'legajos_ignorados' => $legajosIgnorados,
+                'conceptos_generados' => $conceptosGenerados !== [] ? $conceptosGenerados : null,
                 'monto_total' => $fileData['monto_total'] ?? 0,
                 'estado' => 'borrador',
                 'usuario_id' => auth()->id(),
@@ -494,6 +530,7 @@ class LsdController extends Controller
                 'emision_id' => $emision->id,
                 'legajos_excluidos' => $legajosExcluidos,
                 'sac_autocompletado' => $sacAutocompletado,
+                'conceptos_generados' => $conceptosGenerados,
             ]);
         } catch (\DomainException $e) {
             return response()->json([
@@ -2643,20 +2680,24 @@ class LsdController extends Controller
     }
 
     /**
-     * Genera en el catálogo (sue102s) los conceptos "sin parametrizar" detectados
-     * en el LSD. Para cada código:
-     *   - tipo            ← tiporem del rango de sue089s que lo contiene (vacío si no cae en ninguno)
-     *   - concepto_arca   ← codigo_afip del conceptosarca cuyo codigo_contribuyente coincide (null si no hay)
-     * Omite los códigos que ya existen en sue102s.
+     * Da de alta en el catálogo (sue102s) los conceptos que la liquidación usa y el
+     * catálogo no tiene. Lo usan el botón del modal y el alta automática de la
+     * generación, para que las dos hagan exactamente lo mismo.
+     *
+     * Para cada código:
+     *   - tipo          ← tiporem del rango de sue089s que lo contiene ('' si no cae en ninguno)
+     *   - concepto_arca ← codigo_afip del conceptosarca con ese codigo_contribuyente
+     *                     (de la empresa si se indica; null si no hay equivalencia)
+     *
+     * Devuelve los contadores y el detalle por concepto. El detalle importa más que
+     * los contadores: un concepto creado con tipo vacío o sin código ARCA está dado
+     * de alta pero no sirve para liquidar, y el resumen tiene que poder decirlo.
+     *
+     * @param  iterable<array{concepto: mixed, descripcion?: ?string}>  $filas
+     * @return array{creados: int, omitidos: int, sin_tipo: int, sin_arca: int, detalle: list<array<string, mixed>>}
      */
-    public function generarConceptos(Request $request)
+    private function altaDeConceptos(iterable $filas, $idEmpresa = null): array
     {
-        $datos = $request->validate([
-            'conceptos' => 'required|array|min:1',
-            'conceptos.*.concepto' => 'required',
-            'conceptos.*.descripcion' => 'nullable|string',
-        ]);
-
         $rangos = DB::table('sue089s')->get();
 
         // tiporem del rango que contiene al código (o '' si no cae en ninguno)
@@ -2674,9 +2715,10 @@ class LsdController extends Controller
         $omitidos = 0;
         $sinTipo = 0;
         $sinArca = 0;
+        $detalle = [];
 
-        DB::transaction(function () use ($datos, $tipoPorCodigo, &$creados, &$omitidos, &$sinTipo, &$sinArca) {
-            foreach ($datos['conceptos'] as $row) {
+        DB::transaction(function () use ($filas, $tipoPorCodigo, $idEmpresa, &$creados, &$omitidos, &$sinTipo, &$sinArca, &$detalle) {
+            foreach ($filas as $row) {
                 $codigo = (int) $row['concepto'];
 
                 if (Sue102::where('codigo', $codigo)->exists()) {
@@ -2690,33 +2732,75 @@ class LsdController extends Controller
                     $sinTipo++;
                 }
 
-                $codigoAfip = DB::table('conceptosarcas')
-                    ->where('codigo_contribuyente', $codigo)
-                    ->value('codigo_afip');
+                // La parametrización ARCA es por empresa (el mismo código propio puede
+                // mapear a códigos AFIP distintos), así que si se sabe la empresa se
+                // busca la suya primero y sólo después cualquiera.
+                $codigoAfip = $idEmpresa !== null
+                    ? DB::table('conceptosarcas')->where('codigo_contribuyente', $codigo)
+                        ->where('id_empresa', $idEmpresa)->value('codigo_afip')
+                    : null;
+                $codigoAfip ??= DB::table('conceptosarcas')
+                    ->where('codigo_contribuyente', $codigo)->value('codigo_afip');
                 if ($codigoAfip === null) {
                     $sinArca++;
                 }
 
-                $detalle = trim($row['descripcion'] ?? '') ?: "Concepto {$codigo}";
+                $descripcion = trim((string) ($row['descripcion'] ?? ''));
+                // Las descripciones del BASEDAT vienen con saltos de línea ("Vacaciones\nNo Goz.").
+                $descripcion = trim(preg_replace('/\s+/u', ' ', $descripcion));
+                $detalleConcepto = $descripcion !== '' ? $descripcion : "Concepto {$codigo}";
 
                 Sue102::create([
                     'codigo' => $codigo,
-                    'detalle' => mb_substr($detalle, 0, 250),
+                    'detalle' => mb_substr($detalleConcepto, 0, 250),
                     'tipo' => $tipo,
                     'concepto_arca' => $codigoAfip !== null ? mb_substr((string) $codigoAfip, 0, 6) : null,
                 ]);
 
                 $creados++;
+                $detalle[] = [
+                    'concepto' => (string) $codigo,
+                    'descripcion' => mb_substr($detalleConcepto, 0, 250),
+                    'tipo' => $tipo,
+                    'concepto_arca' => $codigoAfip !== null ? mb_substr((string) $codigoAfip, 0, 6) : null,
+                ];
             }
         });
 
-        return response()->json([
-            'success' => true,
+        return [
             'creados' => $creados,
             'omitidos' => $omitidos,
             'sin_tipo' => $sinTipo,
             'sin_arca' => $sinArca,
-            'message' => "Se generaron {$creados} conceptos ({$omitidos} ya existían).",
+            'detalle' => $detalle,
+        ];
+    }
+
+    /**
+     * Genera en el catálogo (sue102s) los conceptos "sin parametrizar" detectados
+     * en el LSD. Para cada código:
+     *   - tipo            ← tiporem del rango de sue089s que lo contiene (vacío si no cae en ninguno)
+     *   - concepto_arca   ← codigo_afip del conceptosarca cuyo codigo_contribuyente coincide (null si no hay)
+     * Omite los códigos que ya existen en sue102s.
+     */
+    public function generarConceptos(Request $request)
+    {
+        $datos = $request->validate([
+            'conceptos' => 'required|array|min:1',
+            'conceptos.*.concepto' => 'required',
+            'conceptos.*.descripcion' => 'nullable|string',
+        ]);
+
+        $r = $this->altaDeConceptos($datos['conceptos'], $request->input('id_empresa'));
+
+        return response()->json([
+            'success' => true,
+            'creados' => $r['creados'],
+            'omitidos' => $r['omitidos'],
+            'sin_tipo' => $r['sin_tipo'],
+            'sin_arca' => $r['sin_arca'],
+            'detalle' => $r['detalle'],
+            'message' => "Se generaron {$r['creados']} conceptos ({$r['omitidos']} ya existían).",
         ]);
     }
 }
