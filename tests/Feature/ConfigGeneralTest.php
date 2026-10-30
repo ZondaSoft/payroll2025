@@ -5,7 +5,6 @@ namespace Tests\Feature;
 use App\Http\Middleware\HandleInertiaRequests;
 use App\Models\SueConfig;
 use App\Models\User;
-use Inertia\Testing\AssertableInertia as Assert;
 use Tests\Support\UsaEsquemaApp;
 use Tests\TestCase;
 
@@ -23,10 +22,12 @@ class ConfigGeneralTest extends TestCase
             ->withHeaders(['X-Inertia' => 'true', 'X-Inertia-Version' => $this->versionInertia()])
             ->get('/config');
 
-        $response->assertOk()->assertInertia(fn (Assert $page) => $page
-            ->component('Config/Index')
-            ->where('edicion', false)
-            ->where('config.lsd_no_conceptos', false));
+        // La respuesta es el JSON de Inertia (component + props), no la vista Blade.
+        $response->assertOk()
+            ->assertJsonPath('component', 'Config/Index')
+            ->assertJsonPath('props.edicion', false)
+            ->assertJsonPath('props.config.id', 1)
+            ->assertJsonPath('props.config.lsd_no_conceptos', false);
 
         self::assertSame(1, SueConfig::count(), 'sue_config debe tener un único registro');
     }
