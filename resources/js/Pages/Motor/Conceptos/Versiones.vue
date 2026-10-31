@@ -1,5 +1,6 @@
 <script setup>
 import { Link } from '@inertiajs/vue3'
+import BotonEditar from '@/Components/BotonEditar.vue'
 import Flash from '@/Components/Motor/Flash.vue'
 import { fecha } from '@/Components/Motor/formato.js'
 
@@ -13,7 +14,7 @@ const valor = (v) => (v === null || v === undefined ? '∅' : typeof v === 'obje
     <div class="app-ecommerce">
       <div class="d-flex flex-column flex-md-row justify-content-between align-items-start align-items-md-center mb-6 row-gap-4">
         <div><h4 class="mb-1">Versiones — <span class="font-monospace">{{ concepto.codigo }}</span> · {{ concepto.nombre }}</h4><p class="mb-0 text-muted">Cada versión congela la definición completa (snapshot). Publicar una nueva cierra la anterior al día previo; una versión usada en liquidación no se modifica.</p></div>
-        <div class="d-flex gap-2"><Link :href="route('motor.conceptos.edit', concepto.id)" class="btn btn-outline-secondary"><i class="ri-edit-line me-1"></i> Editar borrador</Link><Link :href="route('motor.conceptos.index')" class="btn btn-outline-secondary"><i class="ri-arrow-left-line me-1"></i> Volver</Link></div>
+        <div class="d-flex gap-2"><BotonEditar :href="route('motor.conceptos.edit', concepto.id)">Editar borrador</BotonEditar><Link :href="route('motor.conceptos.index')" class="btn btn-outline-secondary"><i class="ri-arrow-left-line me-1"></i> Volver</Link></div>
       </div>
 
       <div class="card mb-4">

@@ -24,3 +24,15 @@ body {
     margin-top: -15px;
     margin-bottom: 15px;
 }
+
+/* Íconos dentro de botones (modelo Materialize v3: .icon-base + .icon-NNpx).
+   El core.css de esta versión del template no los define. Los usa BotonEditar. */
+.icon-base {
+    display: inline-block;
+    vertical-align: middle;
+    line-height: 1;
+}
+
+.icon-16px {
+    font-size: 16px;
+}
