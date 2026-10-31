@@ -1,5 +1,6 @@
 <script setup>
 import { Link } from '@inertiajs/vue3';
+import BotonEditar from '@/Components/BotonEditar.vue';
 
 defineProps({
     agregar: {
@@ -169,13 +170,12 @@ defineEmits(['edit', 'delete', 'grabar', 'cancelar', 'contextmenu-crear']);
                 @contextmenu="$emit('contextmenu-crear', $event)">
                 {{ textoCrear }}
             </Link>
-            <Link
+            <BotonEditar
                 v-if="formId && mostrarModificar"
                 :href="rutaEdit"
-                class="btn btn-outline-secondary"
                 @click="$emit('edit')">
                 {{ textoModificar }}
-            </Link>
+            </BotonEditar>
             <a v-if="mostrarBorrar"
                 type="button"
                 class="btn btn-danger waves-effect waves-light"

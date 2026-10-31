@@ -6,6 +6,7 @@ import TextInput from '@/Components/TextInput.vue';
 import InputError from '@/Components/InputError.vue';
 import FloatMultiselect from '@/Components/FloatMultiselect.vue';
 import { Link, router, useForm, usePage } from '@inertiajs/vue3';
+import BotonEditar from '@/Components/BotonEditar.vue';
 import { reactive, ref, onMounted, watch, computed } from 'vue';
 import { PAISES } from '@/Data/paises';
 import Swal from 'sweetalert2';
@@ -629,13 +630,12 @@ watch(() => props.agregar, () => {
                             >
                             Agregar
                         </Link>
-                        <Link
+                        <BotonEditar
                             :href="form.id ? route('legajos.edit', form.id) : '#'"
-                            class="btn btn-outline-secondary"
                             @click="setFocus"
                             >
                             Modificar
-                        </Link>
+                        </BotonEditar>
                         <!-- <a href="/legajos/edit/{{form.id}}" class="btn btn-outline-secondary">Modificar2</a> -->
 
                         <a

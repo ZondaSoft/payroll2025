@@ -105,6 +105,7 @@ routes/web.php              # Todas las rutas (autenticadas)
 - Componentes reutilizables en `resources/js/Components/`
 - Select2 para búsquedas de registros relacionados
 - Bootstrap 5 para modales de confirmación
+- Botón Editar/Modificar: siempre el componente `BotonEditar` (`btn-label-primary btn-fab demo` + lápiz `ri-pencil-line`); `FormHeader` ya lo usa
 - Paginación de 20 registros por defecto
 
 ## Rutas principales
