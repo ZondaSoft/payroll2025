@@ -2,8 +2,8 @@
 
 namespace App\Models;
 
-use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
+use Illuminate\Database\Eloquent\Model;
 
 class LsdEmision extends Model
 {
@@ -22,6 +22,7 @@ class LsdEmision extends Model
         'periodo_hasta',
         'cantidad_empleados',
         'legajos_ignorados',
+        'conceptos_generados',
         'monto_total',
         'estado',
         'observaciones',
@@ -49,6 +50,7 @@ class LsdEmision extends Model
         'monto_total' => 'decimal:2',
         'tipo_liquidacion' => 'integer',
         'legajos_ignorados' => 'array',
+        'conceptos_generados' => 'array',
     ];
 
     // Relaciones
