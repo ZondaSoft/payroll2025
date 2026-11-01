@@ -126,6 +126,7 @@ const generarEmision = async (opts = {}) => {
 
       const excluidos = response.data.legajos_excluidos
       const sacAuto = response.data.sac_autocompletado
+      const activosNoInformados = response.data.activos_no_informados
       if (Array.isArray(excluidos) && excluidos.length) {
         // Se generó ignorando legajos con datos SICOSS incompletos: avisar cuáles quedaron afuera.
         Swal.fire({
@@ -136,6 +137,10 @@ const generarEmision = async (opts = {}) => {
                 `Esos legajos <b>no se informan</b> en este LSD. Completá sus datos SICOSS y regenerá si corresponde.`,
           confirmButtonText: 'Entendido',
         })
+      } else if (Array.isArray(activosNoInformados) && activosNoInformados.length) {
+        // Activos sin liquidación detectados con la pregunta apagada en Parámetros generales:
+        // quedaron fuera del archivo y se avisa recién al final del proceso.
+        mostrarAvisoActivosNoInformados(activosNoInformados)
       } else if (Array.isArray(sacAuto) && sacAuto.length) {
         // SAC sin días completado con 30 para que ARCA lo cuente en BI 1/4/5.
         mostrarAvisoSacAutocompletado(sacAuto)
@@ -490,6 +495,56 @@ const mostrarAvisoSacAutocompletado = (items) => {
     html,
     width: 900,
     confirmButtonText: 'Entendido',
+  })
+}
+
+// Aviso al final del proceso: empleados ACTIVOS sin liquidación que NO se informaron, porque el
+// switch "Preguntar por empleados activos sin liquidación" está apagado en Parámetros generales.
+// El archivo ya salió; esto es solo para que quede a la vista a quiénes dejó afuera.
+const mostrarAvisoActivosNoInformados = (items) => {
+  // Sin grilla: se informa la cantidad y el detalle se descarga en Excel.
+  const exportarXLSX = () => {
+    const fmtFecha = (d) => {
+      if (!d) return ''
+      const [y, m, day] = String(d).slice(0, 10).split('-')
+      return (y && m && day) ? `${day}/${m}/${y}` : String(d)
+    }
+    const ws = XLSX.utils.json_to_sheet(items.map(i => ({
+      'Legajo': i.legajo,
+      'CUIL': i.cuil || '',
+      'Empleado': i.nombre || '',
+      'Fecha de alta': fmtFecha(i.alta),
+    })))
+    ws['!cols'] = [{ wch: 10 }, { wch: 15 }, { wch: 40 }, { wch: 14 }]
+    const wb = XLSX.utils.book_new()
+    XLSX.utils.book_append_sheet(wb, ws, 'Activos sin liquidación')
+    const fecha = new Date().toISOString().slice(0, 10)
+    XLSX.writeFile(wb, `activos_sin_liquidacion_${formulario.periodo_id}_${fecha}.xlsx`)
+  }
+
+  const html = `
+    <div style="text-align:left;font-size:14px;">
+      <p style="margin-bottom:12px;">El archivo <strong>ya se generó y se descargó</strong>.</p>
+      <div style="display:flex;align-items:center;justify-content:space-between;gap:12px;">
+        <p style="margin:0;">Se detectaron <strong>${items.length}</strong> empleado(s) activo(s) sin liquidación
+          en el período y no se informaron en el archivo.</p>
+        <button type="button" id="aan-descargar" class="btn btn-sm btn-outline-success rounded-pill px-3 text-nowrap"
+                title="Descargar en Excel los empleados activos sin liquidación">
+          <i class="ri-download-2-line me-1"></i>Excel
+        </button>
+      </div>
+    </div>
+  `
+
+  Swal.fire({
+    icon: 'warning',
+    title: 'Emisión generada',
+    html,
+    width: 720,
+    confirmButtonText: 'Entendido',
+    didOpen: () => {
+      document.getElementById('aan-descargar')?.addEventListener('click', exportarXLSX)
+    },
   })
 }
 

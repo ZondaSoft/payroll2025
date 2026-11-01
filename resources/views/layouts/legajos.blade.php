@@ -357,12 +357,6 @@
                 <div data-i18n="Grupo empresario">Grupo empresario</div>
               </a>
             </li>
-            <li class="menu-item {{ request()->routeIs('config.general.*') ? 'active' : '' }}">
-              <a href="{{ url('/config') }}" class="menu-link">
-                <i class="menu-icon tf-icons ri-settings-3-line"></i>
-                <div data-i18n="Parámetros generales">Parámetros generales</div>
-              </a>
-            </li>
             <li class="menu-item {{ request()->routeIs('centros.costo.*') ? 'active' : '' }}">
               <a href="{{ url('/centros-costo') }}" class="menu-link">
                 <i class="menu-icon tf-icons ri-money-dollar-box-line"></i>
@@ -475,6 +469,12 @@
               <a href="{{ url('/config/parametros') }}" class="menu-link">
                 <i class="menu-icon tf-icons ri-settings-3-line"></i>
                 <div data-i18n="Rangos de conceptos">Rangos de conceptos</div>
+              </a>
+            </li>
+            <li class="menu-item {{ request()->routeIs('config.general.*') ? 'active' : '' }}">
+              <a href="{{ url('/config') }}" class="menu-link">
+                <i class="menu-icon tf-icons ri-settings-3-line"></i>
+                <div data-i18n="Parámetros generales">Parámetros generales</div>
               </a>
             </li>
           </ul>
