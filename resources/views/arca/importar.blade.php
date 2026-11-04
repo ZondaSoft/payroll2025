@@ -165,6 +165,7 @@
                                                     name="generar"
                                                     value="1"
                                                     class="form-check-input"
+                                                    @checked(old('generar', '1') == '1')
                                                 />
                                                 <label class="form-check-label" for="generar">Generar concepto de liquidación interno si no existe ?</label>
                                             </div>

@@ -820,7 +820,7 @@ const mostrarErrorSinArca = (mensaje, conceptos) => {
       <td style="padding:4px 8px;border:1px solid #dee2e6;text-align:right;">${h.legajos}</td>
       <td style="padding:4px 8px;border:1px solid #dee2e6;text-align:right;">${escapeHtml(formatMoney(h.total))}</td>
       <td style="padding:4px 8px;border:1px solid #dee2e6;text-align:center;">
-        <a href="${route('liquidacion.conceptos.edit', h.id)}"
+        <a href="${route('liquidacion.conceptos.edit', h.id)}#sicoss"
            class="lupa-concepto"
            target="_blank"
            rel="noopener"
@@ -854,9 +854,14 @@ const mostrarErrorSinArca = (mensaje, conceptos) => {
         </table>
       </div>
       <div style="display:flex;justify-content:space-between;align-items:center;gap:8px;margin-top:16px;">
-        <button type="button" id="sa-exportar" class="btn btn-success">
-          <i class="ri-file-excel-2-line me-1"></i> Exportar Excel
-        </button>
+        <div style="display:flex;gap:8px;">
+          <button type="button" id="sa-exportar" class="btn btn-success">
+            <i class="ri-file-excel-2-line me-1"></i> Exportar Excel
+          </button>
+          <a href="${route('arca.importar')}" id="sa-importar-arca" class="btn btn-primary">
+            <i class="ri-upload-2-line me-1"></i> Importar conceptos ARCA
+          </a>
+        </div>
         <button type="button" id="sa-cerrar" class="btn btn-outline-secondary">Cerrar</button>
       </div>
     </div>

@@ -382,6 +382,21 @@ onMounted(() => {
     modoEdicion.value = props.edicion;
     setFocus();
 
+    // Si se entró desde el modal "Conceptos sin código ARCA" del LSD (link con #sicoss), abrir
+    // la pestaña Sicoss y dejar el foco en Concepto Arca. Sin hash se respeta la pestaña Info.
+    if (window.location.hash === '#sicoss') {
+        setTimeout(() => {
+            const btn = document.querySelector('[data-bs-target="#form-tabs-sicoss"]');
+            const enfocar = () => document.getElementById('concepto_arca')?.focus();
+            if (btn && window.bootstrap?.Tab) {
+                btn.addEventListener('shown.bs.tab', enfocar, { once: true });
+                window.bootstrap.Tab.getOrCreateInstance(btn).show();
+            } else {
+                enfocar();
+            }
+        }, 0);
+    }
+
     // Cargar conceptos iniciales
     buscarConceptosArca('').then(() => {
         cargarConceptoSeleccionado();
