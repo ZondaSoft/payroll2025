@@ -17,6 +17,9 @@ class ConceptosArcaImport
      */
     private int $count = 0;
     private int $rechazados = 0;
+    private int $nuevos = 0;
+    /** codigo_contribuyente => [codigo_afip, descripcion ARCA, línea] ya importados en esta corrida */
+    private array $importados = [];
     private bool $headerProcessed = false;
     private array $headerColumns = [];
 
@@ -69,7 +72,7 @@ class ConceptosArcaImport
                 }
 
                 // Procesar datos
-                $this->processRow($row);
+                $this->processRow($row, $lineNum);
             }
 
             fclose($handle);
@@ -105,7 +108,7 @@ class ConceptosArcaImport
     /**
      * Procesa una fila de datos del archivo CSV
      */
-    private function processRow(array $row): void
+    private function processRow(array $row, int $lineNum = 0): void
     {
         try {
             // Limpiar espacios en blanco
@@ -179,6 +182,28 @@ class ConceptosArcaImport
                 'aportes_especiales' => $this->parseDecimal($row[19] ?? null),
             ];
 
+            // El unique (id_empresa, codigo_contribuyente) admite una sola relación por concepto. Si
+            // ARCA informa el mismo concepto del contribuyente con otro código ARCA, se conserva la
+            // primera y se rechaza esta con un motivo legible (antes salía el error SQL 1062).
+            if (isset($this->importados[$codigoContribuyente])) {
+                [$afipPrevio, $descPrevia, $lineaPrevia] = $this->importados[$codigoContribuyente];
+
+                $this->count++;
+                $this->rechazados++;
+
+                ImportConceptosArcaErr::create([
+                    'registro' => $this->count,
+                    'id_empresa'     => $this->idEmpresa,
+                    'nombre_archivo' => $this->nom_arch,
+                    'tamanio_archivo'=> $this->tam_arch,
+                    'detalle' => "Línea {$lineNum}: el concepto {$codigoContribuyente} ({$descripcionContribuyente}) "
+                        . "ya está relacionado con el código ARCA {$afipPrevio} ({$descPrevia}) en la línea {$lineaPrevia}; "
+                        . "ARCA lo informa de nuevo con {$codigoAfip} ({$descripcion}). Se conservó la primera relación: "
+                        . "revisar en ARCA cuál corresponde.",
+                ]);
+                return;
+            }
+
             // Si el checkbox de generar concepto de liquidación interno está activo y no existe un concepto con ese código ARCA, lo creo automáticamente
             $existeConcepto = Sue102::where('codigo', $codigoContribuyente)
                     ->exists();
@@ -191,6 +216,7 @@ class ConceptosArcaImport
                         'tipo' => $tipo,
                         'concepto_arca' => $codigoAfip,
                     ]);
+                    $this->nuevos++;
                 }
             } else {
                 // Si no se permite generar automáticamente, verifico que exista el concepto antes de continuar
@@ -212,6 +238,7 @@ class ConceptosArcaImport
 
             // Guardar en la base de datos
             Conceptosarca::create($conceptosData);
+            $this->importados[$codigoContribuyente] = [$codigoAfip, $descripcion, $lineNum];
 
             $this->count++;
 
@@ -274,6 +301,14 @@ class ConceptosArcaImport
     public function getRowCount(): int
     {
         return $this->count - $this->rechazados;
+    }
+
+    /**
+     * Retorna la cantidad de conceptos de liquidación internos (Sue102) creados
+     */
+    public function getNuevosCount(): int
+    {
+        return $this->nuevos;
     }
 
     /**

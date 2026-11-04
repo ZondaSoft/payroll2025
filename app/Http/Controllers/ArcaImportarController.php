@@ -223,6 +223,7 @@ class ArcaImportarController extends Controller
             $count = $import->getRowCount();
             $rechazados = $import->getRejectedCount();
             $total = $import->getTotalCount();
+            $nuevos = $import->getNuevosCount();
 
         } catch (\Throwable $e) {
             return response()->json([
@@ -239,6 +240,7 @@ class ArcaImportarController extends Controller
                 'total'       => $total,
                 'count'       => $count,
                 'rechazados'  => $rechazados,
+                'nuevos'      => $nuevos,
                 'msg'         => "Se importaron $count registros y se rechazaron $rechazados.",
             ]);
         }
