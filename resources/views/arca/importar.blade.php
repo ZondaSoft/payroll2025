@@ -56,6 +56,48 @@
         padding: 8px 24px;
     }
     .md3-btn-cerrar:hover, .md3-btn-cerrar:focus { background-color: #6a2fdc; color: #ffffff; }
+    /* Animación de importación (archivo → base de datos) */
+    .imp-anim { max-width: 460px; padding: 8px 0 16px; }
+    .imp-anim__escena { display: flex; align-items: center; gap: 12px; }
+    .imp-anim__origen, .imp-anim__destino {
+        flex: 0 0 auto; display: flex; flex-direction: column; align-items: center;
+        font-size: .75rem; color: #6d6777;
+    }
+    .imp-anim__origen i, .imp-anim__destino i {
+        width: 64px; height: 64px; border-radius: 20px; display: inline-flex;
+        align-items: center; justify-content: center; font-size: 2rem; margin-bottom: 6px;
+        background-color: #e8ddff; color: #7e3ff2;
+    }
+    .imp-anim__destino i { animation: imp-latido 1.8s ease-in-out infinite; }
+    .imp-anim__via { position: relative; flex: 1 1 auto; height: 64px; margin-bottom: 22px; overflow: hidden; }
+    .imp-anim__via::before {
+        content: ''; position: absolute; left: 0; right: 0; top: 50%;
+        border-top: 2px dashed #cbb8f7;
+    }
+    .imp-anim__hoja {
+        position: absolute; top: 50%; left: 0; font-size: 1.5rem; color: #7e3ff2;
+        transform: translate(-100%, -50%); opacity: 0;
+        animation: imp-viaje 1.8s linear infinite;
+    }
+    .imp-anim__hoja:nth-child(2) { animation-delay: .6s; }
+    .imp-anim__hoja:nth-child(3) { animation-delay: 1.2s; }
+    .imp-anim__barra { height: 4px; border-radius: 2px; background: #e8ddff; overflow: hidden; margin-top: 4px; }
+    .imp-anim__barra span {
+        display: block; width: 35%; height: 100%; border-radius: 2px; background: #7e3ff2;
+        animation: imp-barra 1.4s ease-in-out infinite;
+    }
+    .imp-anim__texto { margin: 10px 0 0; font-size: .85rem; color: #6d6777; }
+    @keyframes imp-viaje {
+        0%   { left: 0;    opacity: 0; transform: translate(-100%, -50%) scale(.8); }
+        15%  { opacity: 1; }
+        85%  { opacity: 1; }
+        100% { left: 100%; opacity: 0; transform: translate(0, -50%) scale(.8); }
+    }
+    @keyframes imp-barra { 0% { transform: translateX(-100%); } 100% { transform: translateX(290%); } }
+    @keyframes imp-latido { 0%, 100% { transform: scale(1); } 50% { transform: scale(1.06); } }
+    @media (prefers-reduced-motion: reduce) {
+        .imp-anim__hoja, .imp-anim__barra span, .imp-anim__destino i { animation-duration: 6s; }
+    }
     /* Pasos bloqueados al terminar la importación */
     .wizard .steps > ul li.disabled a { cursor: not-allowed; }
     /* Wizard en violeta (bd-wizard.css trae verde #00d69f) */
@@ -308,17 +350,19 @@
                                 <h5 class="bd-wizard-step-title">Paso 3</h5>
                                 <h2 class="section-heading mb-5" id="titleFinish" name="titleFinish">Procesando importación...</h2>
 
-                                <div id="loadingDiv" name="loadingDiv" class="pt-0">
-                                    <div class="ball-grid-pulse">
-                                    <div></div>
-                                    <div></div>
-                                    <div></div>
-                                    <div></div>
-                                    <div></div>
-                                    <div></div>
-                                    <div></div>
-                                    <div></div>
-                                    <div></div>
+                                <div id="loadingDiv" name="loadingDiv" class="pt-0" hidden>
+                                    <div class="imp-anim" role="status" aria-live="polite">
+                                        <div class="imp-anim__escena">
+                                            <div class="imp-anim__origen"><i class="ri-file-text-line"></i><span>TXT ARCA</span></div>
+                                            <div class="imp-anim__via">
+                                                <i class="ri-file-list-3-line imp-anim__hoja"></i>
+                                                <i class="ri-file-list-3-line imp-anim__hoja"></i>
+                                                <i class="ri-file-list-3-line imp-anim__hoja"></i>
+                                            </div>
+                                            <div class="imp-anim__destino"><i class="ri-database-2-line"></i><span>Conceptos</span></div>
+                                        </div>
+                                        <div class="imp-anim__barra"><span></span></div>
+                                        <p class="imp-anim__texto">Importando conceptos ARCA, esto puede demorar unos segundos…</p>
                                     </div>
                                 </div>
 
@@ -1109,7 +1153,11 @@
             formData.append('tam_arch', document.getElementById('tam_arch').value);
             formData.append('generar', document.getElementById('generar').checked ? '1' : '0');
 
-            // Mostrar loading
+            // Estado "en curso": título de proceso, sin botones ni leyendas de un resultado
+            // anterior, y la animación de importación visible hasta que responda el servidor.
+            document.getElementById('titleFinish').innerText = 'Procesando importación...';
+            ['btn-ok', 'btn-err', 'registrosOk', 'registrosErr'].forEach(id =>
+                document.getElementById(id)?.setAttribute('hidden', true));
             loadingDiv.removeAttribute('hidden');
 
             // Realizar upload con fetch
