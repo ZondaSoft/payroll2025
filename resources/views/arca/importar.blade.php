@@ -22,7 +22,47 @@
         padding-top: 13px !important;
     }
     .content {
-        width: 450px;
+        width: 640px;
+        max-width: 100%;
+    }
+    /* Botón de ayuda MD3 (icon button tonal) y su diálogo */
+    .md3-btn-ayuda {
+        flex: 0 0 auto;
+        width: 40px;
+        height: 40px;
+        border: 0;
+        border-radius: 50%;
+        background-color: #e8ddff;
+        color: #7e3ff2;
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 1.25rem;
+        box-shadow: 0 1px 2px rgba(0, 0, 0, .15);
+        transition: background-color .2s, box-shadow .2s;
+    }
+    .md3-btn-ayuda:hover { background-color: #dccbff; box-shadow: 0 2px 6px rgba(0, 0, 0, .2); }
+    .md3-btn-ayuda:focus-visible { outline: 2px solid #7e3ff2; outline-offset: 2px; }
+    .md3-dialog {
+        border: 0;
+        border-radius: 28px;
+        padding: 8px 8px 4px;
+        background-color: #fdf8ff;
+    }
+    .md3-btn-cerrar {
+        background-color: #7e3ff2;
+        color: #ffffff;
+        border-radius: 20px;
+        padding: 8px 24px;
+    }
+    .md3-btn-cerrar:hover, .md3-btn-cerrar:focus { background-color: #6a2fdc; color: #ffffff; }
+    /* Pasos bloqueados al terminar la importación */
+    .wizard .steps > ul li.disabled a { cursor: not-allowed; }
+    /* Wizard en violeta (bd-wizard.css trae verde #00d69f) */
+    .wizard .steps > ul li.current span.number,
+    .wizard .steps > ul li.done span.number,
+    .wizard .actions li a {
+        background-color: #7e3ff2;
     }
 </style>
 @endsection
@@ -116,11 +156,11 @@
 
                                         <div class="col-lg-12 mt-4 mb-2 mr-4">
                                             <label class="col-form-label" style="padding-top: 0px">Empresa</label>
-                                            <select class="form-control selected2"
+                                            <select class="form-select selected2"
                                                 id="empresa"
                                                 name="empresa"
                                                 autofocus
-                                                style="padding-left: 16px;padding-right: 16px;padding-top: 6px;padding-bottom: 6px;height: 36px;">
+                                                style="padding-left: 16px;padding-top: 6px;padding-bottom: 6px;height: 36px;background-color: #ffffff;">
 
                                                 @foreach ($empresas as $empresa)
                                                     <option value="{{ $empresa->id }}">{{ $empresa->detalle }}</option>
@@ -165,6 +205,7 @@
                                                     name="generar"
                                                     value="1"
                                                     class="form-check-input"
+                                                    @checked(old('generar', '1') == '1')
                                                 />
                                                 <label class="form-check-label" for="generar">Generar concepto de liquidación interno si no existe ?</label>
                                             </div>
@@ -179,7 +220,14 @@
                             <section class="pt-2" hidden>
                                 <h5 class="bd-wizard-step-title mb-2">Paso 2</h5>
                                 <!-- <h5 class="section-heading" style="margin-bottom: 5px">Elija por favor el archivo a importar</h5> -->
-                                <p>Selecciona el archivo de origen descargado desde la plataforma de ARCA:</p>
+                                <div class="d-flex align-items-center justify-content-between gap-3 mb-3">
+                                    <p class="mb-0">Selecciona el archivo de origen descargado desde la plataforma de ARCA:</p>
+                                    <button type="button" class="md3-btn-ayuda" data-bs-toggle="modal"
+                                        data-bs-target="#modalAyudaArca" title="Ayuda: conceptos relacionados ARCA - LSD"
+                                        aria-label="Ayuda">
+                                        <i class="ri-question-mark"></i>
+                                    </button>
+                                </div>
                                 <!-- <div class="form-group">
                                 <label for="firstName" class="sr-only">First Name</label>
                                 <input type="text" name="firstName" id="firstName" class="form-control" placeholder="First Name">
@@ -496,6 +544,26 @@
 
 </form>
 <!-- / Content -->
+
+<!-- Modal de ayuda: ARCA - LSD - Conceptos relacionados -->
+<div class="modal fade" id="modalAyudaArca" tabindex="-1" aria-labelledby="modalAyudaArcaTitulo" aria-hidden="true">
+  <div class="modal-dialog modal-dialog-centered modal-xl">
+    <div class="modal-content md3-dialog">
+      <div class="modal-header border-0 pb-0">
+        <h4 class="modal-title" id="modalAyudaArcaTitulo">ARCA - LSD - Conceptos relacionados</h4>
+      </div>
+      <div class="modal-body text-center">
+        <img src="{{ asset('img/arca/lsd-conceptos-relacionados.png') }}"
+             alt="ARCA - LSD - Conceptos relacionados"
+             class="img-fluid rounded-3"
+             onerror="this.replaceWith(Object.assign(document.createElement('p'), {className: 'text-muted my-5', textContent: 'Imagen no disponible.'}))">
+      </div>
+      <div class="modal-footer border-0 pt-0">
+        <button type="button" class="btn md3-btn-cerrar" data-bs-dismiss="modal">Cerrar</button>
+      </div>
+    </div>
+  </div>
+</div>
 
 <!-- MODAL -->
 <div class="col-lg-4 col-md-3">
@@ -974,6 +1042,54 @@
 
 
         // Función para subir el archivo (para usar con AJAX si es necesario)
+        // Cierre del paso 3 con la respuesta del import. Se resuelve acá (y no en jquery.steps.js,
+        // que compara window.location.pathname sin el prefijo /payroll2025 y nunca coincidía).
+        function mostrarResultadoImportacion(data) {
+            const titulo = document.getElementById('titleFinish');
+            const registrosOk = document.getElementById('registrosOk');
+            const registrosErr = document.getElementById('registrosErr');
+            const btnOk = document.getElementById('btn-ok');
+            const btnErr = document.getElementById('btn-err');
+
+            if (!data || !data.success) {
+                titulo.innerText = 'La importación no pudo completarse';
+                registrosErr.innerText = (data && data.msg) ? data.msg : 'Se detectó un error desconocido en la importación';
+                registrosErr.removeAttribute('hidden');
+                btnErr.innerText = 'Descargar registros rechazados';
+                btnErr.removeAttribute('hidden');
+                return;
+            }
+
+            const count = Number(data.count) || 0;
+            const rechazados = Number(data.rechazados) || 0;
+            const nuevos = Number(data.nuevos) || 0;
+
+            titulo.innerText = 'Importación finalizada';
+
+            // Las cantidades van en los propios botones; las leyendas registrosOk/registrosErr
+            // quedan ocultas (solo se usan para informar un fallo).
+            registrosOk.setAttribute('hidden', true);
+            registrosErr.setAttribute('hidden', true);
+
+            btnOk.innerText = 'Descargar registros importados (' + count +
+                (nuevos > 0 ? ' · ' + nuevos + (nuevos === 1 ? ' concepto interno creado' : ' conceptos internos creados') : '') + ')';
+            btnOk.removeAttribute('hidden');
+
+            if (rechazados > 0) {
+                btnErr.innerText = 'Descargar registros rechazados (' + rechazados + ')';
+                btnErr.removeAttribute('hidden');
+            } else {
+                btnErr.setAttribute('hidden', true);
+            }
+
+            // Importación terminada: no se puede volver atrás. Se oculta "Anterior" y los pasos 1 y 2
+            // quedan deshabilitados en gris (jquery.steps ignora el click en un li.disabled).
+            $(".actions a[href$='#previous']").closest('li').hide();
+            $('#wizard .steps li').not('.current')
+                .removeClass('done').addClass('disabled').attr('aria-disabled', 'true');
+            $(".actions a[href$='#finish']").removeClass('disabled');
+        }
+
         window.subirArchivo = function(callback) {
             const file = fileInput.files[0];
             const loadingDiv = document.getElementById('loadingDiv');
@@ -1017,12 +1133,7 @@
 
                 console.log(data);
 
-                if (data.success) {
-                    // Actualizar contadores en el DOM
-
-                    // Que hago con este proceso ???
-                    // Deuda tecnica
-                }
+                mostrarResultadoImportacion(data);
 
                 if (callback) callback(true, data);
             })
