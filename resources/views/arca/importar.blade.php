@@ -56,6 +56,9 @@
         padding: 8px 24px;
     }
     .md3-btn-cerrar:hover, .md3-btn-cerrar:focus { background-color: #6a2fdc; color: #ffffff; }
+    /* El tema (core.css) no trae el [hidden]{display:none!important} de Bootstrap, así que .btn
+       le ganaba al atributo hidden y los botones de descarga se veían durante la importación. */
+    #wizard [hidden] { display: none !important; }
     /* Animación de importación (archivo → base de datos) */
     .imp-anim { max-width: 460px; padding: 8px 0 16px; }
     .imp-anim__escena { display: flex; align-items: center; gap: 12px; }
