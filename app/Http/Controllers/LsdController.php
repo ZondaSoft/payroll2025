@@ -2,18 +2,18 @@
 
 namespace App\Http\Controllers;
 
+use App\Models\LiquidacionCorreccion;
 use App\Models\LsdEmision;
 use App\Models\LsdImporteDetraer;
-use App\Models\LsdTope;
 use App\Models\LsdItem;
-use App\Models\LiquidacionCorreccion;
+use App\Models\LsdTope;
 use App\Models\Sue086;
 use App\Models\Sue100;
 use App\Models\Sue102;
+use App\Models\SueConfig;
 use Illuminate\Http\Request;
-use Inertia\Inertia;
 use Illuminate\Support\Facades\DB;
-use Illuminate\Support\Facades\Log;
+use Inertia\Inertia;
 
 class LsdController extends Controller
 {
@@ -65,6 +65,7 @@ class LsdController extends Controller
         if ($mes < 1 || $mes > 12) {
             $mes = 1;
         }
+
         return sprintf('%04d-%02d-01', $anio ?: (int) date('Y'), $mes);
     }
 
@@ -138,13 +139,17 @@ class LsdController extends Controller
                 ?? Sue100::where('periodo', $request->periodo_id)->first();
             $tipoLiquidacion = $request->tipo_liquidacion;
 
-            if (!$empresa || !$periodo) {
+            if (! $empresa || ! $periodo) {
                 return response()->json(['success' => false, 'message' => 'Empresa o período no encontrados'], 404);
             }
 
             $cuit = str_replace('-', '', $empresa->cuit ?? '');
 
             $periodoStr = $periodo->periodo;
+
+            // Conceptos creados solos durante esta generación (ver pre-check 1): quedan en la
+            // emisión y se muestran en el resumen final.
+            $conceptosGenerados = [];
 
             // Pre-check: conceptos huérfanos en sue090s que no existen en sue102s.
             // En modo 'RE' no se emiten Reg 02/03 (no aplica el chequeo).
@@ -175,22 +180,52 @@ class LsdController extends Controller
                     ->get();
 
                 if ($huerfanos->isNotEmpty()) {
-                    return response()->json([
-                        'success' => false,
-                        'tipo_error' => 'conceptos_huerfanos',
-                        'message' => sprintf(
-                            'Se encontraron %d conceptos sin parametrizar en el catálogo (Liquidación > Conceptos). ' .
-                            'ARCA puede rechazar el archivo. Dá de alta cada uno con su código ARCA antes de generar el LSD.',
-                            $huerfanos->count()
-                        ),
-                        'huerfanos' => $huerfanos->map(fn($h) => [
-                            'concepto' => $h->concepto,
-                            'descripcion' => $h->descripcion ?? '',
-                            'veces' => (int) $h->veces,
-                            'legajos' => (int) $h->legajos,
-                            'total' => (float) $h->total,
-                        ])->values(),
-                    ], 422);
+                    // El parámetro general decide quién da de alta estos conceptos.
+                    //
+                    //   lsd_no_conceptos = true  → frena acá y los da de alta el usuario desde el
+                    //                              modal, que es donde puede revisar tipo y código ARCA.
+                    //   lsd_no_conceptos = false → se crean solos y la generación sigue. No es que el
+                    //                              dato deje de importar: el detalle de lo creado
+                    //                              viaja al resumen final y queda en la emisión.
+                    //
+                    // En los dos casos el pre-check 2 sigue después: un concepto creado sin
+                    // concepto_arca no se puede informar en el Reg 03 y ARCA rechazaría el archivo,
+                    // así que el alta automática resuelve la falta de catálogo, no la de código ARCA.
+                    if (SueConfig::actual()->lsd_no_conceptos) {
+                        return response()->json([
+                            'success' => false,
+                            'tipo_error' => 'conceptos_huerfanos',
+                            'message' => sprintf(
+                                'Se encontraron %d conceptos sin parametrizar en el catálogo (Liquidación > Conceptos). '.
+                                'ARCA puede rechazar el archivo. Dá de alta cada uno con su código ARCA antes de generar el LSD.',
+                                $huerfanos->count()
+                            ),
+                            'huerfanos' => $huerfanos->map(fn ($h) => [
+                                'concepto' => $h->concepto,
+                                'descripcion' => $h->descripcion ?? '',
+                                'veces' => (int) $h->veces,
+                                'legajos' => (int) $h->legajos,
+                                'total' => (float) $h->total,
+                            ])->values(),
+                        ], 422);
+                    }
+
+                    $alta = $this->altaDeConceptos(
+                        $huerfanos->map(fn ($h) => ['concepto' => $h->concepto, 'descripcion' => $h->descripcion ?? ''])->all(),
+                        $empresa->id,
+                    );
+                    // Al detalle del alta se le suma el uso que tenía cada concepto en la
+                    // liquidación: es lo que permite juzgar en el resumen si lo creado importa.
+                    $usoPorConcepto = $huerfanos->keyBy('concepto');
+                    $conceptosGenerados = array_map(function (array $c) use ($usoPorConcepto) {
+                        $uso = $usoPorConcepto[$c['concepto']] ?? null;
+
+                        return $c + [
+                            'veces' => $uso !== null ? (int) $uso->veces : 0,
+                            'legajos' => $uso !== null ? (int) $uso->legajos : 0,
+                            'total' => $uso !== null ? (float) $uso->total : 0.0,
+                        ];
+                    }, $alta['detalle']);
                 }
 
                 // Pre-check 2: conceptos usados que existen en sue102s pero sin concepto_arca.
@@ -204,7 +239,7 @@ class LsdController extends Controller
                     ->where(fn ($q) => $q->whereNull('sue001s.baja')->orWhere('sue001s.baja', '>=', $this->inicioPeriodo($periodoStr)))
                     ->where(function ($q) {
                         $q->whereNull('sue102s.concepto_arca')
-                          ->orWhere('sue102s.concepto_arca', '=', '');
+                            ->orWhere('sue102s.concepto_arca', '=', '');
                     });
 
                 if ($codEmpresa !== null && $codEmpresa !== '') {
@@ -240,16 +275,16 @@ class LsdController extends Controller
                     }
                 }
 
-                if (!empty($sinArcaPendientes)) {
+                if (! empty($sinArcaPendientes)) {
                     return response()->json([
                         'success' => false,
                         'tipo_error' => 'conceptos_sin_arca',
                         'message' => sprintf(
-                            'Se encontraron %d conceptos sin código ARCA (concepto_arca) y sin equivalencia en la tabla ARCA. ' .
+                            'Se encontraron %d conceptos sin código ARCA (concepto_arca) y sin equivalencia en la tabla ARCA. '.
                             'Asigná el código ARCA a cada uno antes de generar el LSD.',
                             count($sinArcaPendientes)
                         ),
-                        'sin_arca' => collect($sinArcaPendientes)->map(fn($c) => [
+                        'sin_arca' => collect($sinArcaPendientes)->map(fn ($c) => [
                             'id' => (int) $c->concepto_id,
                             'concepto' => $c->concepto,
                             'descripcion' => $c->descripcion ?? '',
@@ -266,7 +301,7 @@ class LsdController extends Controller
                 // determina desde el Reg 03 → rechazo del archivo. Causa típica: la parametrización
                 // se importó en un entorno y no en el otro. Se puede continuar bajo responsabilidad
                 // del usuario (ignorar_sin_parametrizacion).
-                if (!$request->boolean('ignorar_sin_parametrizacion')) {
+                if (! $request->boolean('ignorar_sin_parametrizacion')) {
                     $sinParamQuery = DB::table('sue090s')
                         ->join('sue001s', 'sue090s.legajo', '=', 'sue001s.codigo')
                         ->join('sue102s', 'sue090s.concepto', '=', 'sue102s.codigo')
@@ -301,8 +336,8 @@ class LsdController extends Controller
                             'success' => false,
                             'tipo_error' => 'conceptos_sin_parametrizacion',
                             'message' => sprintf(
-                                '%d conceptos usados en la liquidación no figuran en la parametrización ARCA importada (conceptosarcas) de %s. ' .
-                                'Sin sus marcas (ej. contribuciones LRT), la Base Imponible 9 puede diferir de la que ARCA determina y el archivo sería rechazado. ' .
+                                '%d conceptos usados en la liquidación no figuran en la parametrización ARCA importada (conceptosarcas) de %s. '.
+                                'Sin sus marcas (ej. contribuciones LRT), la Base Imponible 9 puede diferir de la que ARCA determina y el archivo sería rechazado. '.
                                 'Importá la parametrización vigente del portal en /arca/importar antes de generar.',
                                 $sinParametrizacion->count(),
                                 $empresa->detalle ?? 'la empresa'
@@ -327,14 +362,14 @@ class LsdController extends Controller
             $inconsistencias = $this->detectarInconsistenciasReg04($empresa, $periodoStr, $tiposLiq);
             $legajosExcluidos = [];
             $legajosIgnorados = [];
-            if (!empty($inconsistencias)) {
-                if (!$request->boolean('ignorar_inconsistencias')) {
+            if (! empty($inconsistencias)) {
+                if (! $request->boolean('ignorar_inconsistencias')) {
                     return response()->json([
                         'success' => false,
                         'tipo_error' => 'datos_inconsistentes',
                         'message' => sprintf(
-                            'Se encontraron %d inconsistencias en los datos SICOSS de los legajos. ' .
-                            'Estos valores no entran en el formato de ancho fijo del LSD (Registro 04) y ARCA rechazaría el archivo. ' .
+                            'Se encontraron %d inconsistencias en los datos SICOSS de los legajos. '.
+                            'Estos valores no entran en el formato de ancho fijo del LSD (Registro 04) y ARCA rechazaría el archivo. '.
                             'Corregí cada legajo antes de generar.',
                             count($inconsistencias)
                         ),
@@ -344,9 +379,9 @@ class LsdController extends Controller
 
                 // Códigos de legajo a excluir de la generación (el usuario optó por ignorarlos).
                 $legajosExcluidos = array_values(array_filter(array_unique(array_map(
-                    fn($i) => (string) ($i['legajo'] ?? ''),
+                    fn ($i) => (string) ($i['legajo'] ?? ''),
                     $inconsistencias
-                )), fn($v) => $v !== ''));
+                )), fn ($v) => $v !== ''));
 
                 // Detalle de los legajos ignorados (agrupado por legajo con sus motivos) para persistir
                 // en la emisión y mostrarlo luego en el detalle.
@@ -354,11 +389,12 @@ class LsdController extends Controller
                     ->groupBy('legajo')
                     ->map(function ($grupo) {
                         $primero = $grupo->first();
+
                         return [
                             'legajo' => (string) ($primero['legajo'] ?? ''),
                             'cuil' => (string) ($primero['cuil'] ?? ''),
                             'nombre' => (string) ($primero['nombre'] ?? ''),
-                            'motivos' => collect($grupo)->map(fn($i) => [
+                            'motivos' => collect($grupo)->map(fn ($i) => [
                                 'campo' => (string) ($i['campo'] ?? ''),
                                 'detalle' => (string) ($i['problema'] ?? ''),
                             ])->values()->all(),
@@ -372,14 +408,14 @@ class LsdController extends Controller
             // POR LIQUIDACIÓN (Normal, SAC y Final por separado — el liquidador de origen calcula cada
             // una independiente). Bloqueante: el TXT recién se genera si no hay diferencias, si el
             // usuario las ajusta ("Ajustar valores") o si decide seguir igual (ignorar_diferencias_aportes).
-            if (!$request->boolean('ignorar_diferencias_aportes')) {
+            if (! $request->boolean('ignorar_diferencias_aportes')) {
                 $diferenciasAportes = $this->detectarDiferenciasAportes($empresa, $periodoStr, $tiposLiq);
-                if (!empty($diferenciasAportes)) {
+                if (! empty($diferenciasAportes)) {
                     return response()->json([
                         'success' => false,
                         'tipo_error' => 'diferencias_aportes',
                         'message' => sprintf(
-                            'Se detectaron %d diferencias entre los aportes descontados y base × alícuota (control por liquidación). ' .
+                            'Se detectaron %d diferencias entre los aportes descontados y base × alícuota (control por liquidación). '.
                             'El archivo todavía no se generó.',
                             count($diferenciasAportes)
                         ),
@@ -391,27 +427,38 @@ class LsdController extends Controller
             // Pre-check 5: empleados ACTIVOS sin liquidación en el período. Se pregunta (diálogo con
             // checkbox por legajo, tildado por defecto) si se incluyen en el TXT con TODAS las bases en 0.
             // No bloqueante: si el usuario ya revisó (activos_revisados), se toman los legajos elegidos.
+            // El switch "Ocultar ventana de empleados activos sin liquidación y no incluirlos en el txt"
+            // de /config saltea el diálogo: el archivo sale solo con los empleados que tienen
+            // liquidación, y los detectados se devuelven en $activosNoInformados para avisarlo al final.
+            // Las dos cosas van juntas a propósito: sin diálogo no hay forma de elegir a quién incluir.
             $legajosCeroIncluir = [];
-            if ($identificadorEnvio !== 'RE' && !$request->boolean('activos_revisados')) {
-                $activosSinLiq = $this->detectarActivosSinLiquidacion($empresa, $periodoStr, $tiposLiq);
-                if (!empty($activosSinLiq)) {
-                    return response()->json([
-                        'success' => false,
-                        'tipo_error' => 'activos_sin_liquidacion',
-                        'message' => sprintf(
-                            'Hay %d empleado(s) activo(s) sin liquidación en el período. Elegí cuáles incluir ' .
-                            'en el archivo (se informarán con todas las bases en 0).',
-                            count($activosSinLiq)
-                        ),
-                        'activos_sin_liquidacion' => $activosSinLiq,
-                    ], 422);
+            $activosNoInformados = [];
+            $ocultarActivos = SueConfig::actual()->lsd_ocultar_activos;
+            if ($identificadorEnvio !== 'RE') {
+                if ($ocultarActivos) {
+                    // Sin diálogo: no se incluye a nadie, pero se guarda el detalle para el aviso final.
+                    $activosNoInformados = $this->detectarActivosSinLiquidacion($empresa, $periodoStr, $tiposLiq);
+                } elseif (! $request->boolean('activos_revisados')) {
+                    $activosSinLiq = $this->detectarActivosSinLiquidacion($empresa, $periodoStr, $tiposLiq);
+                    if (! empty($activosSinLiq)) {
+                        return response()->json([
+                            'success' => false,
+                            'tipo_error' => 'activos_sin_liquidacion',
+                            'message' => sprintf(
+                                'Hay %d empleado(s) activo(s) sin liquidación en el período. Elegí cuáles incluir '.
+                                'en el archivo (se informarán con todas las bases en 0).',
+                                count($activosSinLiq)
+                            ),
+                            'activos_sin_liquidacion' => $activosSinLiq,
+                        ], 422);
+                    }
+                } else {
+                    // Legajos elegidos por el usuario (checkbox tildado). Se validan contra la detección real
+                    // para no confiar en el cliente (evita inyectar legajos que sí tienen liquidación).
+                    $elegidos = collect($request->input('activos_incluidos', []))->map(fn ($l) => (string) $l)->all();
+                    $validos = collect($this->detectarActivosSinLiquidacion($empresa, $periodoStr, $tiposLiq))->pluck('legajo')->all();
+                    $legajosCeroIncluir = array_values(array_intersect($validos, $elegidos));
                 }
-            } elseif ($identificadorEnvio !== 'RE' && $request->boolean('activos_revisados')) {
-                // Legajos elegidos por el usuario (checkbox tildado). Se validan contra la detección real
-                // para no confiar en el cliente (evita inyectar legajos que sí tienen liquidación).
-                $elegidos = collect($request->input('activos_incluidos', []))->map(fn ($l) => (string) $l)->all();
-                $validos = collect($this->detectarActivosSinLiquidacion($empresa, $periodoStr, $tiposLiq))->pluck('legajo')->all();
-                $legajosCeroIncluir = array_values(array_intersect($validos, $elegidos));
             }
 
             // Número de emisión: correlativo ascendente por empresa + período.
@@ -429,8 +476,9 @@ class LsdController extends Controller
             $fileData = $this->generarTxt($empresa, $periodo, $tipoLiquidacion, $tiposLiq, $numeroEmision, $request->fecha_pago, $identificadorEnvio, $legajosExcluidos, $legajosCeroIncluir);
 
             // Si generarTxt devolvió un error (por ejemplo 404), retornarlo y no crear la emisión
-            if (!is_array($fileData) || ($fileData['status'] ?? 200) !== 200) {
+            if (! is_array($fileData) || ($fileData['status'] ?? 200) !== 200) {
                 $message = is_array($fileData) && isset($fileData['message']) ? $fileData['message'] : 'Error generando archivo';
+
                 return response()->json(['success' => false, 'message' => $message], $fileData['status'] ?? 500);
             }
 
@@ -444,6 +492,7 @@ class LsdController extends Controller
                 'periodo' => $periodoStr,
                 'cantidad_empleados' => $fileData['cantidad_empleados'] ?? 0,
                 'legajos_ignorados' => $legajosIgnorados,
+                'conceptos_generados' => $conceptosGenerados !== [] ? $conceptosGenerados : null,
                 'monto_total' => $fileData['monto_total'] ?? 0,
                 'estado' => 'borrador',
                 'usuario_id' => auth()->id(),
@@ -459,12 +508,13 @@ class LsdController extends Controller
             ]);
 
             // Registrar items en lsd_items
-            if (!empty($fileData['lsd_items'])) {
+            if (! empty($fileData['lsd_items'])) {
                 $now = now();
                 $itemsToInsert = array_map(function ($item) use ($emision, $now) {
                     $item['lsd_emision_id'] = $emision->id;
                     $item['created_at'] = $now;
                     $item['updated_at'] = $now;
+
                     return $item;
                 }, $fileData['lsd_items']);
 
@@ -491,6 +541,9 @@ class LsdController extends Controller
                 'emision_id' => $emision->id,
                 'legajos_excluidos' => $legajosExcluidos,
                 'sac_autocompletado' => $sacAutocompletado,
+                // Activos sin liquidación que quedaron afuera porque /config tiene apagada la pregunta
+                'activos_no_informados' => $activosNoInformados,
+                'conceptos_generados' => $conceptosGenerados,
             ]);
         } catch (\DomainException $e) {
             return response()->json([
@@ -500,7 +553,7 @@ class LsdController extends Controller
         } catch (\Throwable $e) {
             return response()->json([
                 'success' => false,
-                'message' => 'Error al crear la emisión: ' . $e->getMessage() . ' en línea ' . $e->getLine(),
+                'message' => 'Error al crear la emisión: '.$e->getMessage().' en línea '.$e->getLine(),
             ], 500);
         }
     }
@@ -517,20 +570,20 @@ class LsdController extends Controller
         }
 
         $delta = $real - $esperada;
-        $diff = $delta > 0 ? "sobran {$delta} caracteres" : 'faltan ' . abs($delta) . ' caracteres';
+        $diff = $delta > 0 ? "sobran {$delta} caracteres" : 'faltan '.abs($delta).' caracteres';
 
         $ctxStr = '';
-        if (!empty($contexto)) {
+        if (! empty($contexto)) {
             $pares = [];
             foreach ($contexto as $k => $v) {
                 $pares[] = "{$k}={$v}";
             }
-            $ctxStr = ' [' . implode(', ', $pares) . ']';
+            $ctxStr = ' ['.implode(', ', $pares).']';
         }
 
         throw new \DomainException(
-            "Registro {$registro} con longitud incorrecta{$ctxStr}: " .
-            "real {$real} chars, esperado {$esperada} ({$diff}). " .
+            "Registro {$registro} con longitud incorrecta{$ctxStr}: ".
+            "real {$real} chars, esperado {$esperada} ({$diff}). ".
             "Contenido: \"{$linea}\""
         );
     }
@@ -590,7 +643,7 @@ class LsdController extends Controller
         $modalidadesParciales = DB::table('sicoss08s')
             ->where('detalle', 'like', '%tiempo parcial%')
             ->pluck('codigo')
-            ->map(fn($c) => (int) $c)
+            ->map(fn ($c) => (int) $c)
             ->all();
 
         // Campos numéricos del Reg 04 con su ancho fijo: si el valor (como string) supera el ancho, desborda.
@@ -609,13 +662,13 @@ class LsdController extends Controller
 
         foreach ($empleados as $emp) {
             $base = [
-                'id'     => (int) $emp->id,
+                'id' => (int) $emp->id,
                 'legajo' => (string) ($emp->codigo ?? ''),
-                'cuil'   => (string) ($emp->cuil ?? ''),
+                'cuil' => (string) ($emp->cuil ?? ''),
                 // Empleado = apellido (detalle) + nombres.
-                'nombre' => trim(((string) ($emp->detalle ?? '')) . ' ' . ((string) ($emp->nombres ?? ''))),
-                'alta'   => $emp->alta,
-                'baja'   => $emp->baja,
+                'nombre' => trim(((string) ($emp->detalle ?? '')).' '.((string) ($emp->nombres ?? ''))),
+                'alta' => $emp->alta,
+                'baja' => $emp->baja,
             ];
 
             // Datos SICOSS sin cargar: el legajo entra en la liquidación pero no tiene los códigos SICOSS
@@ -639,12 +692,12 @@ class LsdController extends Controller
             if ($emp->sicoss_sini === null || $emp->sicoss_sini === '') {
                 $faltantesSicoss[] = 'Código de siniestrado';
             }
-            if (!empty($faltantesSicoss)) {
+            if (! empty($faltantesSicoss)) {
                 $inconsistencias[] = $base + [
-                    'campo'    => 'Datos SICOSS sin cargar',
-                    'valor'    => implode(', ', $faltantesSicoss),
+                    'campo' => 'Datos SICOSS sin cargar',
+                    'valor' => implode(', ', $faltantesSicoss),
                     'esperado' => 'datos SICOSS completos',
-                    'problema' => 'El legajo no tiene cargado(s): ' . implode(', ', $faltantesSicoss) . '. Completá la solapa SICOSS del legajo antes de generar el LSD.',
+                    'problema' => 'El legajo no tiene cargado(s): '.implode(', ', $faltantesSicoss).'. Completá la solapa SICOSS del legajo antes de generar el LSD.',
                 ];
             }
 
@@ -652,20 +705,20 @@ class LsdController extends Controller
             $cuilDigitos = preg_replace('/\D/', '', (string) ($emp->cuil ?? ''));
             if (strlen($cuilDigitos) !== 11) {
                 $inconsistencias[] = $base + [
-                    'campo'    => 'CUIL',
-                    'valor'    => (string) ($emp->cuil ?? ''),
+                    'campo' => 'CUIL',
+                    'valor' => (string) ($emp->cuil ?? ''),
                     'esperado' => '11 dígitos',
-                    'problema' => "El CUIL '" . ($emp->cuil ?? '') . "' no tiene 11 dígitos. Es obligatorio en el LSD.",
+                    'problema' => "El CUIL '".($emp->cuil ?? '')."' no tiene 11 dígitos. Es obligatorio en el LSD.",
                 ];
             }
 
             // Localidad: sicoss_zona guarda el codigo interno de sicoss_zonas; debe existir para poder
             // resolver su `numero` (código AFIP de 2 chars). Si no existe, no se puede emitir la localidad.
             $zona = $emp->sicoss_zona;
-            if ($zona !== null && $zona !== '' && (int) $zona !== 0 && !$zonasValidas->has($zona)) {
+            if ($zona !== null && $zona !== '' && (int) $zona !== 0 && ! $zonasValidas->has($zona)) {
                 $inconsistencias[] = $base + [
-                    'campo'    => 'Código Localidad',
-                    'valor'    => (string) $zona,
+                    'campo' => 'Código Localidad',
+                    'valor' => (string) $zona,
                     'esperado' => 'localidad existente en SICOSS',
                     'problema' => "La localidad/zona '{$zona}' del legajo no existe en la tabla SICOSS de zonas. Seleccioná una localidad válida.",
                 ];
@@ -676,15 +729,15 @@ class LsdController extends Controller
             $obra = trim((string) ($emp->obra_sijp ?? ''));
             if ($obra === '') {
                 $inconsistencias[] = $base + [
-                    'campo'    => 'Obra social',
-                    'valor'    => '(vacío)',
+                    'campo' => 'Obra social',
+                    'valor' => '(vacío)',
                     'esperado' => 'obra social cargada',
                     'problema' => 'El legajo no tiene cargada la obra social (obra_sijp). Asigná una obra social válida.',
                 ];
-            } elseif (strlen($obra) <= 6 && !$obrasValidas->has(str_pad($obra, 6, '0', STR_PAD_LEFT))) {
+            } elseif (strlen($obra) <= 6 && ! $obrasValidas->has(str_pad($obra, 6, '0', STR_PAD_LEFT))) {
                 $inconsistencias[] = $base + [
-                    'campo'    => 'Obra social',
-                    'valor'    => $obra,
+                    'campo' => 'Obra social',
+                    'valor' => $obra,
                     'esperado' => 'código existente en SICOSS',
                     'problema' => "La obra social '{$obra}' del legajo no existe en la tabla SICOSS de obras sociales. Seleccioná una válida.",
                 ];
@@ -694,23 +747,23 @@ class LsdController extends Controller
             // El prorrateo del importe a detraer y la base diferencial de aportes OS del Reg 04 se disparan
             // por la jornada (sue010s.parcial). Si la modalidad declara tiempo parcial pero la jornada no
             // (o viceversa), ARCA rechazaría o los aportes de OS no cuadrarían.
-            $modalPresente  = !($emp->sicoss_modal === null || $emp->sicoss_modal === '' || (int) $emp->sicoss_modal === 0);
-            $modalParcial   = $modalPresente && in_array((int) $emp->sicoss_modal, $modalidadesParciales, true);
-            $jornadaRow     = $jornadasPorId[$emp->jornada_id] ?? null;
+            $modalPresente = ! ($emp->sicoss_modal === null || $emp->sicoss_modal === '' || (int) $emp->sicoss_modal === 0);
+            $modalParcial = $modalPresente && in_array((int) $emp->sicoss_modal, $modalidadesParciales, true);
+            $jornadaRow = $jornadasPorId[$emp->jornada_id] ?? null;
             $jornadaParcial = $jornadaRow && (int) ($jornadaRow->parcial ?? 0) === 1;
-            $jornadaNombre  = $jornadaRow ? (string) $jornadaRow->detalle : '(sin jornada asignada)';
+            $jornadaNombre = $jornadaRow ? (string) $jornadaRow->detalle : '(sin jornada asignada)';
 
-            if ($modalParcial && !$jornadaParcial) {
+            if ($modalParcial && ! $jornadaParcial) {
                 $inconsistencias[] = $base + [
-                    'campo'    => 'Jornada vs. modalidad',
-                    'valor'    => "Modalidad tiempo parcial (cód. {$emp->sicoss_modal}) · Jornada: {$jornadaNombre}",
+                    'campo' => 'Jornada vs. modalidad',
+                    'valor' => "Modalidad tiempo parcial (cód. {$emp->sicoss_modal}) · Jornada: {$jornadaNombre}",
                     'esperado' => 'jornada de tiempo parcial',
                     'problema' => "La modalidad de contratación es a tiempo parcial (cód. {$emp->sicoss_modal}) pero la jornada asignada ('{$jornadaNombre}') no es de tiempo parcial. Asigná una jornada de tiempo parcial al legajo para que el LSD prorratee el importe a detraer y complete la base diferencial de aportes de obra social.",
                 ];
-            } elseif ($modalPresente && !$modalParcial && $jornadaParcial) {
+            } elseif ($modalPresente && ! $modalParcial && $jornadaParcial) {
                 $inconsistencias[] = $base + [
-                    'campo'    => 'Jornada vs. modalidad',
-                    'valor'    => "Jornada parcial ('{$jornadaNombre}') · Modalidad: cód. {$emp->sicoss_modal}",
+                    'campo' => 'Jornada vs. modalidad',
+                    'valor' => "Jornada parcial ('{$jornadaNombre}') · Modalidad: cód. {$emp->sicoss_modal}",
                     'esperado' => 'modalidad de contratación a tiempo parcial',
                     'problema' => "La jornada asignada ('{$jornadaNombre}') es de tiempo parcial pero la modalidad de contratación (cód. {$emp->sicoss_modal}) no es a tiempo parcial. Hacé coincidir la modalidad con la jornada para que el importe a detraer y los aportes de obra social del LSD se calculen correctamente.",
                 ];
@@ -726,8 +779,8 @@ class LsdController extends Controller
                 if (strlen($valorStr) > $c['ancho']) {
                     $unidad = $c['col'] === 'obra_sijp' ? 'caracteres' : 'dígitos';
                     $inconsistencias[] = $base + [
-                        'campo'    => $c['campo'],
-                        'valor'    => $valorStr,
+                        'campo' => $c['campo'],
+                        'valor' => $valorStr,
                         'esperado' => "máx. {$c['ancho']} {$unidad}",
                         'problema' => "El valor '{$valorStr}' del campo {$c['campo']} supera el ancho de {$c['ancho']} del Registro 04. Revisá el dato SICOSS del legajo.",
                     ];
@@ -749,14 +802,14 @@ class LsdController extends Controller
             if ($legajos->count() > 1) {
                 $primero = $grupo->first();
                 $inconsistencias[] = [
-                    'id'       => (int) $primero->id,
-                    'legajo'   => $legajos->implode(', '),
-                    'cuil'     => $cuilStr,
-                    'nombre'   => trim(((string) ($primero->detalle ?? '')) . ' ' . ((string) ($primero->nombres ?? ''))),
-                    'alta'     => $primero->alta,
-                    'baja'     => $primero->baja,
-                    'campo'    => 'CUIL duplicado en la empresa',
-                    'valor'    => 'legajos ' . $legajos->implode(', '),
+                    'id' => (int) $primero->id,
+                    'legajo' => $legajos->implode(', '),
+                    'cuil' => $cuilStr,
+                    'nombre' => trim(((string) ($primero->detalle ?? '')).' '.((string) ($primero->nombres ?? ''))),
+                    'alta' => $primero->alta,
+                    'baja' => $primero->baja,
+                    'campo' => 'CUIL duplicado en la empresa',
+                    'valor' => 'legajos '.$legajos->implode(', '),
                     'esperado' => 'CUIL único por empresa',
                     'problema' => "El CUIL {$cuilStr} aparece en {$legajos->count()} legajos de la misma empresa ({$legajos->implode(', ')}). El pluriempleo se admite solo entre empresas distintas del grupo: dejá un único legajo por CUIL en esta empresa (dá de baja o reasigná el otro).",
                 ];
@@ -764,7 +817,7 @@ class LsdController extends Controller
         }
 
         // Ordenar por legajo (numérico-aware) para una lectura cómoda en el modal.
-        usort($inconsistencias, fn($a, $b) => strnatcmp($a['legajo'], $b['legajo']));
+        usort($inconsistencias, fn ($a, $b) => strnatcmp($a['legajo'], $b['legajo']));
 
         return $inconsistencias;
     }
@@ -798,6 +851,7 @@ class LsdController extends Controller
                     return strtoupper(trim((string) $r->tiporem));
                 }
             }
+
             return null;
         };
 
@@ -832,10 +886,10 @@ class LsdController extends Controller
         foreach ($rows as $row) {
             $leg = (string) $row->legajo;
             $tipoliqRow = (int) ($row->tipoliq ?? 0);
-            $clave = $leg . '|' . $tipoliqRow;
-            if (!isset($porGrupo[$clave])) {
+            $clave = $leg.'|'.$tipoliqRow;
+            if (! isset($porGrupo[$clave])) {
                 // Empleado = apellido (detalle) + nombres.
-                $nombreCompleto = trim(((string) ($row->apellido ?? '')) . ' ' . ((string) ($row->nombres ?? '')));
+                $nombreCompleto = trim(((string) ($row->apellido ?? '')).' '.((string) ($row->nombres ?? '')));
                 $porGrupo[$clave] = ['legajo' => $leg, 'tipoliq' => $tipoliqRow, 'legajo_id' => $row->legajo_id, 'cuil' => $row->cuil, 'nombre' => $nombreCompleto, 'jornada_id' => $row->jornada_id, 'bruto' => 0.0, 'brutoSac' => 0.0, 'aportes' => []];
             }
             $arca = (string) ($row->concepto_arca ?? '');
@@ -888,30 +942,30 @@ class LsdController extends Controller
                 $diferencia = round($esperado - $informado, 2);
                 if (abs($diferencia) > 0.01) {
                     $diferencias[] = [
-                        'legajo'     => $leg,
-                        'legajo_id'  => $data['legajo_id'] !== null ? (int) $data['legajo_id'] : null,
-                        'cuil'       => (string) $data['cuil'],
-                        'nombre'     => (string) $data['nombre'],
-                        'tipoliq'    => (int) $data['tipoliq'],
-                        'tipo_liq'   => $nombresTipoLiq[(int) $data['tipoliq']] ?? ('Tipo ' . $data['tipoliq']),
+                        'legajo' => $leg,
+                        'legajo_id' => $data['legajo_id'] !== null ? (int) $data['legajo_id'] : null,
+                        'cuil' => (string) $data['cuil'],
+                        'nombre' => (string) $data['nombre'],
+                        'tipoliq' => (int) $data['tipoliq'],
+                        'tipo_liq' => $nombresTipoLiq[(int) $data['tipoliq']] ?? ('Tipo '.$data['tipoliq']),
                         // Aporte descontado en una liquidación SIN haberes (bruto $0): dato de origen
                         // sospechoso (¿haberes cargados en otro tipoliq?). Se resalta para revisar antes
                         // de ajustar (el ajuste lo llevaría a $0).
                         'sin_haberes' => $bruto <= 0,
-                        'aporte'     => $ap['nombre'],
-                        'arca'       => $ap['arca'],
-                        'alicuota'   => $ap['alicuota'],
-                        'bruto'      => round($bruto, 2),
-                        'base'       => round($base, 2),
-                        'esperado'   => $esperado,
-                        'informado'  => round($informado, 2),
+                        'aporte' => $ap['nombre'],
+                        'arca' => $ap['arca'],
+                        'alicuota' => $ap['alicuota'],
+                        'bruto' => round($bruto, 2),
+                        'base' => round($base, 2),
+                        'esperado' => $esperado,
+                        'informado' => round($informado, 2),
                         'diferencia' => $diferencia,
                     ];
                 }
             }
         }
 
-        usort($diferencias, fn($a, $b) => strnatcmp($a['legajo'], $b['legajo']) ?: strcmp($a['aporte'], $b['aporte']) ?: ($a['tipoliq'] <=> $b['tipoliq']));
+        usort($diferencias, fn ($a, $b) => strnatcmp($a['legajo'], $b['legajo']) ?: strcmp($a['aporte'], $b['aporte']) ?: ($a['tipoliq'] <=> $b['tipoliq']));
 
         return $diferencias;
     }
@@ -954,15 +1008,15 @@ class LsdController extends Controller
         ]);
 
         return $rows->map(fn ($r) => [
-            'legajo'      => (string) $r->legajo,
-            'legajo_id'   => $r->legajo_id !== null ? (int) $r->legajo_id : null,
-            'cuil'        => (string) $r->cuil,
-            'nombre'      => trim(((string) ($r->apellido ?? '')) . ' ' . ((string) ($r->nombres ?? ''))),
-            'tipoliq'     => $r->tipoliq !== null ? (int) $r->tipoliq : null,
-            'concepto'    => (string) $r->concepto,
+            'legajo' => (string) $r->legajo,
+            'legajo_id' => $r->legajo_id !== null ? (int) $r->legajo_id : null,
+            'cuil' => (string) $r->cuil,
+            'nombre' => trim(((string) ($r->apellido ?? '')).' '.((string) ($r->nombres ?? ''))),
+            'tipoliq' => $r->tipoliq !== null ? (int) $r->tipoliq : null,
+            'concepto' => (string) $r->concepto,
             'descripcion' => (string) ($r->descripcion ?? ''),
             'concepto_arca' => (string) ($r->concepto_arca ?? ''),
-            'importe'     => round((float) $r->importe, 2),
+            'importe' => round((float) $r->importe, 2),
         ])->values()->all();
     }
 
@@ -987,7 +1041,7 @@ class LsdController extends Controller
 
         $query = DB::table('sue001s')
             ->whereNull('baja')
-            ->when(!empty($conLiquidacion), fn ($q) => $q->whereNotIn('codigo', $conLiquidacion));
+            ->when(! empty($conLiquidacion), fn ($q) => $q->whereNotIn('codigo', $conLiquidacion));
         if ($codEmpresa !== null && $codEmpresa !== '') {
             $query->where('grupo_emp', $codEmpresa);
         }
@@ -996,11 +1050,11 @@ class LsdController extends Controller
             ->get(['id', 'codigo', 'cuil', 'detalle', 'nombres', 'alta']);
 
         return $rows->map(fn ($r) => [
-            'legajo'    => (string) $r->codigo,
+            'legajo' => (string) $r->codigo,
             'legajo_id' => $r->id !== null ? (int) $r->id : null,
-            'cuil'      => (string) ($r->cuil ?? ''),
-            'nombre'    => trim(((string) ($r->detalle ?? '')) . ' ' . ((string) ($r->nombres ?? ''))),
-            'alta'      => $r->alta,
+            'cuil' => (string) ($r->cuil ?? ''),
+            'nombre' => trim(((string) ($r->detalle ?? '')).' '.((string) ($r->nombres ?? ''))),
+            'alta' => $r->alta,
         ])->values()->all();
     }
 
@@ -1021,7 +1075,7 @@ class LsdController extends Controller
 
         $empresa = Sue086::find($request->id_empresa);
         $periodo = Sue100::where('periodo', $request->periodo_id)->first();
-        if (!$empresa || !$periodo) {
+        if (! $empresa || ! $periodo) {
             return response()->json(['success' => false, 'message' => 'Empresa o período no encontrados'], 404);
         }
         $periodoStr = $periodo->periodo;
@@ -1066,18 +1120,18 @@ class LsdController extends Controller
 
                 // Asentar la corrección en el histórico (antes/después a nivel del aporte).
                 LiquidacionCorreccion::registrar([
-                    'periodo'          => $periodoStr,
+                    'periodo' => $periodoStr,
                     // Con "Todas" se asienta el tipoliq real de la fila ajustada.
-                    'tipoliq'          => $primeraFila->tipoliq ?? null,
-                    'legajo'           => (string) $dif['legajo'],
-                    'cuil'             => $dif['cuil'] ?? null,
-                    'concepto'         => $primeraFila->concepto ?? null,
-                    'concepto_arca'    => $dif['arca'] ?? null,
-                    'sue090_id'        => $primeraFila->id ?? null,
+                    'tipoliq' => $primeraFila->tipoliq ?? null,
+                    'legajo' => (string) $dif['legajo'],
+                    'cuil' => $dif['cuil'] ?? null,
+                    'concepto' => $primeraFila->concepto ?? null,
+                    'concepto_arca' => $dif['arca'] ?? null,
+                    'sue090_id' => $primeraFila->id ?? null,
                     'importe_anterior' => $dif['informado'],
-                    'importe_nuevo'    => $dif['esperado'],
-                    'motivo'           => "Ajuste de aporte {$dif['aporte']}: " . number_format($dif['informado'], 2, ',', '.') . ' → ' . number_format($dif['esperado'], 2, ',', '.') . ' (base ' . number_format($dif['base'], 2, ',', '.') . ' × ' . rtrim(rtrim(number_format($dif['alicuota'] * 100, 2), '0'), ',') . '%, tope SIPA)',
-                    'origen'           => 'ajuste_aportes_lsd',
+                    'importe_nuevo' => $dif['esperado'],
+                    'motivo' => "Ajuste de aporte {$dif['aporte']}: ".number_format($dif['informado'], 2, ',', '.').' → '.number_format($dif['esperado'], 2, ',', '.').' (base '.number_format($dif['base'], 2, ',', '.').' × '.rtrim(rtrim(number_format($dif['alicuota'] * 100, 2), '0'), ',').'%, tope SIPA)',
+                    'origen' => 'ajuste_aportes_lsd',
                 ]);
 
                 $ajustados++;
@@ -1172,7 +1226,7 @@ class LsdController extends Controller
         }
 
         // Legajos excluidos manualmente ("Ignorar y continuar" en el modal de inconsistencias SICOSS).
-        if (!empty($legajosExcluidos)) {
+        if (! empty($legajosExcluidos)) {
             $query->whereNotIn('sue001s.codigo', $legajosExcluidos);
         }
 
@@ -1204,7 +1258,7 @@ class LsdController extends Controller
         // Activos sin liquidación seleccionados por el usuario para incluirse con TODOS los valores en 0.
         // Se inyecta una fila sintética por legajo (marcada es_cero) para que reutilice el armado de
         // Reg 02 y Reg 04 (importe 0 → todas las bases en 0). Se saltean en Reg 03/05 y en lsd_items.
-        if (!empty($legajosCeroIncluir)) {
+        if (! empty($legajosCeroIncluir)) {
             $cerosQuery = DB::table('sue001s')
                 ->leftJoin('sue007s', 'sue001s.convenio', '=', 'sue007s.codigo')
                 ->whereIn('sue001s.codigo', $legajosCeroIncluir)
@@ -1280,7 +1334,7 @@ class LsdController extends Controller
         $periodoAnio = (int) ($periodoPartes[0] ?? date('Y'));
         $periodoMes = (int) ($periodoPartes[1] ?? date('m'));
         $ultimoDiaMes = (int) date('t', mktime(0, 0, 0, $periodoMes, 1, $periodoAnio));
-        $periodoStr6 = str_pad($periodoAnio, 4, '0', STR_PAD_LEFT) . str_pad($periodoMes, 2, '0', STR_PAD_LEFT); // YYYYMM para sue028s
+        $periodoStr6 = str_pad($periodoAnio, 4, '0', STR_PAD_LEFT).str_pad($periodoMes, 2, '0', STR_PAD_LEFT); // YYYYMM para sue028s
 
         // Cargar días de vacaciones de sue028s agrupados por legajo para el período
         $vacacionesPorLegajo = DB::table('sue028s')
@@ -1291,7 +1345,7 @@ class LsdController extends Controller
             ->get()
             ->keyBy('legajo');
 
-        $diasDePeriodo = '30'; // Si “identificación del envío” es igual a “RE”, dejar en blanco 
+        $diasDePeriodo = '30'; // Si “identificación del envío” es igual a “RE”, dejar en blanco
         $cantidadEmpleados = $datos->unique('cuil')->count(); // Debe coincidir con la cantidad de registros tipo '04' informados en el archivo. Coincide con la cantidad de empleados del F931
         $montoTotal = $datos->sum('importe'); // Asumiendo que hay
 
@@ -1301,11 +1355,11 @@ class LsdController extends Controller
             $diasDePeriodo = '  ';
         }
 
-        //---------------------------------------
+        // ---------------------------------------
         // Generar Registro de Encabezado (Tipo 01)
-        //---------------------------------------
-        $line01 = '01' . $cuit . $identificadorEnvio . $periodoStr . $tipoLiquidacion2 . $nroLiquidacion .
-            $diasDePeriodo . str_pad($cantidadEmpleados, 6, '0', STR_PAD_LEFT);
+        // ---------------------------------------
+        $line01 = '01'.$cuit.$identificadorEnvio.$periodoStr.$tipoLiquidacion2.$nroLiquidacion.
+            $diasDePeriodo.str_pad($cantidadEmpleados, 6, '0', STR_PAD_LEFT);
 
         $this->validarLongitud($line01, 35, '01', [
             'CUIT' => $cuit,
@@ -1313,7 +1367,7 @@ class LsdController extends Controller
             'empleados' => $cantidadEmpleados,
         ]);
 
-        $contenido = $line01 . "\r\n";
+        $contenido = $line01."\r\n";
 
         // Mapeo de sue001s.formap → forma de pago ARCA (Reg 02 pos 115):
         //   'E' efectivo          → '1' efectivo (ARCA)
@@ -1331,178 +1385,179 @@ class LsdController extends Controller
 
         // En modo 'RE' (rectificativa) ARCA exige que el TXT NO lleve Reg 02 ni Reg 03 ni Reg 05.
         // Solo Reg 01 y Reg 04. Por eso saltamos esos bloques.
-        if (!$esRectificativa) {
+        if (! $esRectificativa) {
 
-        //---------------------------------------
-        // Generar Registro del Cuerpo (Tipo 02)
-        //---------------------------------------
-        // $diasTope se calcula por legajo dentro del loop (ver abajo)
-        // Cant. de días para proporcionar el tope: se usa cuando el período no es completo
-        // (inicio/fin de relación laboral o vacaciones). 0 = período completo sin proporción.
+            // ---------------------------------------
+            // Generar Registro del Cuerpo (Tipo 02)
+            // ---------------------------------------
+            // $diasTope se calcula por legajo dentro del loop (ver abajo)
+            // Cant. de días para proporcionar el tope: se usa cuando el período no es completo
+            // (inicio/fin de relación laboral o vacaciones). 0 = período completo sin proporción.
 
-        //$fechaPago = $fechaPago ?? '20260101'; // Fecha de pago en formato YYYYMMDD
-        $fechaRubrica = '        ';  // No se completa por el momento
+            // $fechaPago = $fechaPago ?? '20260101'; // Fecha de pago en formato YYYYMMDD
+            $fechaRubrica = '        ';  // No se completa por el momento
 
-        // Datos (ajusta los campos según tu tabla sue090s)
-        // Agrupar por cuil y tomar solo un registro por cuil para este bloque
-        $datosPorCuil = $datos->unique('cuil');
+            // Datos (ajusta los campos según tu tabla sue090s)
+            // Agrupar por cuil y tomar solo un registro por cuil para este bloque
+            $datosPorCuil = $datos->unique('cuil');
 
-        foreach ($datosPorCuil as $registro) {
-            // -----------------------------------------------------------
-            // Calcular $diasTope por legajo
-            // Control 1: alta o baja dentro del período → días proporcionales
-            // Control 2: vacaciones en sue028s → restar días de vacaciones
-            // -----------------------------------------------------------
-            $legajoId = $registro->legajo_codigo ?? $registro->legajo ?? null;
-            $workDays = $ultimoDiaMes; // Comenzar con todos los días del mes
+            foreach ($datosPorCuil as $registro) {
+                // -----------------------------------------------------------
+                // Calcular $diasTope por legajo
+                // Control 1: alta o baja dentro del período → días proporcionales
+                // Control 2: vacaciones en sue028s → restar días de vacaciones
+                // -----------------------------------------------------------
+                $legajoId = $registro->legajo_codigo ?? $registro->legajo ?? null;
+                $workDays = $ultimoDiaMes; // Comenzar con todos los días del mes
 
-            // Control 1a: Alta dentro del período
-            if (!empty($registro->alta)) {
-                $altaTs = strtotime($registro->alta);
-                $altaAnio = (int) date('Y', $altaTs);
-                $altaMes = (int) date('n', $altaTs);
-                if ($altaAnio === $periodoAnio && $altaMes === $periodoMes) {
-                    $diaAlta = (int) date('j', $altaTs);
-                    $workDays = $ultimoDiaMes - $diaAlta + 1;
+                // Control 1a: Alta dentro del período
+                if (! empty($registro->alta)) {
+                    $altaTs = strtotime($registro->alta);
+                    $altaAnio = (int) date('Y', $altaTs);
+                    $altaMes = (int) date('n', $altaTs);
+                    if ($altaAnio === $periodoAnio && $altaMes === $periodoMes) {
+                        $diaAlta = (int) date('j', $altaTs);
+                        $workDays = $ultimoDiaMes - $diaAlta + 1;
+                    }
                 }
-            }
 
-            // Control 1b: Baja dentro del período
-            if (!empty($registro->baja)) {
-                $bajaTs = strtotime($registro->baja);
-                $bajaAnio = (int) date('Y', $bajaTs);
-                $bajaMes = (int) date('n', $bajaTs);
-                if ($bajaAnio === $periodoAnio && $bajaMes === $periodoMes) {
-                    $diaBaja = (int) date('j', $bajaTs);
-                    $diasBaja = ($workDays < $ultimoDiaMes) // ya había prorate por alta
-                        ? min($workDays, $diaBaja - (int) date('j', strtotime($registro->alta)) + 1)
-                        : $diaBaja;
-                    $workDays = $diasBaja;
+                // Control 1b: Baja dentro del período
+                if (! empty($registro->baja)) {
+                    $bajaTs = strtotime($registro->baja);
+                    $bajaAnio = (int) date('Y', $bajaTs);
+                    $bajaMes = (int) date('n', $bajaTs);
+                    if ($bajaAnio === $periodoAnio && $bajaMes === $periodoMes) {
+                        $diaBaja = (int) date('j', $bajaTs);
+                        $diasBaja = ($workDays < $ultimoDiaMes) // ya había prorate por alta
+                            ? min($workDays, $diaBaja - (int) date('j', strtotime($registro->alta)) + 1)
+                            : $diaBaja;
+                        $workDays = $diasBaja;
+                    }
                 }
-            }
 
-            // Control 2: Vacaciones en sue028s para el período
-            if (isset($vacacionesPorLegajo[$legajoId])) {
-                $diasVac = (int) $vacacionesPorLegajo[$legajoId]->total_vac;
-                $workDays = max(0, $workDays - $diasVac);
-            }
-
-            // Si $workDays == $ultimoDiaMes no hubo proporción → informar 0
-            $diasTope = ($workDays < $ultimoDiaMes)
-                ? str_pad((string) $workDays, 3, '0', STR_PAD_LEFT)
-                : '000';
-
-            $legajoValue = str_pad($registro->legajo_codigo ?? $registro->legajo ?? '', 10, ' ', STR_PAD_RIGHT);
-            $cuilValue = $registro->cuil ?? '';
-            $dependencia = str_pad($registro->dependenciaRevista ?? '', 50, ' ', STR_PAD_LEFT);
-            $formaPago = $mapearFormaPago($registro->formap ?? null);
-            // CBU: 22 posiciones numéricas. Se exige solo cuando la forma de pago
-            // ARCA es '3' (acreditación en cuenta); para efectivo ('1') va en blanco.
-            $cbuDigitos = preg_replace('/\D/', '', (string) ($registro->cbu ?? ''));
-            $cbu = ($formaPago === '3' && $cbuDigitos !== '')
-                ? str_pad(substr($cbuDigitos, 0, 22), 22, '0', STR_PAD_LEFT)
-                : str_repeat(' ', 22);
-
-            $line02 = '02'
-                . $cuilValue
-                . $legajoValue
-                . $dependencia
-                . $cbu
-                . $diasTope
-                . $fechaPago
-                . $fechaRubrica
-                . $formaPago;
-
-            $this->validarLongitud($line02, 115, '02', [
-                'CUIL' => $cuilValue,
-                'legajo' => trim($legajoValue),
-            ]);
-
-            $contenido .= $line02 . "\r\n";
-        }
-
-        //---------------------------------------
-        // Generar Registro Tipo 03 - Detalle de los conceptos liquidados a cada trabajador
-        //---------------------------------------
-        // Cargar rangos sue089s antes del Reg 03 para que tanto D/C del Reg 03
-        // como la remuneración bruta del Reg 04 usen la MISMA fuente de verdad.
-        $rangosSue089 = DB::table('sue089s')->get();
-
-        // Helper: dado un código de concepto, devuelve el tiporem según sue089s ('H', 'NR', 'D' o null).
-        $tiporemPorCodigo = function ($codigo) use ($rangosSue089): ?string {
-            foreach ($rangosSue089 as $rango) {
-                if ($codigo >= $rango->desde && $codigo <= $rango->hasta) {
-                    return strtoupper(trim($rango->tiporem ?? ''));
+                // Control 2: Vacaciones en sue028s para el período
+                if (isset($vacacionesPorLegajo[$legajoId])) {
+                    $diasVac = (int) $vacacionesPorLegajo[$legajoId]->total_vac;
+                    $workDays = max(0, $workDays - $diasVac);
                 }
-            }
-            return null;
-        };
 
-        foreach ($datos as $registro) {
-            // Empleados "activos sin liquidación" incluidos con valores en 0: no generan Reg 03
-            // (no tienen conceptos); solo aparecen en Reg 02 y Reg 04 con bases en cero.
-            if (!empty($registro->es_cero)) {
-                continue;
-            }
-            $legajoValue = str_pad($registro->legajo_codigo ?? $registro->legajo ?? '', 10, ' ', STR_PAD_RIGHT);
-            $cuilValue = $registro->cuil ?? '';
-            $concepto = str_pad($registro->concepto ?? '', 10, ' ', STR_PAD_RIGHT);
-            //$cantidad = str_pad(number_format($registro->cantidad ?? 0, 2, '.', ''), 6, ' ', STR_PAD_LEFT);
-            $cantidadRaw = $registro->cantidad;
-            $cantidadNum = ($cantidadRaw === null || $cantidadRaw === '') ? 0.0 : (float) $cantidadRaw;
-            // SAC (concepto ARCA 12xxxx): ARCA lo EXCLUYE de las bases topeadas (BI 1/4/5) cuando va
-            // sin días → "BI informada difiere de la determinada". Si el origen no informó días,
-            // mandamos 30 (mes completo) para que el tope de SAC no lo cape y ARCA lo cuente en 1/4/5.
-            // El importe no cambia; solo se completa la cantidad. Conceptos con días ya cargados no se tocan.
-            $esConceptoSac = str_starts_with((string) ($registro->concepto_arca ?? ''), '12');
-            if ($esConceptoSac && $cantidadNum <= 0) {
-                $cantidadNum = 30.0;
-            }
-            $cantidadInt = (int) round($cantidadNum * 100);
-            $cantidad = $cantidadInt > 99999 ? '99999' : str_pad((string) $cantidadInt, 5, '0', STR_PAD_LEFT);
-            $unidades = substr(str_pad($registro->unidades ?? ' ', 1, ' ', STR_PAD_LEFT), 0, 1);
-            $importe = str_pad((string) (int) round(abs($registro->importe ?? 0) * 100), 15, '0', STR_PAD_LEFT);
+                // Si $workDays == $ultimoDiaMes no hubo proporción → informar 0
+                $diasTope = ($workDays < $ultimoDiaMes)
+                    ? str_pad((string) $workDays, 3, '0', STR_PAD_LEFT)
+                    : '000';
 
-            // D/C según sue089s:
-            //   H o NR con importe >= 0 → C (Crédito, suma al bruto)
-            //   H o NR con importe < 0  → D (Débito, resta al bruto)
-            //   D (descuento)            → D
-            //   sin rango               → D (default seguro)
-            $rangoConcepto = $tiporemPorCodigo($registro->concepto);
-            if (in_array($rangoConcepto, ['H', 'NR'], true) && ($registro->importe ?? 0) >= 0) {
-                $debitoCredito = 'C';
-            } else {
-                $debitoCredito = 'D';
+                $legajoValue = str_pad($registro->legajo_codigo ?? $registro->legajo ?? '', 10, ' ', STR_PAD_RIGHT);
+                $cuilValue = $registro->cuil ?? '';
+                $dependencia = str_pad($registro->dependenciaRevista ?? '', 50, ' ', STR_PAD_LEFT);
+                $formaPago = $mapearFormaPago($registro->formap ?? null);
+                // CBU: 22 posiciones numéricas. Se exige solo cuando la forma de pago
+                // ARCA es '3' (acreditación en cuenta); para efectivo ('1') va en blanco.
+                $cbuDigitos = preg_replace('/\D/', '', (string) ($registro->cbu ?? ''));
+                $cbu = ($formaPago === '3' && $cbuDigitos !== '')
+                    ? str_pad(substr($cbuDigitos, 0, 22), 22, '0', STR_PAD_LEFT)
+                    : str_repeat(' ', 22);
+
+                $line02 = '02'
+                    .$cuilValue
+                    .$legajoValue
+                    .$dependencia
+                    .$cbu
+                    .$diasTope
+                    .$fechaPago
+                    .$fechaRubrica
+                    .$formaPago;
+
+                $this->validarLongitud($line02, 115, '02', [
+                    'CUIL' => $cuilValue,
+                    'legajo' => trim($legajoValue),
+                ]);
+
+                $contenido .= $line02."\r\n";
             }
 
-            $periodoAjuste = '      ';
+            // ---------------------------------------
+            // Generar Registro Tipo 03 - Detalle de los conceptos liquidados a cada trabajador
+            // ---------------------------------------
+            // Cargar rangos sue089s antes del Reg 03 para que tanto D/C del Reg 03
+            // como la remuneración bruta del Reg 04 usen la MISMA fuente de verdad.
+            $rangosSue089 = DB::table('sue089s')->get();
 
-            $line03 = '03'
-                . $cuilValue
-                . $concepto
-                . $cantidad
-                . $unidades
-                . $importe
-                . $debitoCredito
-                . $periodoAjuste;
+            // Helper: dado un código de concepto, devuelve el tiporem según sue089s ('H', 'NR', 'D' o null).
+            $tiporemPorCodigo = function ($codigo) use ($rangosSue089): ?string {
+                foreach ($rangosSue089 as $rango) {
+                    if ($codigo >= $rango->desde && $codigo <= $rango->hasta) {
+                        return strtoupper(trim($rango->tiporem ?? ''));
+                    }
+                }
 
-            $this->validarLongitud($line03, 51, '03', [
-                'CUIL' => $cuilValue,
-                'legajo' => trim($legajoValue),
-                'concepto' => trim($concepto),
-                'importe' => $registro->importe ?? 0,
-            ]);
+                return null;
+            };
 
-            $contenido .= $line03 . "\r\n";
-        }
+            foreach ($datos as $registro) {
+                // Empleados "activos sin liquidación" incluidos con valores en 0: no generan Reg 03
+                // (no tienen conceptos); solo aparecen en Reg 02 y Reg 04 con bases en cero.
+                if (! empty($registro->es_cero)) {
+                    continue;
+                }
+                $legajoValue = str_pad($registro->legajo_codigo ?? $registro->legajo ?? '', 10, ' ', STR_PAD_RIGHT);
+                $cuilValue = $registro->cuil ?? '';
+                $concepto = str_pad($registro->concepto ?? '', 10, ' ', STR_PAD_RIGHT);
+                // $cantidad = str_pad(number_format($registro->cantidad ?? 0, 2, '.', ''), 6, ' ', STR_PAD_LEFT);
+                $cantidadRaw = $registro->cantidad;
+                $cantidadNum = ($cantidadRaw === null || $cantidadRaw === '') ? 0.0 : (float) $cantidadRaw;
+                // SAC (concepto ARCA 12xxxx): ARCA lo EXCLUYE de las bases topeadas (BI 1/4/5) cuando va
+                // sin días → "BI informada difiere de la determinada". Si el origen no informó días,
+                // mandamos 30 (mes completo) para que el tope de SAC no lo cape y ARCA lo cuente en 1/4/5.
+                // El importe no cambia; solo se completa la cantidad. Conceptos con días ya cargados no se tocan.
+                $esConceptoSac = str_starts_with((string) ($registro->concepto_arca ?? ''), '12');
+                if ($esConceptoSac && $cantidadNum <= 0) {
+                    $cantidadNum = 30.0;
+                }
+                $cantidadInt = (int) round($cantidadNum * 100);
+                $cantidad = $cantidadInt > 99999 ? '99999' : str_pad((string) $cantidadInt, 5, '0', STR_PAD_LEFT);
+                $unidades = substr(str_pad($registro->unidades ?? ' ', 1, ' ', STR_PAD_LEFT), 0, 1);
+                $importe = str_pad((string) (int) round(abs($registro->importe ?? 0) * 100), 15, '0', STR_PAD_LEFT);
+
+                // D/C según sue089s:
+                //   H o NR con importe >= 0 → C (Crédito, suma al bruto)
+                //   H o NR con importe < 0  → D (Débito, resta al bruto)
+                //   D (descuento)            → D
+                //   sin rango               → D (default seguro)
+                $rangoConcepto = $tiporemPorCodigo($registro->concepto);
+                if (in_array($rangoConcepto, ['H', 'NR'], true) && ($registro->importe ?? 0) >= 0) {
+                    $debitoCredito = 'C';
+                } else {
+                    $debitoCredito = 'D';
+                }
+
+                $periodoAjuste = '      ';
+
+                $line03 = '03'
+                    .$cuilValue
+                    .$concepto
+                    .$cantidad
+                    .$unidades
+                    .$importe
+                    .$debitoCredito
+                    .$periodoAjuste;
+
+                $this->validarLongitud($line03, 51, '03', [
+                    'CUIL' => $cuilValue,
+                    'legajo' => trim($legajoValue),
+                    'concepto' => trim($concepto),
+                    'importe' => $registro->importe ?? 0,
+                ]);
+
+                $contenido .= $line03."\r\n";
+            }
 
         } // fin if (!$esRectificativa) — cierre del bloque que envuelve Reg 02 y Reg 03
 
-        //---------------------------------------
+        // ---------------------------------------
         // Generar Registro Tipo 04 - Atributos de la relación laboral - DJ - Una fila por cada empleado
         // Se agrupa por CUIL y se calcula remuneracionBruta sumando importes H y NR según rangos de sue089s
         // (los $rangosSue089 ya están cargados antes del Reg 03 — reutilizamos la misma fuente).
-        //---------------------------------------
+        // ---------------------------------------
 
         // Mapa codigo (id interno de sicoss_zonas, lo que guarda sue001s.sicoss_zona) → numero (código AFIP real, 2 chars).
         // El campo "Código Localidad" del Reg 04/05 debe llevar el `numero` (ej. codigo 155 = Salta → '62'),
@@ -1518,6 +1573,7 @@ class LsdController extends Controller
             ->pluck('contribuciones_lrt', 'codigo_contribuyente');
         $esConceptoLrt = function ($concepto) use ($lrtPorConcepto): bool {
             $flag = $lrtPorConcepto[$concepto] ?? null;
+
             return $flag !== null && (float) $flag > 0;
         };
 
@@ -1538,6 +1594,7 @@ class LsdController extends Controller
                         break;
                     }
                 }
+
                 return $carry;
             }, 0.0);
 
@@ -1551,6 +1608,7 @@ class LsdController extends Controller
                         break;
                     }
                 }
+
                 return $carry;
             }, 0.0);
 
@@ -1586,6 +1644,7 @@ class LsdController extends Controller
                         break;
                     }
                 }
+
                 return $carry;
             }, 0.0);
             $baseImponible9Calculada = max(0.0, $baseImponible9Calculada);
@@ -1598,7 +1657,7 @@ class LsdController extends Controller
             $scvo = str_pad((string) ($registro->sicoss_cob_scvo ?? 0), 1, '0', STR_PAD_LEFT);
             $reduccion = str_pad((string) ($registro->sicoss_reduccion ?? 0), 1, '0', STR_PAD_LEFT);
             $tipoempresa = $tipoEmpleadorLsd;
-            $tipoOperacion = "0";
+            $tipoOperacion = '0';
             $situacion = str_pad((string) ($registro->sicoss_situa ?? 0), 2, '0', STR_PAD_LEFT);
             $condicion = str_pad((string) ($registro->sicoss_condi ?? 0), 2, '0', STR_PAD_LEFT);
             $actividad = str_pad((string) ($registro->sicoss_activ ?? 0), 3, '0', STR_PAD_LEFT);
@@ -1610,15 +1669,15 @@ class LsdController extends Controller
             // Situaciones de revista (cambios dentro del mes): hoy se informa una sola situación todo el mes desde el día 1.
             // TODO: implementar cambios intermes leyendo licencias/vacaciones de sue028s o similar.
             $situacionRevista1 = $situacion;
-            $diaSituacionRevista1 = "01";
-            $situacionRevista2 = "00";
-            $diaSituacionRevista2 = "00";
-            $situacionRevista3 = "00";
-            $diaSituacionRevista3 = "00";
+            $diaSituacionRevista1 = '01';
+            $situacionRevista2 = '00';
+            $diaSituacionRevista2 = '00';
+            $situacionRevista3 = '00';
+            $diaSituacionRevista3 = '00';
 
             $cantidadDias = str_pad($registro->cantidadDias ?? '30', 2, '0', STR_PAD_LEFT); // Cantidad de días trabajados en el período. Valor optativo, puede informarse en blanco.
             $cantidadHoras = str_pad($registro->cantidadHoras ?? '0', 3, '0', STR_PAD_LEFT); // Si se informa un valor, el campo Cantidad días trabajados debe ser 0. Formato: 3 dígitos enteros.
-            $porcAporteAdicionalSS = str_pad($registro->porcAporteAdicionalSS ?? '0', 5, '0', STR_PAD_LEFT); // Se consignarán los puntos porcentuales que superen los establecidos en la Ley N° 24241, artículo 11 o Decreto N° 1387/01, artículo 15. El programa adicionará el porcentaje adicional que se consigne en el campo al aporte obligatorio vigente a cada periodo y procederá al cálculo sobre la Base Imponible de aportes SIPA. 
+            $porcAporteAdicionalSS = str_pad($registro->porcAporteAdicionalSS ?? '0', 5, '0', STR_PAD_LEFT); // Se consignarán los puntos porcentuales que superen los establecidos en la Ley N° 24241, artículo 11 o Decreto N° 1387/01, artículo 15. El programa adicionará el porcentaje adicional que se consigne en el campo al aporte obligatorio vigente a cada periodo y procederá al cálculo sobre la Base Imponible de aportes SIPA.
             // % Contribución tarea diferencial: ARCA exige 2%-10% cuando el empleado está en un régimen de
             // Servicios Diferenciados (condición 05 = "Servicios Diferenciados", 13 = "Serv. dif. no alcanzados Dto 633/18").
             // Prioridad: el porcentaje configurado en el convenio del empleado (Sue007.porc_tarea_dif).
@@ -1670,6 +1729,7 @@ class LsdController extends Controller
                             break;
                         }
                     }
+
                     return $carry;
                 }, 0.0)
                 : 0.0;
@@ -1709,8 +1769,8 @@ class LsdController extends Controller
             // BI 9 (LRT) = H + NR-con-marca-LRT (ver cálculo de $baseImponible9Calculada arriba).
             // Coincide con la base que ARCA determina a partir de las liquidaciones + parametrización.
             $baseImponible9 = str_pad((string) (int) round($baseImponible9Calculada * 100), 15, '0', STR_PAD_LEFT);
-            $baseCalculoDiferencialAportesSS = str_pad($registro->baseCalculoDiferencialAportesSS ?? '0', 15, '0', STR_PAD_LEFT); // Para informar diferenciales que sumen a la base imponible 1 Formato: 13 dígitos enteros y 2 decimales. 
-            $baseCalculoDiferencialContribSS = str_pad($registro->baseCalculoDiferencialContribSS ?? '0', 15, '0', STR_PAD_LEFT); // Para informar diferenciales que sumen a la base imponible 2 Formato: 13 dígitos enteros y 2 decimales. 
+            $baseCalculoDiferencialAportesSS = str_pad($registro->baseCalculoDiferencialAportesSS ?? '0', 15, '0', STR_PAD_LEFT); // Para informar diferenciales que sumen a la base imponible 1 Formato: 13 dígitos enteros y 2 decimales.
+            $baseCalculoDiferencialContribSS = str_pad($registro->baseCalculoDiferencialContribSS ?? '0', 15, '0', STR_PAD_LEFT); // Para informar diferenciales que sumen a la base imponible 2 Formato: 13 dígitos enteros y 2 decimales.
             // BI 10 (Ley 27.430) = base de contribuciones (conceptos H) − importe a detraer.
             // La detracción NO puede superar la base (no genera base negativa): se topea al valor de la base.
             // Así, cuando la base es 0 (ej. licencia por maternidad con haberes neteados, o meses sin haberes),
@@ -1746,52 +1806,52 @@ class LsdController extends Controller
             $importeDetraer = str_pad((string) (int) round($detraerAplicado * 100), 15, '0', STR_PAD_LEFT);
 
             $line04 = '04'
-                . $cuilValue
-                . $conyugue
-                . $hijos
-                . $cct
-                . $scvo
-                . $reduccion
-                . $tipoempresa
-                . $tipoOperacion
-                . $situacion
-                . $condicion
-                . $actividad
-                . $modalidadContrato
-                . $siniestro
-                . $localidad
-                . $situacionRevista1
-                . $diaSituacionRevista1
-                . $situacionRevista2
-                . $diaSituacionRevista2
-                . $situacionRevista3
-                . $diaSituacionRevista3
-                . $cantidadDias
-                . $cantidadHoras
-                . $porcAporteAdicionalSS
-                . $contribucionTareDif
-                . $codObraSocial
-                . $adherentes
-                . $aporteAdicionalOS
-                . $contribAdicionalOS
-                . $baseCalculoDiferencialAportes
-                . $baseCalculoDiferencialOS
-                . $baseCalculoDiferencialLRT
-                . $remuneracionMaternidad
-                . $remuneracionBruta
-                . $baseImponible1
-                . $baseImponible2
-                . $baseImponible3
-                . $baseImponible4
-                . $baseImponible5
-                . $baseImponible6
-                . $baseImponible7
-                . $baseImponible8
-                . $baseImponible9
-                . $baseCalculoDiferencialAportesSS
-                . $baseCalculoDiferencialContribSS
-                . $baseImponible10
-                . $importeDetraer;
+                .$cuilValue
+                .$conyugue
+                .$hijos
+                .$cct
+                .$scvo
+                .$reduccion
+                .$tipoempresa
+                .$tipoOperacion
+                .$situacion
+                .$condicion
+                .$actividad
+                .$modalidadContrato
+                .$siniestro
+                .$localidad
+                .$situacionRevista1
+                .$diaSituacionRevista1
+                .$situacionRevista2
+                .$diaSituacionRevista2
+                .$situacionRevista3
+                .$diaSituacionRevista3
+                .$cantidadDias
+                .$cantidadHoras
+                .$porcAporteAdicionalSS
+                .$contribucionTareDif
+                .$codObraSocial
+                .$adherentes
+                .$aporteAdicionalOS
+                .$contribAdicionalOS
+                .$baseCalculoDiferencialAportes
+                .$baseCalculoDiferencialOS
+                .$baseCalculoDiferencialLRT
+                .$remuneracionMaternidad
+                .$remuneracionBruta
+                .$baseImponible1
+                .$baseImponible2
+                .$baseImponible3
+                .$baseImponible4
+                .$baseImponible5
+                .$baseImponible6
+                .$baseImponible7
+                .$baseImponible8
+                .$baseImponible9
+                .$baseCalculoDiferencialAportesSS
+                .$baseCalculoDiferencialContribSS
+                .$baseImponible10
+                .$importeDetraer;
 
             $this->validarLongitud($line04, 370, '04', [
                 'CUIL' => $cuilValue,
@@ -1800,237 +1860,241 @@ class LsdController extends Controller
                 'modalidad' => trim($modalidadContrato),
             ]);
 
-            $contenido .= $line04 . "\r\n";
+            $contenido .= $line04."\r\n";
         }
 
-
-        //---------------------------------------
+        // ---------------------------------------
         // Generar Registro Tipo 05 - Trabajadores Eventuales - Una fila por cada empleado declarado con modalidad 102 en el registro 4
-        //---------------------------------------
-        if (!$esRectificativa) { foreach ($datos as $registro) {
-            // Los empleados incluidos con valores en 0 no son eventuales → no generan Reg 05.
-            if (!empty($registro->es_cero)) {
-                continue;
-            }
-            $legajoValue = str_pad($registro->legajo_codigo ?? $registro->legajo ?? '', 10, ' ', STR_PAD_RIGHT);
-            $cuilValue = $registro->cuil ?? '';
-            $conyugue = str_pad((string) ($registro->conyugue ?? 0), 1, '0', STR_PAD_LEFT);
-            $hijos = str_pad((string) ($registro->hijos ?? 0), 2, '0', STR_PAD_LEFT);
-            $cct = str_pad((string) ($registro->cct ?? 0), 1, '0', STR_PAD_LEFT);
-            $scvo = str_pad((string) ($registro->sicoss_cob_scvo ?? 0), 1, '0', STR_PAD_LEFT);
-            $reduccion = str_pad((string) ($registro->sicoss_reduccion ?? 0), 1, '0', STR_PAD_LEFT);
-            $tipoempresa = $tipoEmpleadorLsd;
-            $tipoOperacion = "0";
-            $situacion = str_pad((string) ($registro->sicoss_situa ?? 0), 2, '0', STR_PAD_LEFT);
-            $condicion = str_pad((string) ($registro->sicoss_condi ?? 0), 2, '0', STR_PAD_LEFT);
-            $actividad = str_pad((string) ($registro->sicoss_activ ?? 0), 3, '0', STR_PAD_LEFT);
-            $modalidadContrato = str_pad((string) ($registro->sicoss_modal ?? 0), 3, '0', STR_PAD_LEFT);
-            $siniestro = str_pad((string) ($registro->sicoss_sini ?? 0), 2, '0', STR_PAD_LEFT);
-            // Localidad: numero (código AFIP, 2 chars) mapeado desde el codigo guardado en sicoss_zona.
-            $localidad = str_pad((string) ($zonaNumeroPorCodigo[$registro->sicoss_zona] ?? '0'), 2, '0', STR_PAD_LEFT);
-            $situacionRevista1 = $situacion;
-            $diaSituacionRevista1 = "01";
-            $situacionRevista2 = "00";
-            $diaSituacionRevista2 = "00";
-            $situacionRevista3 = "00";
-            $diaSituacionRevista3 = "00";
-            $cantidadDias = str_pad($registro->cantidadDias ?? '30', 2, '0', STR_PAD_LEFT); // Cantidad de días trabajados en el período. Valor optativo, puede informarse en blanco.
-            $cantidadHoras = str_pad($registro->cantidadHoras ?? '0', 3, '0', STR_PAD_LEFT); // Si se informa un valor, el campo Cantidad días trabajados debe ser 0. Formato: 3 dígitos enteros.
-            $porcAporteAdicionalSS = str_pad($registro->porcAporteAdicionalSS ?? '0', 5, '0', STR_PAD_LEFT); // Se consignarán los puntos porcentuales que superen los establecidos en la Ley N° 24241, artículo 11 o Decreto N° 1387/01, artículo 15. El programa adicionará el porcentaje adicional que se consigne en el campo al aporte obligatorio vigente a cada periodo y procederá al cálculo sobre la Base Imponible de aportes SIPA. 
-            // % Contribución tarea diferencial: prioriza el convenio (Sue007.porc_tarea_dif); fallback 2,00% para
-            // Servicios Diferenciados (condición 05/13), 0 en el resto. Igual que en Reg 04.
-            $condicionDiferencial = in_array((int) ($registro->sicoss_condi ?? 0), [5, 13], true);
-            $porcTareaDifConvenio = (float) ($registro->porc_tarea_dif ?? 0);
-            $porcTareaDif = $porcTareaDifConvenio > 0
-                ? $porcTareaDifConvenio
-                : ($condicionDiferencial ? 2.00 : 0.0);
-            $contribucionTareDif = str_pad((string) (int) round($porcTareaDif * 100), 5, '0', STR_PAD_LEFT);
-            // Código de obra social (ídem Reg 04): obra_sijp con ceros a la izquierda, o blanco si no tiene.
-            $osRaw05 = trim((string) ($registro->obra_sijp ?? ''));
-            $codObraSocial = $osRaw05 !== '' ? str_pad($osRaw05, 6, '0', STR_PAD_LEFT) : str_repeat(' ', 6);
-            $adherentes = "00";  // Se registra el número de aquellos que no integran el grupo familiar. Ese dato es tenido en cuenta para el incremento del porcentaje a considerar para el cálculo de aportes de Obra Social.
-            $aporteAdicionalOS = str_pad($registro->aporteAdicionalOS ?? '0', 15, '0', STR_PAD_LEFT); // Se consignarán los aportes del trabajador, emergentes de la diferencia entre la remuneración efectivamente percibida por este y el mínimo fijado por ANSES, a los efectos de acceder a una cobertura médico asistencial (Dec. 492/95, art. 8) Formato: 13 dígitos enteros y 2 decimales
-            $contribAdicionalOS = str_pad($registro->aporteAdicionalOS ?? '0', 15, '0', STR_PAD_LEFT); // Se consignarán las contribuciones del empleador, emergentes de la diferencia entre la remuneración efectivamente percibida por el trabajador y el mínimo fijado por ANSES, a los efectos de permitirle a este acceder a una cobertura médico asistencial (Dec. 492/95, art. 8) Formato: 13 dígitos enteros y 2 decimales. 
-            // $baseDifAportesOS05 / $baseCalculoDiferencialAportes se calculan más abajo, una vez definidas
-            // las variables de jornada parcial ($esJornadaParcial05, $osDeducida05) y $totalHaberesCalc05.
-            $baseCalculoDiferencialOS = str_pad($registro->baseCalculoDiferencialOs ?? '0', 15, '0', STR_PAD_LEFT); // Para informar diferenciales que sumen a la base imponible 8 (contribuciones de obra social y FSR) en los casos de trabajadores a tiempo parcial que contribuyen como tiempo completo (Ley, 26.474 art 1, inc. 4) Formato: 13 dígitos enteros y 2 decimales. 
-            $baseCalculoDiferencialLRT = str_pad($registro->baseCalculoDiferencialLRT ?? '0', 15, '0', STR_PAD_LEFT); // Para informar diferenciales que sumen a la base imponible 9 (contribuciones LRT) . Formato: 13 dígitos enteros y 2 decimales. 
-            $remuneracionMaternidad = str_pad($registro->remuneracionMaternidad ?? '0', 15, '0', STR_PAD_LEFT); // Informará el monto de la remuneración bruta que le hubiera correspondido percibir a la trabajadora si hubiera cumplido sus servicios normalmente.  Formato: 13 dígitos enteros y 2 decimales. 
-            // remuneracionBruta: suma de importes H y NR del legajo según rangos de sue089s (13 enteros + 2 decimales implícitos)
-            $remuneracionBrutaCalc05 = $datos->where('cuil', $registro->cuil)->reduce(function (float $carry, $row) use ($rangosSue089) {
-                foreach ($rangosSue089 as $rango) {
-                    if ($row->concepto >= $rango->desde && $row->concepto <= $rango->hasta) {
-                        if (in_array(strtoupper(trim($rango->tiporem)), ['H', 'NR'])) {
-                            $carry += (float) ($row->importe ?? 0);
-                        }
-                        break;
-                    }
+        // ---------------------------------------
+        if (! $esRectificativa) {
+            foreach ($datos as $registro) {
+                // Los empleados incluidos con valores en 0 no son eventuales → no generan Reg 05.
+                if (! empty($registro->es_cero)) {
+                    continue;
                 }
-                return $carry;
-            }, 0.0);
-
-            // totalHaberes: suma solo de importes remunerativos (tiporem = H)
-            $totalHaberesCalc05 = $datos->where('cuil', $registro->cuil)->reduce(function (float $carry, $row) use ($rangosSue089) {
-                foreach ($rangosSue089 as $rango) {
-                    if ($row->concepto >= $rango->desde && $row->concepto <= $rango->hasta) {
-                        if (strtoupper(trim($rango->tiporem)) === 'H') {
-                            $carry += (float) ($row->importe ?? 0);
+                $legajoValue = str_pad($registro->legajo_codigo ?? $registro->legajo ?? '', 10, ' ', STR_PAD_RIGHT);
+                $cuilValue = $registro->cuil ?? '';
+                $conyugue = str_pad((string) ($registro->conyugue ?? 0), 1, '0', STR_PAD_LEFT);
+                $hijos = str_pad((string) ($registro->hijos ?? 0), 2, '0', STR_PAD_LEFT);
+                $cct = str_pad((string) ($registro->cct ?? 0), 1, '0', STR_PAD_LEFT);
+                $scvo = str_pad((string) ($registro->sicoss_cob_scvo ?? 0), 1, '0', STR_PAD_LEFT);
+                $reduccion = str_pad((string) ($registro->sicoss_reduccion ?? 0), 1, '0', STR_PAD_LEFT);
+                $tipoempresa = $tipoEmpleadorLsd;
+                $tipoOperacion = '0';
+                $situacion = str_pad((string) ($registro->sicoss_situa ?? 0), 2, '0', STR_PAD_LEFT);
+                $condicion = str_pad((string) ($registro->sicoss_condi ?? 0), 2, '0', STR_PAD_LEFT);
+                $actividad = str_pad((string) ($registro->sicoss_activ ?? 0), 3, '0', STR_PAD_LEFT);
+                $modalidadContrato = str_pad((string) ($registro->sicoss_modal ?? 0), 3, '0', STR_PAD_LEFT);
+                $siniestro = str_pad((string) ($registro->sicoss_sini ?? 0), 2, '0', STR_PAD_LEFT);
+                // Localidad: numero (código AFIP, 2 chars) mapeado desde el codigo guardado en sicoss_zona.
+                $localidad = str_pad((string) ($zonaNumeroPorCodigo[$registro->sicoss_zona] ?? '0'), 2, '0', STR_PAD_LEFT);
+                $situacionRevista1 = $situacion;
+                $diaSituacionRevista1 = '01';
+                $situacionRevista2 = '00';
+                $diaSituacionRevista2 = '00';
+                $situacionRevista3 = '00';
+                $diaSituacionRevista3 = '00';
+                $cantidadDias = str_pad($registro->cantidadDias ?? '30', 2, '0', STR_PAD_LEFT); // Cantidad de días trabajados en el período. Valor optativo, puede informarse en blanco.
+                $cantidadHoras = str_pad($registro->cantidadHoras ?? '0', 3, '0', STR_PAD_LEFT); // Si se informa un valor, el campo Cantidad días trabajados debe ser 0. Formato: 3 dígitos enteros.
+                $porcAporteAdicionalSS = str_pad($registro->porcAporteAdicionalSS ?? '0', 5, '0', STR_PAD_LEFT); // Se consignarán los puntos porcentuales que superen los establecidos en la Ley N° 24241, artículo 11 o Decreto N° 1387/01, artículo 15. El programa adicionará el porcentaje adicional que se consigne en el campo al aporte obligatorio vigente a cada periodo y procederá al cálculo sobre la Base Imponible de aportes SIPA.
+                // % Contribución tarea diferencial: prioriza el convenio (Sue007.porc_tarea_dif); fallback 2,00% para
+                // Servicios Diferenciados (condición 05/13), 0 en el resto. Igual que en Reg 04.
+                $condicionDiferencial = in_array((int) ($registro->sicoss_condi ?? 0), [5, 13], true);
+                $porcTareaDifConvenio = (float) ($registro->porc_tarea_dif ?? 0);
+                $porcTareaDif = $porcTareaDifConvenio > 0
+                    ? $porcTareaDifConvenio
+                    : ($condicionDiferencial ? 2.00 : 0.0);
+                $contribucionTareDif = str_pad((string) (int) round($porcTareaDif * 100), 5, '0', STR_PAD_LEFT);
+                // Código de obra social (ídem Reg 04): obra_sijp con ceros a la izquierda, o blanco si no tiene.
+                $osRaw05 = trim((string) ($registro->obra_sijp ?? ''));
+                $codObraSocial = $osRaw05 !== '' ? str_pad($osRaw05, 6, '0', STR_PAD_LEFT) : str_repeat(' ', 6);
+                $adherentes = '00';  // Se registra el número de aquellos que no integran el grupo familiar. Ese dato es tenido en cuenta para el incremento del porcentaje a considerar para el cálculo de aportes de Obra Social.
+                $aporteAdicionalOS = str_pad($registro->aporteAdicionalOS ?? '0', 15, '0', STR_PAD_LEFT); // Se consignarán los aportes del trabajador, emergentes de la diferencia entre la remuneración efectivamente percibida por este y el mínimo fijado por ANSES, a los efectos de acceder a una cobertura médico asistencial (Dec. 492/95, art. 8) Formato: 13 dígitos enteros y 2 decimales
+                $contribAdicionalOS = str_pad($registro->aporteAdicionalOS ?? '0', 15, '0', STR_PAD_LEFT); // Se consignarán las contribuciones del empleador, emergentes de la diferencia entre la remuneración efectivamente percibida por el trabajador y el mínimo fijado por ANSES, a los efectos de permitirle a este acceder a una cobertura médico asistencial (Dec. 492/95, art. 8) Formato: 13 dígitos enteros y 2 decimales.
+                // $baseDifAportesOS05 / $baseCalculoDiferencialAportes se calculan más abajo, una vez definidas
+                // las variables de jornada parcial ($esJornadaParcial05, $osDeducida05) y $totalHaberesCalc05.
+                $baseCalculoDiferencialOS = str_pad($registro->baseCalculoDiferencialOs ?? '0', 15, '0', STR_PAD_LEFT); // Para informar diferenciales que sumen a la base imponible 8 (contribuciones de obra social y FSR) en los casos de trabajadores a tiempo parcial que contribuyen como tiempo completo (Ley, 26.474 art 1, inc. 4) Formato: 13 dígitos enteros y 2 decimales.
+                $baseCalculoDiferencialLRT = str_pad($registro->baseCalculoDiferencialLRT ?? '0', 15, '0', STR_PAD_LEFT); // Para informar diferenciales que sumen a la base imponible 9 (contribuciones LRT) . Formato: 13 dígitos enteros y 2 decimales.
+                $remuneracionMaternidad = str_pad($registro->remuneracionMaternidad ?? '0', 15, '0', STR_PAD_LEFT); // Informará el monto de la remuneración bruta que le hubiera correspondido percibir a la trabajadora si hubiera cumplido sus servicios normalmente.  Formato: 13 dígitos enteros y 2 decimales.
+                // remuneracionBruta: suma de importes H y NR del legajo según rangos de sue089s (13 enteros + 2 decimales implícitos)
+                $remuneracionBrutaCalc05 = $datos->where('cuil', $registro->cuil)->reduce(function (float $carry, $row) use ($rangosSue089) {
+                    foreach ($rangosSue089 as $rango) {
+                        if ($row->concepto >= $rango->desde && $row->concepto <= $rango->hasta) {
+                            if (in_array(strtoupper(trim($rango->tiporem)), ['H', 'NR'])) {
+                                $carry += (float) ($row->importe ?? 0);
+                            }
+                            break;
                         }
-                        break;
                     }
-                }
-                return $carry;
-            }, 0.0);
-            // Jornada parcial (igual que en Reg 04): factor de prorrateo del detraer y OS descontada para la base diferencial.
-            $jornada05 = $jornadasPorId[$registro->jornada_id] ?? null;
-            $esJornadaParcial05 = $jornada05 && (int) ($jornada05->parcial ?? 0) === 1;
-            $horasSemana05 = (float) ($jornada05->horas_semana ?? 0);
-            $factorParcial05 = ($esJornadaParcial05 && $horasSemana05 > 0)
-                ? min(1.0, $horasSemana05 / $HORAS_JORNADA_COMPLETA)
-                : 1.0;
-            $osDeducida05 = $esJornadaParcial05
-                ? $datos->where('cuil', $registro->cuil)->reduce(function (float $carry, $row) {
-                    return $carry + (((string) ($row->concepto_arca ?? '') === '810002') ? abs((float) ($row->importe ?? 0)) : 0.0);
-                }, 0.0)
-                : 0.0;
-            // Jornada parcial (igual criterio que Reg 04): el BI4 lleva la base completa de OS (OS/3%, topeada) Y
-            // el diferencial (pos 101-115) = base − haberes, porque ARCA determina BI4 = haberes + diferencial y
-            // exige que coincida con el BI4 informado.
-            $baseOSAportes05 = ($esJornadaParcial05 && $osDeducida05 > 0)
-                ? (($topeAportesNumerico > 0) ? min($osDeducida05 / 0.03, $topeAportesNumerico) : $osDeducida05 / 0.03)
-                : null;
-            $baseDifAportesOS05 = ($baseOSAportes05 !== null)
-                ? max(0.0, $baseOSAportes05 - max(0.0, $totalHaberesCalc05))
-                : (float) ($registro->baseCalculoDiferencialAportes ?? 0);
-            $baseCalculoDiferencialAportes = str_pad((string) (int) round($baseDifAportesOS05 * 100), 15, '0', STR_PAD_LEFT); // BI 4: diferencial aportes OS+FSR (jornada parcial, Ley 26.474).
-            // Diferencial CONTRIBUCIONES OS+FSR (pos 116-130): mismo criterio que aportes (Art. 92 ter LCT). Sobrescribe
-            // el default de arriba para parcial.
-            if ($baseOSAportes05 !== null) {
-                $baseCalculoDiferencialOS = str_pad((string) (int) round($baseDifAportesOS05 * 100), 15, '0', STR_PAD_LEFT);
-            }
-            $remuneracionBruta = str_pad((string) (int) round($remuneracionBrutaCalc05 * 100), 15, '0', STR_PAD_LEFT);
-            // Reg 05 (eventuales): BI 1-8 usan $totalHaberes (solo H); BI 9 (LRT) = H + NR-con-marca-LRT.
-            $totalHaberes05Str = str_pad((string) (int) round($totalHaberesCalc05 * 100), 15, '0', STR_PAD_LEFT);
-            $baseImponible9Calc05 = $datos->where('cuil', $registro->cuil)->reduce(function (float $carry, $row) use ($rangosSue089, $esConceptoLrt) {
-                foreach ($rangosSue089 as $rango) {
-                    if ($row->concepto >= $rango->desde && $row->concepto <= $rango->hasta) {
-                        $tiporem = strtoupper(trim($rango->tiporem));
-                        if ($tiporem === 'H' || ($tiporem === 'NR' && $esConceptoLrt($row->concepto))) {
-                            $carry += (float) ($row->importe ?? 0);
+
+                    return $carry;
+                }, 0.0);
+
+                // totalHaberes: suma solo de importes remunerativos (tiporem = H)
+                $totalHaberesCalc05 = $datos->where('cuil', $registro->cuil)->reduce(function (float $carry, $row) use ($rangosSue089) {
+                    foreach ($rangosSue089 as $rango) {
+                        if ($row->concepto >= $rango->desde && $row->concepto <= $rango->hasta) {
+                            if (strtoupper(trim($rango->tiporem)) === 'H') {
+                                $carry += (float) ($row->importe ?? 0);
+                            }
+                            break;
                         }
-                        break;
                     }
+
+                    return $carry;
+                }, 0.0);
+                // Jornada parcial (igual que en Reg 04): factor de prorrateo del detraer y OS descontada para la base diferencial.
+                $jornada05 = $jornadasPorId[$registro->jornada_id] ?? null;
+                $esJornadaParcial05 = $jornada05 && (int) ($jornada05->parcial ?? 0) === 1;
+                $horasSemana05 = (float) ($jornada05->horas_semana ?? 0);
+                $factorParcial05 = ($esJornadaParcial05 && $horasSemana05 > 0)
+                    ? min(1.0, $horasSemana05 / $HORAS_JORNADA_COMPLETA)
+                    : 1.0;
+                $osDeducida05 = $esJornadaParcial05
+                    ? $datos->where('cuil', $registro->cuil)->reduce(function (float $carry, $row) {
+                        return $carry + (((string) ($row->concepto_arca ?? '') === '810002') ? abs((float) ($row->importe ?? 0)) : 0.0);
+                    }, 0.0)
+                    : 0.0;
+                // Jornada parcial (igual criterio que Reg 04): el BI4 lleva la base completa de OS (OS/3%, topeada) Y
+                // el diferencial (pos 101-115) = base − haberes, porque ARCA determina BI4 = haberes + diferencial y
+                // exige que coincida con el BI4 informado.
+                $baseOSAportes05 = ($esJornadaParcial05 && $osDeducida05 > 0)
+                    ? (($topeAportesNumerico > 0) ? min($osDeducida05 / 0.03, $topeAportesNumerico) : $osDeducida05 / 0.03)
+                    : null;
+                $baseDifAportesOS05 = ($baseOSAportes05 !== null)
+                    ? max(0.0, $baseOSAportes05 - max(0.0, $totalHaberesCalc05))
+                    : (float) ($registro->baseCalculoDiferencialAportes ?? 0);
+                $baseCalculoDiferencialAportes = str_pad((string) (int) round($baseDifAportesOS05 * 100), 15, '0', STR_PAD_LEFT); // BI 4: diferencial aportes OS+FSR (jornada parcial, Ley 26.474).
+                // Diferencial CONTRIBUCIONES OS+FSR (pos 116-130): mismo criterio que aportes (Art. 92 ter LCT). Sobrescribe
+                // el default de arriba para parcial.
+                if ($baseOSAportes05 !== null) {
+                    $baseCalculoDiferencialOS = str_pad((string) (int) round($baseDifAportesOS05 * 100), 15, '0', STR_PAD_LEFT);
                 }
-                return $carry;
-            }, 0.0);
-            // Aportes (BI 1/4/5) topeados al tope máximo vigente; contribuciones (BI 2/3/8) sin tope (ver Reg 04).
-            $baseAportes05 = ($topeAportesNumerico > 0)
-                ? min($totalHaberesCalc05, $topeAportesNumerico)
-                : $totalHaberesCalc05;
-            $baseAportes05Str = str_pad((string) (int) round($baseAportes05 * 100), 15, '0', STR_PAD_LEFT);
-            $baseImponible1 = $baseAportes05Str;
-            $baseImponible2 = $totalHaberes05Str;
-            $baseImponible3 = $totalHaberes05Str;
-            // BI4 (aportes OS): en parcial = base completa de OS ($baseOSAportes05, calculada arriba); resto $baseAportes05.
-            $baseImponible4 = str_pad((string) (int) round(($baseOSAportes05 ?? $baseAportes05) * 100), 15, '0', STR_PAD_LEFT);
-            $baseImponible5 = $baseAportes05Str;
-            $baseImponible6 = str_pad($registro->baseImponible6 ?? '0', 15, '0', STR_PAD_LEFT);
-            $baseImponible7 = str_pad($registro->baseImponible7 ?? '0', 15, '0', STR_PAD_LEFT);
-            // Contribuciones OS y FSR. En parcial = base completa de OS (igual que BI4); Art. 92 ter LCT.
-            $baseImponible8 = ($baseOSAportes05 !== null)
-                ? str_pad((string) (int) round($baseOSAportes05 * 100), 15, '0', STR_PAD_LEFT)
-                : $totalHaberes05Str;
-            $baseImponible9 = str_pad((string) (int) round(max(0.0, $baseImponible9Calc05) * 100), 15, '0', STR_PAD_LEFT);
-            $baseCalculoDiferencialAportesSS = str_pad($registro->baseCalculoDiferencialAportesSS ?? '0', 15, '0', STR_PAD_LEFT); // Para informar diferenciales que sumen a la base imponible 1 Formato: 13 dígitos enteros y 2 decimales. 
-            $baseCalculoDiferencialContribSS = str_pad($registro->baseCalculoDiferencialContribSS ?? '0', 15, '0', STR_PAD_LEFT); // Para informar diferenciales que sumen a la base imponible 2 Formato: 13 dígitos enteros y 2 decimales. 
-            // BI 10 (Ley 27.430) = base de conceptos H − importe a detraer, con detracción topeada a la base
-            // (no supera la base; ver comentario equivalente en Reg 04).
-            $baseBI10_05 = max(0.0, $totalHaberesCalc05);
-            // Mes con SAC (ver Reg 04): ×1,5 si el empleado tiene concepto de SAC (ARCA 12xxxx).
-            $tieneSac05 = $datos->where('cuil', $registro->cuil)->contains(
-                fn ($row) => str_starts_with((string) ($row->concepto_arca ?? ''), '12')
-            );
-            $detraccionMensual05 = $tieneSac05 ? $importeDetraerSacNumerico : $importeDetraerNumerico;
-            $detraccionEmpleado05 = round($detraccionMensual05 * $factorParcial05, 2); // prorrateo por jornada parcial
-            // Tope estructural ARCA para parcial: máx. 67% del valor (ver Reg 04).
-            if ($esJornadaParcial05) {
-                $detraccionEmpleado05 = min($detraccionEmpleado05, round($detraccionMensual05 * 0.67, 2));
+                $remuneracionBruta = str_pad((string) (int) round($remuneracionBrutaCalc05 * 100), 15, '0', STR_PAD_LEFT);
+                // Reg 05 (eventuales): BI 1-8 usan $totalHaberes (solo H); BI 9 (LRT) = H + NR-con-marca-LRT.
+                $totalHaberes05Str = str_pad((string) (int) round($totalHaberesCalc05 * 100), 15, '0', STR_PAD_LEFT);
+                $baseImponible9Calc05 = $datos->where('cuil', $registro->cuil)->reduce(function (float $carry, $row) use ($rangosSue089, $esConceptoLrt) {
+                    foreach ($rangosSue089 as $rango) {
+                        if ($row->concepto >= $rango->desde && $row->concepto <= $rango->hasta) {
+                            $tiporem = strtoupper(trim($rango->tiporem));
+                            if ($tiporem === 'H' || ($tiporem === 'NR' && $esConceptoLrt($row->concepto))) {
+                                $carry += (float) ($row->importe ?? 0);
+                            }
+                            break;
+                        }
+                    }
+
+                    return $carry;
+                }, 0.0);
+                // Aportes (BI 1/4/5) topeados al tope máximo vigente; contribuciones (BI 2/3/8) sin tope (ver Reg 04).
+                $baseAportes05 = ($topeAportesNumerico > 0)
+                    ? min($totalHaberesCalc05, $topeAportesNumerico)
+                    : $totalHaberesCalc05;
+                $baseAportes05Str = str_pad((string) (int) round($baseAportes05 * 100), 15, '0', STR_PAD_LEFT);
+                $baseImponible1 = $baseAportes05Str;
+                $baseImponible2 = $totalHaberes05Str;
+                $baseImponible3 = $totalHaberes05Str;
+                // BI4 (aportes OS): en parcial = base completa de OS ($baseOSAportes05, calculada arriba); resto $baseAportes05.
+                $baseImponible4 = str_pad((string) (int) round(($baseOSAportes05 ?? $baseAportes05) * 100), 15, '0', STR_PAD_LEFT);
+                $baseImponible5 = $baseAportes05Str;
+                $baseImponible6 = str_pad($registro->baseImponible6 ?? '0', 15, '0', STR_PAD_LEFT);
+                $baseImponible7 = str_pad($registro->baseImponible7 ?? '0', 15, '0', STR_PAD_LEFT);
+                // Contribuciones OS y FSR. En parcial = base completa de OS (igual que BI4); Art. 92 ter LCT.
+                $baseImponible8 = ($baseOSAportes05 !== null)
+                    ? str_pad((string) (int) round($baseOSAportes05 * 100), 15, '0', STR_PAD_LEFT)
+                    : $totalHaberes05Str;
+                $baseImponible9 = str_pad((string) (int) round(max(0.0, $baseImponible9Calc05) * 100), 15, '0', STR_PAD_LEFT);
+                $baseCalculoDiferencialAportesSS = str_pad($registro->baseCalculoDiferencialAportesSS ?? '0', 15, '0', STR_PAD_LEFT); // Para informar diferenciales que sumen a la base imponible 1 Formato: 13 dígitos enteros y 2 decimales.
+                $baseCalculoDiferencialContribSS = str_pad($registro->baseCalculoDiferencialContribSS ?? '0', 15, '0', STR_PAD_LEFT); // Para informar diferenciales que sumen a la base imponible 2 Formato: 13 dígitos enteros y 2 decimales.
+                // BI 10 (Ley 27.430) = base de conceptos H − importe a detraer, con detracción topeada a la base
+                // (no supera la base; ver comentario equivalente en Reg 04).
+                $baseBI10_05 = max(0.0, $totalHaberesCalc05);
+                // Mes con SAC (ver Reg 04): ×1,5 si el empleado tiene concepto de SAC (ARCA 12xxxx).
+                $tieneSac05 = $datos->where('cuil', $registro->cuil)->contains(
+                    fn ($row) => str_starts_with((string) ($row->concepto_arca ?? ''), '12')
+                );
+                $detraccionMensual05 = $tieneSac05 ? $importeDetraerSacNumerico : $importeDetraerNumerico;
+                $detraccionEmpleado05 = round($detraccionMensual05 * $factorParcial05, 2); // prorrateo por jornada parcial
+                // Tope estructural ARCA para parcial: máx. 67% del valor (ver Reg 04).
+                if ($esJornadaParcial05) {
+                    $detraccionEmpleado05 = min($detraccionEmpleado05, round($detraccionMensual05 * 0.67, 2));
+                }
+                // Modalidades sin detracción (ver Reg 04): importe a detraer = 0 Y BI 10 = 0.
+                if ($this->modalidadSinDetraccion($registro->sicoss_modal ?? 0)) {
+                    $detraerAplicado05 = 0.0;
+                    $bi10Calc05 = 0.0;
+                } else {
+                    $detraerAplicado05 = min($detraccionEmpleado05, $baseBI10_05);
+                    $bi10Calc05 = $baseBI10_05 - $detraerAplicado05;
+                }
+                $baseImponible10 = str_pad((string) (int) round($bi10Calc05 * 100), 15, '0', STR_PAD_LEFT);
+                $importeDetraer = str_pad((string) (int) round($detraerAplicado05 * 100), 15, '0', STR_PAD_LEFT);
+
+                if ($modalidadContrato == '102') {
+                    $line05 = '05'
+                        .$cuilValue
+                        .$conyugue
+                        .$hijos
+                        .$cct
+                        .$scvo
+                        .$reduccion
+                        .$tipoempresa
+                        .$tipoOperacion
+                        .$situacion
+                        .$condicion
+                        .$actividad
+                        .$modalidadContrato
+                        .$siniestro
+                        .$localidad
+                        .$situacionRevista1
+                        .$diaSituacionRevista1
+                        .$situacionRevista2
+                        .$diaSituacionRevista2
+                        .$situacionRevista3
+                        .$diaSituacionRevista3
+                        .$cantidadDias
+                        .$cantidadHoras
+                        .$porcAporteAdicionalSS
+                        .$contribucionTareDif
+                        .$codObraSocial
+                        .$adherentes
+                        .$aporteAdicionalOS
+                        .$contribAdicionalOS
+                        .$baseCalculoDiferencialAportes
+                        .$baseCalculoDiferencialOS
+                        .$baseCalculoDiferencialLRT
+                        .$remuneracionMaternidad
+                        .$remuneracionBruta
+                        .$baseImponible1
+                        .$baseImponible2
+                        .$baseImponible3
+                        .$baseImponible4
+                        .$baseImponible5
+                        .$baseImponible6
+                        .$baseImponible7
+                        .$baseImponible8
+                        .$baseImponible9
+                        .$baseCalculoDiferencialAportesSS
+                        .$baseCalculoDiferencialContribSS
+                        .$baseImponible10;
+
+                    $this->validarLongitud($line05, 65, '05', [
+                        'CUIL' => $cuilValue,
+                        'legajo' => trim($legajoValue),
+                        'modalidad' => trim($modalidadContrato),
+                    ]);
+
+                    $contenido .= $line05."\r\n";
+                }
             }
-            // Modalidades sin detracción (ver Reg 04): importe a detraer = 0 Y BI 10 = 0.
-            if ($this->modalidadSinDetraccion($registro->sicoss_modal ?? 0)) {
-                $detraerAplicado05 = 0.0;
-                $bi10Calc05 = 0.0;
-            } else {
-                $detraerAplicado05 = min($detraccionEmpleado05, $baseBI10_05);
-                $bi10Calc05 = $baseBI10_05 - $detraerAplicado05;
-            }
-            $baseImponible10 = str_pad((string) (int) round($bi10Calc05 * 100), 15, '0', STR_PAD_LEFT);
-            $importeDetraer = str_pad((string) (int) round($detraerAplicado05 * 100), 15, '0', STR_PAD_LEFT);
+        } // fin foreach Reg 05 + fin if (!$esRectificativa)
 
-            if ($modalidadContrato == '102') {
-                $line05 = '05'
-                    . $cuilValue
-                    . $conyugue
-                    . $hijos
-                    . $cct
-                    . $scvo
-                    . $reduccion
-                    . $tipoempresa
-                    . $tipoOperacion
-                    . $situacion
-                    . $condicion
-                    . $actividad
-                    . $modalidadContrato
-                    . $siniestro
-                    . $localidad
-                    . $situacionRevista1
-                    . $diaSituacionRevista1
-                    . $situacionRevista2
-                    . $diaSituacionRevista2
-                    . $situacionRevista3
-                    . $diaSituacionRevista3
-                    . $cantidadDias
-                    . $cantidadHoras
-                    . $porcAporteAdicionalSS
-                    . $contribucionTareDif
-                    . $codObraSocial
-                    . $adherentes
-                    . $aporteAdicionalOS
-                    . $contribAdicionalOS
-                    . $baseCalculoDiferencialAportes
-                    . $baseCalculoDiferencialOS
-                    . $baseCalculoDiferencialLRT
-                    . $remuneracionMaternidad
-                    . $remuneracionBruta
-                    . $baseImponible1
-                    . $baseImponible2
-                    . $baseImponible3
-                    . $baseImponible4
-                    . $baseImponible5
-                    . $baseImponible6
-                    . $baseImponible7
-                    . $baseImponible8
-                    . $baseImponible9
-                    . $baseCalculoDiferencialAportesSS
-                    . $baseCalculoDiferencialContribSS
-                    . $baseImponible10;
-
-                $this->validarLongitud($line05, 65, '05', [
-                    'CUIL' => $cuilValue,
-                    'legajo' => trim($legajoValue),
-                    'modalidad' => trim($modalidadContrato),
-                ]);
-
-                $contenido .= $line05 . "\r\n";
-            }
-        } } // fin foreach Reg 05 + fin if (!$esRectificativa)
-
-        //$contenido .= str_repeat('-', 80) . "\n";
-        //$contenido .= "TOTAL REGISTROS: " . $datos->count() . "\n";
+        // $contenido .= str_repeat('-', 80) . "\n";
+        // $contenido .= "TOTAL REGISTROS: " . $datos->count() . "\n";
 
         // Guardar en storage/app/lsd y devolver información para descarga
         $dir = storage_path('app/lsd');
-        if (!is_dir($dir)) {
+        if (! is_dir($dir)) {
             mkdir($dir, 0755, true);
         }
 
@@ -2038,10 +2102,10 @@ class LsdController extends Controller
         $nombresTipoLiq = [1 => 'Normal', 4 => 'SAC', 5 => 'LiqFinal'];
         $tipoLiqArchivo = $tiposLiq === null
             ? 'Todas'
-            : ($nombresTipoLiq[$tiposLiq[0]] ?? ('Tipo' . $tiposLiq[0]));
+            : ($nombresTipoLiq[$tiposLiq[0]] ?? ('Tipo'.$tiposLiq[0]));
 
-        $filename = "LSD_{$empresaName}_liq_{$numero_emision}_periodo_{$periodoId}_{$tipoLiqArchivo}_" . date('Ymd_His') . ".txt";
-        $fullPath = $dir . DIRECTORY_SEPARATOR . $filename;
+        $filename = "LSD_{$empresaName}_liq_{$numero_emision}_periodo_{$periodoId}_{$tipoLiqArchivo}_".date('Ymd_His').'.txt';
+        $fullPath = $dir.DIRECTORY_SEPARATOR.$filename;
 
         $contentToWrite = rtrim($contenido, "\r\n");
 
@@ -2050,7 +2114,7 @@ class LsdController extends Controller
         } catch (\Throwable $e) {
             return [
                 'status' => 500,
-                'message' => 'No se pudo guardar el archivo: ' . $e->getMessage() . ' en línea ' . $e->getLine(),
+                'message' => 'No se pudo guardar el archivo: '.$e->getMessage().' en línea '.$e->getLine(),
                 'line' => $e->getLine(),
             ];
         }
@@ -2062,7 +2126,7 @@ class LsdController extends Controller
         $lsdItems = [];
         foreach ($datos as $registro) {
             // Los empleados incluidos con valores en 0 no tienen conceptos (no hay Reg 03 que guardar).
-            if (!empty($registro->es_cero)) {
+            if (! empty($registro->es_cero)) {
                 continue;
             }
             $lsdItems[] = [
@@ -2092,7 +2156,6 @@ class LsdController extends Controller
         ];
     }
 
-
     /**
      * Mostrar detalle completo de una emisión con sus items
      */
@@ -2113,6 +2176,7 @@ class LsdController extends Controller
                     return strtoupper(trim((string) $r->tiporem));
                 }
             }
+
             return null;
         };
 
@@ -2120,7 +2184,7 @@ class LsdController extends Controller
         $descConcepto = DB::table('sue102s')->pluck('detalle', 'codigo');
         $codEmpresa = $empresa->codigo ?? null;
         $empleados = DB::table('sue001s')
-            ->when($codEmpresa, fn($q) => $q->where('grupo_emp', $codEmpresa))
+            ->when($codEmpresa, fn ($q) => $q->where('grupo_emp', $codEmpresa))
             ->get(['codigo', 'cuil', 'detalle', 'nombres', 'convenio'])
             ->keyBy('cuil');
 
@@ -2131,11 +2195,11 @@ class LsdController extends Controller
             // Emisiones nuevas: el filtro elegido al generar ('todas' o un tipoliq del Mapa A).
             $tipoLiqNombre = $emision->tipoliq_filtro === 'todas'
                 ? 'Todas'
-                : ($tiposLiq[(int) $emision->tipoliq_filtro] ?? ('Tipo ' . $emision->tipoliq_filtro));
+                : ($tiposLiq[(int) $emision->tipoliq_filtro] ?? ('Tipo '.$emision->tipoliq_filtro));
         } else {
             // Fallback legacy (emisiones previas al filtro): usa tipo_liquidacion (M/Q/D/H),
             // que no es el Mapa A — se mantiene solo por compatibilidad histórica.
-            $tipoLiqNombre = $tiposLiq[(int) $emision->tipo_liquidacion] ?? ('Tipo ' . $emision->tipo_liquidacion);
+            $tipoLiqNombre = $tiposLiq[(int) $emision->tipo_liquidacion] ?? ('Tipo '.$emision->tipo_liquidacion);
         }
 
         // Bases imponibles y cálculos del Reg 04 (parseados del TXT generado, por CUIL).
@@ -2145,7 +2209,9 @@ class LsdController extends Controller
         $resumen = [];
         $detallePorCuil = [];
         foreach ($items->groupBy('cuil') as $cuil => $grupo) {
-            $rem = 0.0; $norem = 0.0; $desc = 0.0;
+            $rem = 0.0;
+            $norem = 0.0;
+            $desc = 0.0;
             $conceptos = [];
             foreach ($grupo as $it) {
                 $tipo = $tipoDe((int) $it->codigo_concepto);
@@ -2171,7 +2237,7 @@ class LsdController extends Controller
                 'tipo_liq' => $tipoLiqNombre,
                 'convenio' => $emp ? ($convenios[$emp->convenio] ?? (string) ($emp->convenio ?? '')) : '',
                 'cuil' => (string) $cuil,
-                'nombre' => $emp ? trim(((string) ($emp->detalle ?? '')) . ' ' . ((string) ($emp->nombres ?? ''))) : '',
+                'nombre' => $emp ? trim(((string) ($emp->detalle ?? '')).' '.((string) ($emp->nombres ?? ''))) : '',
                 'legajo' => $grupo->first()->legajo,
                 'remunerativos' => round($rem, 2),
                 'no_remunerativos' => round($norem, 2),
@@ -2203,20 +2269,20 @@ class LsdController extends Controller
             $cod = (string) $it->codigo_concepto;
             $monto = (($it->debito_credito === 'C') ? 1 : -1) * abs((float) $it->importe);
             $esOtroPeriodo = trim((string) ($it->periodo_ajuste ?? '')) !== '';
-            if (!isset($conceptosTot[$cod])) {
+            if (! isset($conceptosTot[$cod])) {
                 $conceptosTot[$cod] = ['codigo' => $cod, 'descripcion' => $descConcepto[$it->codigo_concepto] ?? '', 'nuevo' => isset($conceptosNuevosMes[$cod]), 'total' => 0.0, 'actual' => 0.0, 'otros' => 0.0];
             }
             $conceptosTot[$cod]['total'] += $monto;
             $conceptosTot[$cod][$esOtroPeriodo ? 'otros' : 'actual'] += $monto;
         }
-        uksort($conceptosTot, fn($a, $b) => strcmp($a, $b)); // orden por código como string (1, 102, 11, 17, ...)
+        uksort($conceptosTot, fn ($a, $b) => strcmp($a, $b)); // orden por código como string (1, 102, 11, 17, ...)
 
         $regs = $this->contarRegistros($emision->archivo_txt);
         $resumenLiq = [
             'cuit' => $emision->cuit_empresa,
             'razon_social' => $empresa->detalle ?? '',
             'periodo' => $emision->periodo,
-            'liquidacion' => ($regs['letra'] !== '' ? $regs['letra'] : '?') . '-' . $emision->numero_emision,
+            'liquidacion' => ($regs['letra'] !== '' ? $regs['letra'] : '?').'-'.$emision->numero_emision,
             'cant_trabajadores' => $items->pluck('cuil')->unique()->count(),
             'cant_eventuales' => $regs['counts']['05'],
             'cant_conceptos' => count($conceptosTot),
@@ -2295,8 +2361,8 @@ class LsdController extends Controller
                 'legajo' => $it->legajo,
                 'legajo_id' => ($emp && $emp->id !== null) ? (int) $emp->id : null,
                 'cuil' => (string) $it->cuil,
-                'nombre' => $emp ? trim(((string) ($emp->detalle ?? '')) . ' ' . ((string) ($emp->nombres ?? ''))) : '',
-                'tipo_liq' => $tipoliq !== null ? ($tiposLiq[(int) $tipoliq] ?? ('Tipo ' . $tipoliq)) : '—',
+                'nombre' => $emp ? trim(((string) ($emp->detalle ?? '')).' '.((string) ($emp->nombres ?? ''))) : '',
+                'tipo_liq' => $tipoliq !== null ? ($tiposLiq[(int) $tipoliq] ?? ('Tipo '.$tipoliq)) : '—',
                 'tipoliq_cod' => $tipoliq !== null ? (int) $tipoliq : null,
                 'cantidad' => (float) $it->cantidad,
                 'importe' => $monto,
@@ -2350,7 +2416,7 @@ class LsdController extends Controller
             ->where('codigo_concepto', $concepto)
             ->first();
 
-        if (!$item) {
+        if (! $item) {
             return response()->json(['success' => false, 'message' => 'La línea no pertenece a esta emisión/concepto.'], 404);
         }
 
@@ -2361,7 +2427,7 @@ class LsdController extends Controller
 
         $tipoOriginal = DB::table('sue102s')->where('codigo', $concepto)->value('tipo');
         $conceptoNuevo = DB::table('sue102s')->where('codigo', $nuevoCodigo)->first(['detalle', 'tipo', 'concepto_arca']);
-        if (!$tipoOriginal || !$conceptoNuevo || trim((string) $conceptoNuevo->tipo) !== trim((string) $tipoOriginal)) {
+        if (! $tipoOriginal || ! $conceptoNuevo || trim((string) $conceptoNuevo->tipo) !== trim((string) $tipoOriginal)) {
             return response()->json(['success' => false, 'message' => "El nuevo código debe ser del mismo tipo ({$tipoOriginal}) que el concepto original."], 422);
         }
 
@@ -2376,7 +2442,7 @@ class LsdController extends Controller
         $fila = (clone $filaQuery)->where('importe', $item->importe)->orderBy('id')->first()
             ?? $filaQuery->orderBy('id')->first();
 
-        if (!$fila) {
+        if (! $fila) {
             return response()->json(['success' => false, 'message' => 'No se encontró la línea en la liquidación de origen (sue090s). Puede haber sido modificada o eliminada después de generar la emisión.'], 404);
         }
 
@@ -2387,17 +2453,17 @@ class LsdController extends Controller
             $item->update(['codigo_concepto' => $nuevoCodigo]);
 
             LiquidacionCorreccion::registrar([
-                'periodo'          => $emision->periodo,
-                'tipoliq'          => $fila->tipoliq ?? null,
-                'legajo'           => (string) $item->legajo,
-                'cuil'             => $item->cuil,
-                'concepto'         => (string) $nuevoCodigo,
-                'concepto_arca'    => $conceptoNuevo->concepto_arca ?? null,
-                'sue090_id'        => $fila->id,
+                'periodo' => $emision->periodo,
+                'tipoliq' => $fila->tipoliq ?? null,
+                'legajo' => (string) $item->legajo,
+                'cuil' => $item->cuil,
+                'concepto' => (string) $nuevoCodigo,
+                'concepto_arca' => $conceptoNuevo->concepto_arca ?? null,
+                'sue090_id' => $fila->id,
                 'importe_anterior' => (float) $fila->importe,
-                'importe_nuevo'    => (float) $fila->importe,
-                'motivo'           => "Código de concepto: {$concepto} ({$descOriginal}) → {$nuevoCodigo} ({$conceptoNuevo->detalle}) (edición desde detalle LSD, emisión #{$emision->numero_emision})",
-                'origen'           => 'edicion_codigo_lsd',
+                'importe_nuevo' => (float) $fila->importe,
+                'motivo' => "Código de concepto: {$concepto} ({$descOriginal}) → {$nuevoCodigo} ({$conceptoNuevo->detalle}) (edición desde detalle LSD, emisión #{$emision->numero_emision})",
+                'origen' => 'edicion_codigo_lsd',
             ]);
         });
 
@@ -2413,11 +2479,11 @@ class LsdController extends Controller
     private function contarRegistros(?string $path): array
     {
         $res = ['counts' => ['01' => 0, '02' => 0, '03' => 0, '04' => 0, '05' => 0], 'letra' => ''];
-        if (empty($path) || !is_file($path)) {
+        if (empty($path) || ! is_file($path)) {
             return $res;
         }
         $fh = @fopen($path, 'r');
-        if (!$fh) {
+        if (! $fh) {
             return $res;
         }
         while (($l = fgets($fh)) !== false) {
@@ -2430,6 +2496,7 @@ class LsdController extends Controller
             }
         }
         fclose($fh);
+
         return $res;
     }
 
@@ -2439,14 +2506,14 @@ class LsdController extends Controller
      */
     private function parsearReg04(?string $path): array
     {
-        if (empty($path) || !is_file($path)) {
+        if (empty($path) || ! is_file($path)) {
             return [];
         }
         $fh = @fopen($path, 'r');
-        if (!$fh) {
+        if (! $fh) {
             return [];
         }
-        $num = fn(string $l, int $desde, int $largo): float => round(((int) substr($l, $desde - 1, $largo)) / 100, 2);
+        $num = fn (string $l, int $desde, int $largo): float => round(((int) substr($l, $desde - 1, $largo)) / 100, 2);
         $mapa = [];
         while (($linea = fgets($fh)) !== false) {
             $linea = rtrim($linea, "\r\n");
@@ -2482,6 +2549,7 @@ class LsdController extends Controller
             ];
         }
         fclose($fh);
+
         return $mapa;
     }
 
@@ -2492,13 +2560,13 @@ class LsdController extends Controller
     {
         $emision = LsdEmision::find($id);
 
-        if (!$emision) {
+        if (! $emision) {
             abort(404, 'Emisión no encontrada');
         }
 
         $filepath = $emision->archivo_txt;
 
-        if (empty($filepath) || !is_file($filepath)) {
+        if (empty($filepath) || ! is_file($filepath)) {
             abort(404, 'Archivo de emisión no encontrado');
         }
 
@@ -2509,7 +2577,7 @@ class LsdController extends Controller
     {
         $emision = LsdEmision::with(['empresa', 'usuario'])->find($id);
 
-        if (!$emision) {
+        if (! $emision) {
             return response()->json(['error' => 'Emisión no encontrada'], 404);
         }
 
@@ -2521,11 +2589,11 @@ class LsdController extends Controller
      * Las hojas terminales (confirmado, rechazado) no permiten salir.
      */
     private const TRANSICIONES_PERMITIDAS = [
-        'borrador'   => ['enviado'],
-        'generado'   => ['enviado'],   // 'generado' se comporta como borrador a efectos del flujo
-        'enviado'    => ['confirmado', 'rechazado'],
+        'borrador' => ['enviado'],
+        'generado' => ['enviado'],   // 'generado' se comporta como borrador a efectos del flujo
+        'enviado' => ['confirmado', 'rechazado'],
         'confirmado' => [],
-        'rechazado'  => [],
+        'rechazado' => [],
     ];
 
     /**
@@ -2539,7 +2607,7 @@ class LsdController extends Controller
 
         $emision = LsdEmision::find($id);
 
-        if (!$emision) {
+        if (! $emision) {
             return response()->json(['success' => false, 'message' => 'Emisión no encontrada'], 404);
         }
 
@@ -2554,12 +2622,12 @@ class LsdController extends Controller
         }
 
         $permitidas = self::TRANSICIONES_PERMITIDAS[$estadoActual] ?? [];
-        if (!in_array($nuevoEstado, $permitidas, true)) {
+        if (! in_array($nuevoEstado, $permitidas, true)) {
             return response()->json([
                 'success' => false,
-                'message' => "Transición no permitida: \"{$estadoActual}\" → \"{$nuevoEstado}\". " .
+                'message' => "Transición no permitida: \"{$estadoActual}\" → \"{$nuevoEstado}\". ".
                     ($permitidas
-                        ? 'Estados válidos desde aquí: ' . implode(', ', $permitidas) . '.'
+                        ? 'Estados válidos desde aquí: '.implode(', ', $permitidas).'.'
                         : 'Este estado es final y no admite cambios.'),
             ], 422);
         }
@@ -2605,7 +2673,7 @@ class LsdController extends Controller
     {
         $emision = LsdEmision::find($id);
 
-        if (!$emision) {
+        if (! $emision) {
             return response()->json(['error' => 'Emisión no encontrada'], 404);
         }
 
@@ -2625,20 +2693,24 @@ class LsdController extends Controller
     }
 
     /**
-     * Genera en el catálogo (sue102s) los conceptos "sin parametrizar" detectados
-     * en el LSD. Para cada código:
-     *   - tipo            ← tiporem del rango de sue089s que lo contiene (vacío si no cae en ninguno)
-     *   - concepto_arca   ← codigo_afip del conceptosarca cuyo codigo_contribuyente coincide (null si no hay)
-     * Omite los códigos que ya existen en sue102s.
+     * Da de alta en el catálogo (sue102s) los conceptos que la liquidación usa y el
+     * catálogo no tiene. Lo usan el botón del modal y el alta automática de la
+     * generación, para que las dos hagan exactamente lo mismo.
+     *
+     * Para cada código:
+     *   - tipo          ← tiporem del rango de sue089s que lo contiene ('' si no cae en ninguno)
+     *   - concepto_arca ← codigo_afip del conceptosarca con ese codigo_contribuyente
+     *                     (de la empresa si se indica; null si no hay equivalencia)
+     *
+     * Devuelve los contadores y el detalle por concepto. El detalle importa más que
+     * los contadores: un concepto creado con tipo vacío o sin código ARCA está dado
+     * de alta pero no sirve para liquidar, y el resumen tiene que poder decirlo.
+     *
+     * @param  iterable<array{concepto: mixed, descripcion?: ?string}>  $filas
+     * @return array{creados: int, omitidos: int, sin_tipo: int, sin_arca: int, detalle: list<array<string, mixed>>}
      */
-    public function generarConceptos(Request $request)
+    private function altaDeConceptos(iterable $filas, $idEmpresa = null): array
     {
-        $datos = $request->validate([
-            'conceptos'               => 'required|array|min:1',
-            'conceptos.*.concepto'    => 'required',
-            'conceptos.*.descripcion' => 'nullable|string',
-        ]);
-
         $rangos = DB::table('sue089s')->get();
 
         // tiporem del rango que contiene al código (o '' si no cae en ninguno)
@@ -2648,6 +2720,7 @@ class LsdController extends Controller
                     return trim($r->tiporem ?? '');
                 }
             }
+
             return '';
         };
 
@@ -2655,13 +2728,15 @@ class LsdController extends Controller
         $omitidos = 0;
         $sinTipo = 0;
         $sinArca = 0;
+        $detalle = [];
 
-        DB::transaction(function () use ($datos, $tipoPorCodigo, &$creados, &$omitidos, &$sinTipo, &$sinArca) {
-            foreach ($datos['conceptos'] as $row) {
+        DB::transaction(function () use ($filas, $tipoPorCodigo, $idEmpresa, &$creados, &$omitidos, &$sinTipo, &$sinArca, &$detalle) {
+            foreach ($filas as $row) {
                 $codigo = (int) $row['concepto'];
 
                 if (Sue102::where('codigo', $codigo)->exists()) {
                     $omitidos++;
+
                     continue;
                 }
 
@@ -2670,33 +2745,75 @@ class LsdController extends Controller
                     $sinTipo++;
                 }
 
-                $codigoAfip = DB::table('conceptosarcas')
-                    ->where('codigo_contribuyente', $codigo)
-                    ->value('codigo_afip');
+                // La parametrización ARCA es por empresa (el mismo código propio puede
+                // mapear a códigos AFIP distintos), así que si se sabe la empresa se
+                // busca la suya primero y sólo después cualquiera.
+                $codigoAfip = $idEmpresa !== null
+                    ? DB::table('conceptosarcas')->where('codigo_contribuyente', $codigo)
+                        ->where('id_empresa', $idEmpresa)->value('codigo_afip')
+                    : null;
+                $codigoAfip ??= DB::table('conceptosarcas')
+                    ->where('codigo_contribuyente', $codigo)->value('codigo_afip');
                 if ($codigoAfip === null) {
                     $sinArca++;
                 }
 
-                $detalle = trim($row['descripcion'] ?? '') ?: "Concepto {$codigo}";
+                $descripcion = trim((string) ($row['descripcion'] ?? ''));
+                // Las descripciones del BASEDAT vienen con saltos de línea ("Vacaciones\nNo Goz.").
+                $descripcion = trim(preg_replace('/\s+/u', ' ', $descripcion));
+                $detalleConcepto = $descripcion !== '' ? $descripcion : "Concepto {$codigo}";
 
                 Sue102::create([
-                    'codigo'        => $codigo,
-                    'detalle'       => mb_substr($detalle, 0, 250),
-                    'tipo'          => $tipo,
+                    'codigo' => $codigo,
+                    'detalle' => mb_substr($detalleConcepto, 0, 250),
+                    'tipo' => $tipo,
                     'concepto_arca' => $codigoAfip !== null ? mb_substr((string) $codigoAfip, 0, 6) : null,
                 ]);
 
                 $creados++;
+                $detalle[] = [
+                    'concepto' => (string) $codigo,
+                    'descripcion' => mb_substr($detalleConcepto, 0, 250),
+                    'tipo' => $tipo,
+                    'concepto_arca' => $codigoAfip !== null ? mb_substr((string) $codigoAfip, 0, 6) : null,
+                ];
             }
         });
 
-        return response()->json([
-            'success'  => true,
-            'creados'  => $creados,
+        return [
+            'creados' => $creados,
             'omitidos' => $omitidos,
             'sin_tipo' => $sinTipo,
             'sin_arca' => $sinArca,
-            'message'  => "Se generaron {$creados} conceptos ({$omitidos} ya existían).",
+            'detalle' => $detalle,
+        ];
+    }
+
+    /**
+     * Genera en el catálogo (sue102s) los conceptos "sin parametrizar" detectados
+     * en el LSD. Para cada código:
+     *   - tipo            ← tiporem del rango de sue089s que lo contiene (vacío si no cae en ninguno)
+     *   - concepto_arca   ← codigo_afip del conceptosarca cuyo codigo_contribuyente coincide (null si no hay)
+     * Omite los códigos que ya existen en sue102s.
+     */
+    public function generarConceptos(Request $request)
+    {
+        $datos = $request->validate([
+            'conceptos' => 'required|array|min:1',
+            'conceptos.*.concepto' => 'required',
+            'conceptos.*.descripcion' => 'nullable|string',
+        ]);
+
+        $r = $this->altaDeConceptos($datos['conceptos'], $request->input('id_empresa'));
+
+        return response()->json([
+            'success' => true,
+            'creados' => $r['creados'],
+            'omitidos' => $r['omitidos'],
+            'sin_tipo' => $r['sin_tipo'],
+            'sin_arca' => $r['sin_arca'],
+            'detalle' => $r['detalle'],
+            'message' => "Se generaron {$r['creados']} conceptos ({$r['omitidos']} ya existían).",
         ]);
     }
 }

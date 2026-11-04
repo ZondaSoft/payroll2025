@@ -2,7 +2,6 @@
 
 namespace App\Motor\Aplicacion\CasosDeUso;
 
-use App\Motor\Aplicacion\DTO\AmbitosLote;
 use App\Motor\Aplicacion\DTO\ResultadoSimulacion;
 use App\Motor\Aplicacion\DTO\SolicitudSimulacion;
 use App\Motor\Aplicacion\Puertos\ProveedorCategorias;
@@ -14,6 +13,7 @@ use App\Motor\Aplicacion\Puertos\RepositorioAlicuotas;
 use App\Motor\Aplicacion\Puertos\RepositorioBasesArca;
 use App\Motor\Aplicacion\Puertos\RepositorioBasicos;
 use App\Motor\Aplicacion\Puertos\RepositorioEncuadramientos;
+use App\Motor\Aplicacion\Puertos\RepositorioIncidenciasArca;
 use App\Motor\Aplicacion\Puertos\RepositorioModelosAntiguedad;
 use App\Motor\Aplicacion\Puertos\RepositorioNovedades;
 use App\Motor\Aplicacion\Puertos\RepositorioParametros;
@@ -22,17 +22,21 @@ use App\Motor\Aplicacion\Puertos\RepositorioRelacionesLaborales;
 use App\Motor\Aplicacion\Puertos\RepositorioSubsistemas;
 use App\Motor\Aplicacion\Puertos\RepositorioTopes;
 use App\Motor\Aplicacion\Puertos\RepositorioVersiones;
+use App\Motor\Aplicacion\Servicios\ArmadorContextoRelacion;
 use App\Motor\Dominio\Enums\CodigoBloqueo;
 use App\Motor\Dominio\Liquidador\ContextoPeriodo;
-use App\Motor\Dominio\Liquidador\ContextoRelacionLaboral;
 use App\Motor\Dominio\Liquidador\MotorLiquidacion;
-use App\Motor\Dominio\Liquidador\Resultado\Aviso;
 use App\Motor\Dominio\Liquidador\Resultado\Bloqueo;
 use App\Motor\Dominio\Liquidador\Resultado\Liquidacion;
+use App\Motor\Dominio\Servicios\GateValidacion;
 
 /**
  * Arma los contextos desde los puertos (una query por tabla, nunca por fila) y
  * ejecuta el motor para UNA relación laboral. No persiste el resultado (fase futura).
+ *
+ * Un solo camino de cálculo: los haberes salen de las fórmulas publicadas
+ * (perfil + grafo + DSL, vía CalcularHaberes) y sobre ellos se arman las bases
+ * ARCA, los topes, los aportes y las contribuciones contra la matriz S/N vigente.
  */
 final class SimularLiquidacion
 {
@@ -54,6 +58,9 @@ final class SimularLiquidacion
         private readonly ProveedorConvenios $convenios,
         private readonly ProveedorJornadas $jornadas,
         private readonly ProveedorEmpresas $empresas,
+        private readonly ArmadorContextoRelacion $armador,
+        private readonly CalcularHaberes $haberes,
+        private readonly RepositorioIncidenciasArca $incidencias,
         private readonly MotorLiquidacion $motor = new MotorLiquidacion,
     ) {}
 
@@ -71,26 +78,19 @@ final class SimularLiquidacion
         $periodo = new ContextoPeriodo($s->periodo, $s->tipoLiquidacion, $s->entorno, $this->versiones->vigentesA($fecha), $this->basesArca->todas(), $this->subsistemas->todos(),
             $this->subsistemas->aplicaciones(), $this->alicuotas->contribucionesVigentes($fecha), $this->alicuotas->aportesVigentes($fecha), $this->topes->delPeriodo($s->periodo), $this->regimenes->vigentes($fecha));
 
-        // categoría → convenio (regla de la spec: el convenio sale de la categoría vigente)
+        // El mismo contexto que ve el cálculo por fórmulas: el convenio sale de la
+        // categoría vigente y la discrepancia con el legajo queda como aviso.
+        $ctx = $this->armador->armar($rl, $s->periodo, $s->diasLiquidados, $s->factorJornada, $s->condicionSindical);
         $cat = $rl->categoriaVigenteA($fecha);
         $categoria = $cat?->idCategoria === null ? null : ($this->categorias->porIds([$cat->idCategoria])[$cat->idCategoria] ?? null);
-        $legajo = $this->legajos->porIds([$rl->idLegajo])[$rl->idLegajo] ?? null;
-        $codigoConvenio = $categoria?->codigoConvenio ?? $legajo?->codigoConvenio;
-        $convenio = $codigoConvenio === null ? null : ($this->convenios->porCodigos([$codigoConvenio])[$codigoConvenio] ?? null);
-        $avisos = [];
-        if ($categoria?->codigoConvenio !== null && $legajo?->codigoConvenio !== null && $categoria->codigoConvenio !== $legajo->codigoConvenio) {
-            $avisos[] = new Aviso('CONVENIO_DISCREPANTE', "El convenio de la categoría ({$categoria->codigoConvenio}) difiere del convenio del legajo ({$legajo->codigoConvenio}); se usa el de la categoría.", 'sue001s.convenio');
-        }
-        $ambitos = new AmbitosLote($convenio === null ? [] : [$convenio->id], $cat?->idCategoria === null ? [] : [$cat->idCategoria], [$rl->empresaId], [$rl->id]);
-        $modelo = $convenio === null ? null : ($this->modelosAntiguedad->asignadosAConvenios([$convenio->id], $fecha)[$convenio->id] ?? null);
-        $enc = $this->encuadramientos->porEmpresas([$rl->empresaId], $fecha)[$rl->empresaId][0] ?? null;
+        $convenio = $ctx->codigoConvenio === null ? null : ($this->convenios->porCodigos([$ctx->codigoConvenio])[$ctx->codigoConvenio] ?? null);
+        $modelo = $ctx->modeloAntiguedad;
+        $enc = $ctx->encuadramiento;
 
-        $ctx = new ContextoRelacionLaboral($rl, $fecha, $cat?->idCategoria, $cat?->codigoCategoria, $convenio?->id, $convenio?->codigo,
-            $this->jornadas->porId($legajo?->jornadaId), $enc, $modelo, $this->novedades->porPeriodoYRelaciones($s->periodo, [$rl->id])[$rl->id] ?? [],
-            $s->diasLiquidados, $s->factorJornada, $s->condicionSindical);
-        $ctx->avisos = $avisos;
-
-        $liq = $this->motor->liquidar($periodo, $ctx, $this->parametros->valoresVigentes($fecha, $ambitos), $cat?->idCategoria === null ? [] : $this->basicos->porCategorias([$cat->idCategoria], $fecha));
+        $corrida = $this->haberes->paraContexto($ctx, new GateValidacion($s->entorno));
+        $liq = $this->motor->liquidar($periodo, $ctx, $this->parametros->valoresVigentes($fecha, $this->armador->ambitos($ctx)),
+            $cat?->idCategoria === null ? [] : $this->basicos->porCategorias([$cat->idCategoria], $fecha),
+            $corrida, $this->incidencias->todasVigentes($fecha));
         $empresa = $this->empresas->porId($rl->empresaId);
 
         return new ResultadoSimulacion($liq, [

@@ -106,9 +106,9 @@ final class CasoJulio2026
     }
 
     /** @return list<SubsistemaAplicacion> */
-    public static function aplicaciones(): array
+    public static function aplicaciones(EstadoValidacion $estado = EstadoValidacion::SinConfirmar): array
     {
-        $sc = EstadoValidacion::SinConfirmar;
+        $sc = $estado;
 
         return [
             new SubsistemaAplicacion(1, 1, 'SIPA', TipoAplicacion::Aporte, 'REM_1', 1, true, $sc), new SubsistemaAplicacion(2, 1, 'SIPA', TipoAplicacion::Contribucion, 'REM_2', 2, true, $sc),
@@ -384,7 +384,7 @@ final class CasoJulio2026
 
     public static function contextoPeriodo(Entorno $entorno = Entorno::Prueba, TipoLiquidacion $tipo = TipoLiquidacion::Normal, array $versiones = [], EstadoValidacion $estadoNormativa = EstadoValidacion::SinConfirmar): ContextoPeriodo
     {
-        return new ContextoPeriodo(self::periodo(), $tipo, $entorno, $versiones ?: self::versiones(), self::basesArca(), self::subsistemas(), self::aplicaciones(),
+        return new ContextoPeriodo(self::periodo(), $tipo, $entorno, $versiones ?: self::versiones(), self::basesArca(), self::subsistemas(), self::aplicaciones($estadoNormativa),
             self::alicuotasContribuciones($estadoNormativa), self::alicuotasAportes($estadoNormativa), self::topes($estadoNormativa), self::regimenes($estadoNormativa));
     }
 

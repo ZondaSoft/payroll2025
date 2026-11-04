@@ -27,6 +27,7 @@ final class RepositorioSubsistemasEloquent implements RepositorioSubsistemas
             ->map(fn ($f) => new SubsistemaAplicacion(
                 (int) $f->id_subsistema_aplicacion, (int) $f->id_subsistema, $f->codigo_subsistema, TipoAplicacion::from($f->tipo_aplicacion),
                 $f->codigo_base, (int) $f->columna_lsd, (bool) $f->activo, Mapeos::estado($f),
+                $f->aplicabilidad ?? SubsistemaAplicacion::GENERAL,
             ))->all();
     }
 }

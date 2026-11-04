@@ -40,4 +40,41 @@ final class EsquemaAppMinimo
             $t->timestamp('created_at')->nullable();
         });
     }
+
+    /**
+     * Las tres tablas del catálogo de liquidación que intervienen en el alta de
+     * conceptos del LSD: el catálogo, los rangos que deciden el tipo y la
+     * parametrización ARCA de la que sale el código AFIP.
+     *
+     * Las crea el portal, igual que `users`: en este repo sus Schema::create están
+     * comentados. Sólo se declaran las columnas que el alta lee o escribe.
+     */
+    public static function crearCatalogoLiquidacion(): void
+    {
+        Schema::create('sue102s', function (Blueprint $t) {
+            $t->id();
+            $t->integer('codigo')->unique();
+            $t->string('detalle', 250)->nullable();
+            $t->string('tipo', 4)->nullable();
+            $t->string('concepto_arca', 6)->nullable();
+            $t->timestamps();
+        });
+
+        Schema::create('sue089s', function (Blueprint $t) {
+            $t->id();
+            $t->integer('desde');
+            $t->integer('hasta');
+            $t->string('tiporem', 4)->nullable();
+            $t->timestamps();
+        });
+
+        Schema::create('conceptosarcas', function (Blueprint $t) {
+            $t->id();
+            $t->unsignedBigInteger('id_empresa')->nullable();
+            $t->integer('codigo_contribuyente')->nullable();
+            $t->integer('codigo_afip')->nullable();
+            $t->string('descripcion', 255)->nullable();
+            $t->timestamps();
+        });
+    }
 }

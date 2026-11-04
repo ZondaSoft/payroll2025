@@ -57,34 +57,33 @@ final class SimularLiquidacionTest extends TestCase
 
         self::assertSame('BLOQUEADO', $r['estado']);
         $codigos = array_unique(array_column($r['bloqueos'], 'codigo'));
-        self::assertContains('BASICO_SIN_IMPORTE', $codigos, 'no hay básico cargado para la categoría real 0106. Bloqueos: '.implode(', ', $codigos));
+        // Sin perfiles cargados ningún concepto puede afirmarse (F-3: la ausencia de regla
+        // no es NO_APLICA), y sin encuadramiento no hay contribuciones.
+        self::assertContains('PERFIL_SIN_REGLA', $codigos, 'Bloqueos: '.implode(', ', $codigos));
         self::assertContains('ENCUADRAMIENTO_AUSENTE', $codigos);
         self::assertGreaterThanOrEqual(2, count($codigos));
     }
 
-    public function test_en_prueba_con_basico_y_encuadramiento_liquida(): void
+    /**
+     * Antes este caso liquidaba con las estrategias tipadas aunque ningún perfil
+     * dijera qué le corresponde al trabajador. Con un solo camino de cálculo, el
+     * básico cargado no alcanza: sin perfil cada concepto bloquea, las bases que
+     * integran quedan BLOQUEADAS y no se inventan aportes ni contribuciones.
+     */
+    public function test_sin_perfiles_no_liquida_aunque_haya_basico_y_encuadramiento(): void
     {
         $ahora = now();
         DB::table('motor_basicos')->insert(['id_categoria' => 300, 'codigo_categoria' => '0106', 'vigencia_desde' => '2026-07-01', 'importe_basico' => '1312961.90', 'moneda' => 'ARS', 'estado_validacion' => 'SIN_CONFIRMAR', 'created_at' => $ahora, 'updated_at' => $ahora]);
         DB::table('motor_empresa_encuadramiento')->insert(['empresa_id' => 6, 'encuadramiento' => 'B', 'vigencia_desde' => '2026-01-01', 'estado_validacion' => 'SIN_CONFIRMAR', 'created_at' => $ahora, 'updated_at' => $ahora]);
-        // El tope máximo de REM_4 ya viene del Excel v5 (TOP-008): no hace falta cargarlo acá.
-        // el convenio real 9 (código 3) necesita modelo de antigüedad para ANTIG
-        DB::table('motor_convenio_modelo_antiguedad')->insert(['id_convenio' => 9, 'id_modelo_antiguedad' => 1, 'vigencia_desde' => '2026-07-01', 'estado_validacion' => 'SIN_CONFIRMAR', 'created_at' => $ahora, 'updated_at' => $ahora]);
-        // parámetros del convenio 371/03 para convenio real 9
-        foreach (['PORC_TITULO' => '0.05', 'PORC_ASISTENCIA' => '0.08', 'PORC_MANEJO_FONDOS' => '0.08'] as $cod => $val) {
-            $idp = DB::table('motor_parametros')->where('codigo', $cod)->value('id_parametro');
-            DB::table('motor_valores_parametros')->insert(['id_parametro' => $idp, 'alcance' => 'CONVENIO', 'id_convenio' => 9, 'valor' => $val, 'vigencia_desde' => '2026-07-01', 'estado_validacion' => 'SIN_CONFIRMAR', 'created_at' => $ahora, 'updated_at' => $ahora]);
-        }
 
         $r = $this->simular(Entorno::Prueba);
 
-        self::assertNotSame('BLOQUEADO', $r['estado'], json_encode($r['bloqueos'], JSON_UNESCAPED_UNICODE));
-        $h = array_column($r['haberes'], 'importe', 'codigo');
-        self::assertSame('1312961.90', $h['BASICO']);
-        self::assertSame('210073.90', $h['ANTIG'], '8 años → 16 %');
-        self::assertArrayHasKey('REM_1', $r['bases_arca']);
-        self::assertNotEmpty($r['aportes']);
+        self::assertSame('BLOQUEADO', $r['estado']);
+        self::assertSame([], $r['haberes'], 'ningún haber sin una regla de perfil que lo alcance');
+        self::assertSame('BLOQUEADA', $r['bases_arca']['REM_1']['estado']);
+        self::assertNull($r['bases_arca']['REM_1']['importe_aplicado']);
+        self::assertSame([], $r['aportes']);
+        self::assertSame([], $r['contribuciones']);
         self::assertSame('B', $r['cabecera']['encuadramiento']);
-        self::assertContains('SIN_CONFIRMAR', array_column($r['avisos'], 'codigo'));
     }
 }

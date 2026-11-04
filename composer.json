@@ -14,7 +14,8 @@
         "laravel/tinker": "^2.10.1",
         "maatwebsite/excel": "^3.1",
         "spatie/laravel-permission": "^6.23",
-        "tightenco/ziggy": "^2.0"
+        "tightenco/ziggy": "^2.0",
+        "zonda/hub-connector": "@dev"
     },
     "require-dev": {
         "fakerphp/faker": "^1.23",
@@ -89,5 +90,11 @@
         }
     },
     "minimum-stability": "stable",
-    "prefer-stable": true
+    "prefer-stable": true,
+    "repositories": {
+        "hub-connector": {
+            "type": "path",
+            "url": "../hubadmin/packages/hub-connector"
+        }
+    }
 }

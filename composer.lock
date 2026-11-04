@@ -4,7 +4,7 @@
         "Read more about it at https://getcomposer.org/doc/01-basic-usage.md#installing-dependencies",
         "This file is @generated automatically"
     ],
-    "content-hash": "7b6e2a9eb350dde3cdc2ef105483c43e",
+    "content-hash": "65051fc70b54a9152f106e993f39384a",
     "packages": [
         {
             "name": "barryvdh/laravel-dompdf",
@@ -7399,6 +7399,40 @@
                 }
             ],
             "time": "2024-11-21T01:49:47+00:00"
+        },
+        {
+            "name": "zonda/hub-connector",
+            "version": "dev-main",
+            "dist": {
+                "type": "path",
+                "url": "../hubadmin/packages/hub-connector",
+                "reference": "470fa4f31b7fbd024fbc57b54cd3ff63b33cf804"
+            },
+            "require": {
+                "illuminate/http": "^11.0|^12.0",
+                "illuminate/support": "^11.0|^12.0",
+                "php": "^8.2"
+            },
+            "type": "library",
+            "extra": {
+                "laravel": {
+                    "providers": [
+                        "Zonda\\HubConnector\\HubConnectorServiceProvider"
+                    ]
+                }
+            },
+            "autoload": {
+                "psr-4": {
+                    "Zonda\\HubConnector\\": "src/"
+                }
+            },
+            "license": [
+                "proprietary"
+            ],
+            "description": "Conector de los sistemas cliente (RRHH, portal, nómina) con HubAdmin: API de lectura + webhooks firmados.",
+            "transport-options": {
+                "relative": true
+            }
         }
     ],
     "packages-dev": [
@@ -9828,7 +9862,9 @@
     ],
     "aliases": [],
     "minimum-stability": "stable",
-    "stability-flags": [],
+    "stability-flags": {
+        "zonda/hub-connector": 20
+    },
     "prefer-stable": true,
     "prefer-lowest": false,
     "platform": {

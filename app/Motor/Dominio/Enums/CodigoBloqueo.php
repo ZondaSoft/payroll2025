@@ -23,6 +23,12 @@ enum CodigoBloqueo: string
     case TopeDuplicado = 'TOPE_DUPLICADO';
     case EstadoNoHabilitado = 'ESTADO_NO_HABILITADO';
     case IncidenciaPendiente = 'INCIDENCIA_PENDIENTE';
+    /** Un concepto calculado sin fila de incidencia vigente para la aplicación: la ausencia no es N. */
+    case IncidenciaAusente = 'INCIDENCIA_AUSENTE';
+    /** La fila existe pero no dice S ni N (PENDIENTE, CONDICIONADO): no se puede componer la base. */
+    case IncidenciaNoResuelta = 'INCIDENCIA_NO_RESUELTA';
+    /** Una base ARCA quedó bloqueada (concepto bloqueado con incidencia S, incidencia ausente…). */
+    case BaseBloqueada = 'BASE_BLOQUEADA';
     case ConflictoPerfiles = 'CONFLICTO_PERFILES';
     case NovedadObligatoriaAusente = 'NOVEDAD_OBLIGATORIA_AUSENTE';
     case NovedadSinMapeo = 'NOVEDAD_SIN_MAPEO';
@@ -59,6 +65,9 @@ enum CodigoBloqueo: string
             self::TopeDuplicado => 'Tope duplicado (configuración ambigua)',
             self::EstadoNoHabilitado => 'Estado de validación no habilitado para el entorno',
             self::IncidenciaPendiente => 'Incidencia ARCA pendiente',
+            self::IncidenciaAusente => 'Concepto sin incidencia ARCA vigente para la aplicación',
+            self::IncidenciaNoResuelta => 'Incidencia ARCA que no es S ni N',
+            self::BaseBloqueada => 'Base ARCA bloqueada',
             self::ConflictoPerfiles => 'Conflicto de aplicabilidad de igual nivel',
             self::NovedadObligatoriaAusente => 'Novedad obligatoria ausente',
             self::NovedadSinMapeo => 'Novedad de origen sin mapeo',
@@ -71,6 +80,7 @@ enum CodigoBloqueo: string
             self::AlicuotaAusente => 'Alícuota no parametrizada',
             self::RegimenSinBase => 'Sin régimen BASE para el trabajador',
             self::BaseZondaInexistente => 'Base de Zonda inexistente o inactiva',
+            self::BaseNoConstruida => 'Base ARCA no calculada',
             self::JornadaSinDato => 'Jornada sin dato y sin referencia',
             self::ConfiguracionInvalida => 'Configuración inválida del concepto',
             self::PeriodicidadDesconocida => 'Periodicidad desconocida',

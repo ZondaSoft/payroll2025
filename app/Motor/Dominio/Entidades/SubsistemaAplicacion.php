@@ -17,7 +17,18 @@ final readonly class SubsistemaAplicacion
         public int $columnaLsd,
         public bool $activo,
         public EstadoValidacion $estadoValidacion,
+        /** GENERAL: se evalúa para toda relación. REGIMEN: sólo cuando un régimen de la relación la habilita (DBML v2). */
+        public string $aplicabilidad = self::GENERAL,
     ) {}
+
+    public const GENERAL = 'GENERAL';
+
+    public const REGIMEN = 'REGIMEN';
+
+    public function esPorRegimen(): bool
+    {
+        return $this->aplicabilidad === self::REGIMEN;
+    }
 
     /** Clave estable para snapshots: SIPA|APORTE */
     public function clave(): string

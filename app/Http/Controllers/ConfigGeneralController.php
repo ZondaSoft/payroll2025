@@ -28,9 +28,12 @@ class ConfigGeneralController extends Controller
     {
         $validated = $request->validate([
             'lsd_no_conceptos' => 'required|boolean',
+            'lsd_ocultar_activos' => 'required|boolean',
         ], [
-            'lsd_no_conceptos.required' => 'Indique si el LSD se genera sin conceptos.',
-            'lsd_no_conceptos.boolean' => 'El valor de "LSD sin conceptos" no es válido.',
+            'lsd_no_conceptos.required' => 'Indique si en la generación del LSD se agregan los conceptos sin preguntar.',
+            'lsd_no_conceptos.boolean' => 'El valor del switch de conceptos del LSD no es válido.',
+            'lsd_ocultar_activos.required' => 'Indique si se oculta el diálogo de empleados activos sin liquidación.',
+            'lsd_ocultar_activos.boolean' => 'El valor del switch de empleados activos sin liquidación no es válido.',
         ]);
 
         SueConfig::actual()->update($validated + ['usuario_id' => $request->user()?->id]);

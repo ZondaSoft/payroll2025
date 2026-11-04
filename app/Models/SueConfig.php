@@ -14,11 +14,13 @@ class SueConfig extends Model
 
     protected $fillable = [
         'lsd_no_conceptos',
+        'lsd_ocultar_activos',
         'usuario_id',
     ];
 
     protected $casts = [
         'lsd_no_conceptos' => 'boolean',
+        'lsd_ocultar_activos' => 'boolean',
     ];
 
     public function usuario()
@@ -29,6 +31,11 @@ class SueConfig extends Model
     /** El único registro de parámetros; lo crea con los valores por defecto si todavía no existe. */
     public static function actual(): self
     {
-        return static::query()->orderBy('id')->firstOrCreate([], ['lsd_no_conceptos' => false]);
+        return static::query()->orderBy('id')->firstOrCreate([], [
+            'lsd_no_conceptos' => false,
+            // El diálogo de activos sin liquidación se muestra por defecto: ocultarlo
+            // deja gente afuera del TXT, así que tiene que ser una decisión explícita.
+            'lsd_ocultar_activos' => false,
+        ]);
     }
 }

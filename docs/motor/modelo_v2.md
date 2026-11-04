@@ -62,7 +62,7 @@ Principio de la persistencia: **lo liquidado se congela**. La versión de fórmu
 
 ## 6-bis. Etapa 3A contrastada contra el motor de Oscar (2026-10-13)
 
-El instructivo `instructivo-daniel.html` trae `sim/motor_contributivo.js`, que no estaba en GitHub: es la Etapa 3A **ejecutable**. Contrastado contra la implementación propia, aparecieron cinco diferencias. Tres ya están aplicadas:
+El instructivo `instructivo-daniel.html` trae `sim/motor_contributivo.js`, que no estaba en `main` (vive en la rama `feature/instructivo-interactivo-daniel`, PR #10): es la Etapa 3A **ejecutable**. Contrastado contra la implementación propia, aparecieron cinco diferencias. Tres ya están aplicadas:
 
 1. **REM_10 es una base DERIVADA, no sale de la matriz.** `REM_10 = REM_2 − importe a detraer (Ley 27.430)`, con el piso mínimo previsional como tope. Y con detracción **cero** no es que no se informe: **se informa en cero** (ARCA G18). Implementado en `MotorLiquidacion` (etapa 6-bis) y en `BaseImponibleResultado::derivar()`.
 2. **Las contribuciones de seguridad social se liquidan sobre REM_10**, no sobre la base nominal de cada alícuota, cuando REM_10 está calculada. Aplica a las líneas generales y al régimen sustitutivo; los adicionales y las sustituciones de subsistema conservan su propia base.
@@ -98,11 +98,11 @@ El generador emite `database/seeders/motor/datos/v5/*.php` con los datos tal com
 
 ## 8. Lo que falta
 
-Las fórmulas están cargadas como dato pero **todavía no se ejecutan**: hace falta portar el parser/evaluador del DSL (`dsl_v11.js` del repo `okat0566/motor-zonda`, 906 líneas y 110 pruebas) a PHP. Hasta entonces el motor sigue calculando con las estrategias tipadas, cuyas fórmulas difieren de las verificadas — ver §3 de este documento y las diferencias registradas en el análisis del repo.
+*Actualizado el 2026-10-15.* El DSL **ya está portado y se ejecuta** (commits `8fe602f`, el port, a `8074ca4`, las pantallas; guía en [`dsl.md`](dsl.md)): el 7019 y el 221 cierran al centavo evaluando las `expr_*` publicadas. Estado de los cuatro puntos que esta sección dejaba abiertos:
 
-Cuatro puntos a cerrar con Oscar antes del port:
+1. **Fórmulas `LISTO_DESARROLLO`** — sigue sin promoción formal en el último commit del PR #10; el protocolo del PR #12 §3.3 lo deja para que Oscar lo regularice, sin frenar el desarrollo en curso. Abierto.
+2. **DBML v2** — resuelto: `docs/arquitectura/modelo_2026-09-24/zonda_modelo_motor_v2.dbml` en la rama `feature/instructivo-interactivo-daniel` (58 tablas / 82 FK / 58 PK).
+3. **Fixture de la conciliación F.931** — parcial: la versión anonimizada está en `sim/data/reconciliacion_control_2026_08.json` de esa rama; la evidencia real queda en SharePoint.
+4. **Firma del DSL** — resuelto: `NOV(COD)` es la única firma canónica (F-2/P-6); el `dsl_v11.js` de `main` es el que estaba desactualizado.
 
-1. ¿El módulo **Fórmulas** también pasó `LISTO_DESARROLLO`, o sólo la Etapa 3A? La auditoría acredita 3A, y hay versiones en BORRADOR (ADTIT, COMIDA, VIATESP, APJUB, APINSSJYP).
-2. El **DBML v2** como archivo: el repo sólo tiene el v1 del 30/08.
-3. El **fixture de BLEXA 08/2026** para reproducir la conciliación contra F.931.
-4. La **firma del DSL**: este Excel usa `NOV(COD)` y `dsl_v11.js` exige `NOV(COD,CANT)`.
+Las incidencias de la integración se coordinan en el issue #11 de `okat0566/motor-zonda` con el protocolo del PR #12.

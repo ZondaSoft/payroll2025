@@ -4,6 +4,7 @@ namespace App\Motor\Dominio\Liquidador;
 
 use App\Motor\Dominio\Entidades\Concepto;
 use App\Motor\Dominio\Entidades\ConceptoVersion;
+use App\Motor\Dominio\Entidades\IncidenciaArca;
 use App\Motor\Dominio\Enums\CodigoBloqueo;
 use App\Motor\Dominio\Enums\ComponenteTope;
 use App\Motor\Dominio\Enums\EstrategiaCalculo;
@@ -11,6 +12,8 @@ use App\Motor\Dominio\Enums\TipoConcepto;
 use App\Motor\Dominio\Estrategias\RegistroEstrategias;
 use App\Motor\Dominio\Estrategias\SinNovedad;
 use App\Motor\Dominio\Excepciones\MotorBloqueado;
+use App\Motor\Dominio\Formulas\EstadoCorrida;
+use App\Motor\Dominio\Formulas\ResultadoConcepto;
 use App\Motor\Dominio\Liquidador\Resultado\Aviso;
 use App\Motor\Dominio\Liquidador\Resultado\BaseImponibleResultado;
 use App\Motor\Dominio\Liquidador\Resultado\Bloqueo;
@@ -18,6 +21,7 @@ use App\Motor\Dominio\Liquidador\Resultado\LineaAporte;
 use App\Motor\Dominio\Liquidador\Resultado\LineaContribucion;
 use App\Motor\Dominio\Liquidador\Resultado\LineaHaber;
 use App\Motor\Dominio\Liquidador\Resultado\Liquidacion;
+use App\Motor\Dominio\Servicios\ConceptoEnBase;
 use App\Motor\Dominio\Servicios\ConstructorBasesArca;
 use App\Motor\Dominio\Servicios\GateValidacion;
 use App\Motor\Dominio\Servicios\Redondeador;
@@ -40,6 +44,13 @@ use App\Motor\Dominio\ValorObjetos\Importe;
  * Etapas: parámetros técnicos → versiones (snapshot) → aplicabilidad → elegibilidad
  *   → básico → haberes integrantes de BASE_HORA_NORMAL → consumidores → resto
  *   → bases ARCA → topes → aportes → contribuciones → totales.
+ *
+ * Con una corrida de fórmulas ($haberesDsl) los haberes salen de ella —perfil,
+ * grafo y DSL— y no de las estrategias tipadas: las bases ARCA se componen desde
+ * los conceptos CALCULADOS y BLOQUEADOS de esa corrida contra la matriz S/N
+ * vigente, y los aportes desde las aplicaciones APORTE de Seguridad Social
+ * (instructivo §22 F–I; sim/motor_contributivo.js). Es el camino del simulador;
+ * el de las estrategias queda para quien no trae corrida.
  */
 final class MotorLiquidacion
 {
@@ -59,8 +70,17 @@ final class MotorLiquidacion
      * @param  list<\App\Motor\Dominio\Entidades\ValorParametro>  $valoresParametros  vigentes para los ámbitos del trabajador
      * @param  array<int, list<\App\Motor\Dominio\Entidades\Basico>>  $basicosPorCategoria
      */
-    public function liquidar(ContextoPeriodo $periodo, ContextoRelacionLaboral $ctx, array $valoresParametros, array $basicosPorCategoria): Liquidacion
-    {
+    /**
+     * @param  array<string, list<IncidenciaArca>>|null  $incidenciasVigentes  matriz S/N vigente por concepto; requerida con $haberesDsl
+     */
+    public function liquidar(
+        ContextoPeriodo $periodo,
+        ContextoRelacionLaboral $ctx,
+        array $valoresParametros,
+        array $basicosPorCategoria,
+        ?EstadoCorrida $haberesDsl = null,
+        ?array $incidenciasVigentes = null,
+    ): Liquidacion {
         $liq = new Liquidacion($periodo->periodo, $ctx->relacion->id ?? 0, $periodo->tipoLiquidacion, $periodo->entorno);
         $gate = new GateValidacion($periodo->entorno);
         $parametros = new ResolutorParametros($valoresParametros, $gate);
@@ -89,10 +109,17 @@ final class MotorLiquidacion
             return $this->cerrar($liq, $ctx);
         }
 
-        // 2) versiones vigentes → conceptos + aplicabilidad + elegibilidad
+        $porFormulas = $haberesDsl !== null;
         $activados = [];   // codigo => [Concepto, ConceptoVersion]
-        $integrantes = []; // base zonda => conceptos
+        $versionesUsadas = [];
         $incidenciasArca = [];
+        $conceptosEnBase = [];
+        if ($porFormulas) {
+            // 2–4) perfil + grafo + DSL ya resueltos en la corrida
+            $conceptosEnBase = $this->haberesDesdeFormulas($liq, $periodo, $haberesDsl);
+        } else {
+        // 2) versiones vigentes → conceptos + aplicabilidad + elegibilidad
+        $integrantes = []; // base zonda => conceptos
         foreach ($periodo->versiones as $codigo => $version) {
             $c = $version->concepto();
             if (! $c->activo) {
@@ -147,7 +174,6 @@ final class MotorLiquidacion
         // 3) haberes: primero integrantes de BASE_HORA_NORMAL, luego consumidores de bases, luego el resto
         $haberes = array_filter($activados, fn ($par) => $par[0]->esHaber() && ! $par[0]->esModuloSistema());
         $orden = $this->ordenar($haberes, $integrantes);
-        $versionesUsadas = [];
         foreach ($orden as $codigo) {
             [$c, $version] = $activados[$codigo];
             try {
@@ -190,19 +216,27 @@ final class MotorLiquidacion
             }
             $liq->basesZonda[$codigoBase] = $b;
         }
-
-        // 5) bases ARCA (solo haberes remunerativos/no remunerativos según incidencia)
-        try {
-            $r = $this->basesArca->construir($periodo->aplicacionesPorClave(), $incidenciasArca, $liq->haberes, $periodo->fechaResolucion, $periodo->entorno);
-            $liq->basesArca = $r['bases'];
-            foreach ($r['avisos'] as $a) {
-                $liq->agregarAviso($a);
-            }
-            $liq->etapas['bases_arca'] = 'OK';
-        } catch (MotorBloqueado $e) {
-            $liq->agregarBloqueo(Bloqueo::desde($e, 'bases_arca'));
-            $liq->etapas['bases_arca'] = 'BLOQUEADA';
         }
+
+        // 5) bases ARCA desde la matriz S/N. Una base que no se puede afirmar queda
+        // BLOQUEADA y sin importe: nunca cero (PE-2, instructivo §11–§12).
+        $r = $porFormulas
+            ? $this->basesArca->componer($periodo->aplicacionesPorClave(), $incidenciasVigentes ?? [],
+                $conceptosEnBase, $periodo->fechaResolucion, $gate, $this->subsistemasPorRegimen($periodo, $ctx))
+            : $this->basesArca->construir($periodo->aplicacionesPorClave(), $incidenciasArca, $liq->haberes, $periodo->fechaResolucion, $periodo->entorno);
+        $liq->basesArca = $r['bases'];
+        foreach ($r['avisos'] as $a) {
+            $liq->agregarAviso($a);
+        }
+        foreach ($r['omitidas'] as $o) {
+            $liq->noEjecutados[] = ['codigo' => $o['clave'], 'motivo' => "aplicación por régimen ({$o['codigo_base']}): ningún régimen de la relación la habilita"];
+        }
+        foreach ($liq->basesArca as $codigoBase => $base) {
+            if ($base->estaBloqueada()) {
+                $liq->agregarBloqueo(new Bloqueo(CodigoBloqueo::BaseBloqueada, "{$codigoBase} [{$base->codigoError}]: {$base->motivoBloqueo}", 'bases_arca', 'motor_concepto_incidencia_arca'));
+            }
+        }
+        $liq->etapas['bases_arca'] = array_filter($liq->basesArca, fn ($b) => $b->estaBloqueada()) === [] ? 'OK' : 'BLOQUEADA';
 
         // 5-bis) diferenciales de base ajenos a la matriz de conceptos: los resuelve el
         // módulo responsable (obra social por jornada parcial) y entran a la base ANTES
@@ -223,7 +257,7 @@ final class MotorLiquidacion
         $topes = new ResolutorTopes($periodo->topes, $gate);
         foreach ($liq->basesArca as $codigoBase => $base) {
             $def = $periodo->baseArca($codigoBase);
-            if ($def === null) {
+            if ($def === null || $base->estaBloqueada()) {
                 continue;
             }
             try {
@@ -246,8 +280,8 @@ final class MotorLiquidacion
         // con detracción se aplica además su propio tope, que es el piso previsional.
         if ($ctx->importeDetraer !== null) {
             $rem2 = $liq->basesArca['REM_2'] ?? null;
-            if ($rem2 === null) {
-                $liq->agregarBloqueo(new Bloqueo(CodigoBloqueo::BaseNoConstruida, 'REM_10 no se puede derivar: REM_2 no fue construida.', 'bases_arca', 'motor_bases_arca'));
+            if ($rem2 === null || $rem2->estaBloqueada()) {
+                $liq->agregarBloqueo(new Bloqueo(CodigoBloqueo::BaseNoConstruida, 'REM_10 no se puede derivar: REM_2 no fue construida o está bloqueada.', 'bases_arca', 'motor_bases_arca'));
             } else {
                 $detraer = Importe::de($ctx->importeDetraer);
                 $rem10 = new BaseImponibleResultado('REM_10');
@@ -277,7 +311,9 @@ final class MotorLiquidacion
         // 7) aportes personales (MODULO_SISTEMA con sujeto TRABAJADOR): alícuota por condición × base topeada
         $alicuotas = new ResolutorAlicuotas($periodo->alicuotasAportes, $gate);
         $condicion = $ctx->relacion->encuadreArca?->codigoCondicion ?? '1';
-        foreach ($activados as $codigo => [$c, $version]) {
+        if ($porFormulas) {
+            $this->aportesPorAplicacion($liq, $periodo, $ctx, $alicuotas, $condicion);
+        } else foreach ($activados as $codigo => [$c, $version]) {
             if (! $c->esModuloSistema() || $c->tipo !== TipoConcepto::Descuento) {
                 continue;
             }
@@ -333,8 +369,9 @@ final class MotorLiquidacion
             foreach ($r['lineas'] as $l) {
                 $codigoBase = $rem10Calculada && in_array($l['regla'], ['BASE', 'SUSTITUTIVO'], true) ? 'REM_10' : $l['base'];
                 $base = $liq->basesArca[$codigoBase] ?? null;
-                if ($base === null) {
-                    $liq->agregarBloqueo(new Bloqueo(CodigoBloqueo::AlicuotaAusente, "Contribución {$l['subsistema']}: la base {$codigoBase} no fue construida.", 'contribuciones', 'motor_bases_arca'));
+                if ($base === null || $base->estaBloqueada()) {
+                    $liq->agregarBloqueo(new Bloqueo($base === null ? CodigoBloqueo::BaseNoConstruida : CodigoBloqueo::BaseBloqueada,
+                        "Contribución {$l['subsistema']}: la base {$codigoBase} ".($base === null ? 'no fue construida.' : "está bloqueada [{$base->codigoError}]."), 'contribuciones', 'motor_bases_arca'));
 
                     continue;
                 }
@@ -352,6 +389,160 @@ final class MotorLiquidacion
         $liq->traza->registrar('resumen', 'Versiones usadas', ['ids' => array_values(array_unique($versionesUsadas))]);
 
         return $this->cerrar($liq, $ctx);
+    }
+
+    /**
+     * Pasa la corrida de fórmulas al resultado del liquidador: los calculados son
+     * líneas del recibo, los bloqueados son bloqueos, lo que no aplica queda con su
+     * motivo. Devuelve lo que la composición de bases ARCA necesita de cada uno.
+     *
+     * @return list<ConceptoEnBase>
+     */
+    private function haberesDesdeFormulas(Liquidacion $liq, ContextoPeriodo $periodo, EstadoCorrida $corrida): array
+    {
+        $enBase = [];
+        foreach ($corrida->conceptos as $codigo => $r) {
+            $codigo = (string) $codigo;
+            if ($r->estado === ResultadoConcepto::NO_APLICA) {
+                $liq->noEjecutados[] = ['codigo' => $codigo, 'motivo' => (string) $r->motivo];
+
+                continue;
+            }
+            if ($r->estado !== ResultadoConcepto::CALCULADO) {
+                // BLOQUEADO o NO_MODELADO: el concepto corresponde y no se puede afirmar.
+                // Igual que en las bases de Zonda, bloquea toda base ARCA que integre.
+                $liq->agregarBloqueo(new Bloqueo(CodigoBloqueo::tryFrom((string) $r->codigoError) ?? CodigoBloqueo::ConfiguracionInvalida,
+                    "{$codigo} [{$r->codigoError}]: {$r->motivo}", 'haberes', 'motor_concepto_versiones', null, false, $codigo));
+                $enBase[] = ConceptoEnBase::bloqueado($codigo, $r->codigoError);
+
+                continue;
+            }
+
+            $concepto = isset($periodo->versiones[$codigo]) ? $periodo->versiones[$codigo]->concepto() : null;
+            if ($concepto === null) {
+                $liq->agregarBloqueo(new Bloqueo(CodigoBloqueo::ConceptoSinVersion,
+                    "{$codigo}: la fórmula lo calculó pero el concepto no está en el catálogo vigente del período.", 'haberes', 'motor_conceptos', null, false, $codigo));
+                $enBase[] = ConceptoEnBase::bloqueado($codigo, CodigoBloqueo::ConceptoSinVersion->value);
+
+                continue;
+            }
+
+            // El importe del DSL es exacto: la fórmula ya aplicó su propio redondeo y
+            // el motor no agrega redondeos implícitos (P-7).
+            $importe = Importe::de((string) $r->importeResultado);
+            $linea = new LineaHaber($concepto, $importe, $importe, $r->cantidad,
+                $r->valorUnitario === null ? null : Importe::de((string) $r->valorUnitario), null, null,
+                ['origen' => 'FORMULA', 'variante' => $r->variante, 'referencias' => $r->traza?->resumen() ?? []]);
+            if ($concepto->tipo === TipoConcepto::Descuento) {
+                $liq->descuentos[] = $linea;
+            } else {
+                $liq->haberes[] = $linea;
+            }
+            $liq->traza->registrar('haberes', "{$codigo} = {$importe->aTexto(2)}", ['variante' => $r->variante], $codigo);
+            $enBase[] = ConceptoEnBase::calculado($codigo, $importe);
+        }
+        $liq->etapas['aplicabilidad'] = 'OK';
+        $liq->etapas['haberes'] = $liq->haberes === [] && $liq->tieneBloqueos() ? 'BLOQUEADA' : 'OK';
+
+        foreach ($corrida->bases as $codigoBase => $b) {
+            $res = new BaseImponibleResultado((string) $codigoBase, 'ZONDA');
+            foreach ($b->incluidos as $c => $imp) {
+                $res->incluir((string) $c, Importe::de((string) $imp));
+            }
+            foreach ($b->excluidos as $c => $motivo) {
+                $res->excluir((string) $c, (string) $motivo);
+            }
+            if (! $b->esOk()) {
+                $res->bloquear('BASE_ZONDA_BLOQUEADA', (string) $b->motivo);
+            }
+            $liq->basesZonda[(string) $codigoBase] = $res;
+        }
+
+        return $enBase;
+    }
+
+    /**
+     * Aportes personales desde las aplicaciones APORTE de Seguridad Social: base
+     * REM_n de la aplicación × alícuota por condición ARCA. Obra social y FSR son de
+     * su propio módulo. Una aplicación REGIMEN sin régimen que la habilite no aplica
+     * (no se busca alícuota ni se bloquea); habilitada y sin alícuota, bloquea.
+     */
+    private function aportesPorAplicacion(Liquidacion $liq, ContextoPeriodo $periodo, ContextoRelacionLaboral $ctx, ResolutorAlicuotas $alicuotas, string $condicion): void
+    {
+        $modulo = [];
+        foreach ($periodo->subsistemas as $s) {
+            $modulo[$s->codigo] = $s->moduloResponsable;
+        }
+        $porRegimen = $this->subsistemasPorRegimen($periodo, $ctx);
+
+        foreach ($periodo->aplicacionesPorClave() as $clave => $ap) {
+            if ($ap->tipoAplicacion->value !== 'APORTE' || ! $ap->activo || $ap->codigoBase === null) {
+                continue;
+            }
+            if (($modulo[$ap->codigoSubsistema] ?? null) !== 'SEGURIDAD_SOCIAL') {
+                $liq->noEjecutados[] = ['codigo' => $clave, 'motivo' => "aporte {$ap->codigoSubsistema}: lo liquida el módulo ".($modulo[$ap->codigoSubsistema] ?? '?')];
+
+                continue;
+            }
+            if ($ap->esPorRegimen() && ! in_array($ap->codigoSubsistema, $porRegimen, true)) {
+                continue; // ya informado como aplicación omitida al componer las bases
+            }
+            $base = $liq->basesArca[$ap->codigoBase] ?? null;
+            if ($base === null || $base->estaBloqueada()) {
+                $liq->agregarBloqueo(new Bloqueo($base === null ? CodigoBloqueo::BaseNoConstruida : CodigoBloqueo::BaseBloqueada,
+                    "Aporte {$ap->codigoSubsistema}: la base {$ap->codigoBase} ".($base === null ? 'no fue construida.' : "está bloqueada [{$base->codigoError}]."), 'aportes', 'motor_bases_arca'));
+
+                continue;
+            }
+            try {
+                $r = $alicuotas->aporte($ap->codigoSubsistema, $condicion);
+                if ($r['aviso'] !== null) {
+                    $liq->agregarAviso($r['aviso']);
+                }
+                $a = $r['alicuota'];
+                $importe = $a->porcentaje->aplicarA($a->aplicaTope ? $base->importeAplicado : $base->importeAntesAjustes)->redondeado(2);
+                $liq->aportes[] = new LineaAporte($this->conceptoAportePara($periodo, $ap->codigoSubsistema, $ap->codigoBase), $ap->codigoSubsistema,
+                    $ap->codigoBase, $base->importeAplicado, $a->porcentaje, $importe, $a->codigo, $a->codigoCondicion);
+            } catch (MotorBloqueado $e) {
+                $liq->agregarBloqueo(Bloqueo::desde($e, 'aportes'));
+            }
+        }
+    }
+
+    /** El concepto de recibo del aporte (APJUB, APINSSJYP…), si el catálogo lo tiene. */
+    private function conceptoAportePara(ContextoPeriodo $periodo, string $subsistema, string $codigoBase): string
+    {
+        foreach ($periodo->versiones as $codigo => $version) {
+            $c = $version->concepto();
+            if ($c->esModuloSistema() && $c->tipo === TipoConcepto::Descuento && $c->baseModulo === $codigoBase
+                && $this->subsistemaDeConcepto($periodo, $c) === $subsistema) {
+                return (string) $codigo;
+            }
+        }
+
+        return 'AP_'.$subsistema;
+    }
+
+    /**
+     * Subsistemas que los regímenes vigentes de la relación habilitan (su destino y,
+     * en una sustitución, el subsistema que entra). Es lo que activa una aplicación
+     * REGIMEN como RENATRE.
+     *
+     * @return list<string>
+     */
+    private function subsistemasPorRegimen(ContextoPeriodo $periodo, ContextoRelacionLaboral $ctx): array
+    {
+        $codigos = array_map(fn ($r) => $r->codigoRegimen, $ctx->relacion->regimenesVigentesA($periodo->fechaResolucion));
+        $subsistemas = [];
+        foreach ($periodo->regimenes as $r) {
+            if (in_array($r->codigo, $codigos, true) && $r->destino !== null) {
+                foreach (explode('+', $r->destino) as $d) {
+                    $subsistemas[] = trim($d);
+                }
+            }
+        }
+
+        return array_values(array_unique($subsistemas));
     }
 
     /**

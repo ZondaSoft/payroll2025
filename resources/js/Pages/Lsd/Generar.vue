@@ -124,30 +124,7 @@ const generarEmision = async (opts = {}) => {
       }
       router.reload({ only: ['emisiones'] })
 
-      const excluidos = response.data.legajos_excluidos
-      const sacAuto = response.data.sac_autocompletado
-      if (Array.isArray(excluidos) && excluidos.length) {
-        // Se generó ignorando legajos con datos SICOSS incompletos: avisar cuáles quedaron afuera.
-        Swal.fire({
-          icon: 'warning',
-          title: 'Emisión generada (con legajos ignorados)',
-          html: `Se generó el archivo <b>excluyendo ${excluidos.length} legajo(s)</b> con datos SICOSS incompletos:<br><br>` +
-                `<span style="font-family:monospace;">${escapeHtml(excluidos.join(', '))}</span><br><br>` +
-                `Esos legajos <b>no se informan</b> en este LSD. Completá sus datos SICOSS y regenerá si corresponde.`,
-          confirmButtonText: 'Entendido',
-        })
-      } else if (Array.isArray(sacAuto) && sacAuto.length) {
-        // SAC sin días completado con 30 para que ARCA lo cuente en BI 1/4/5.
-        mostrarAvisoSacAutocompletado(sacAuto)
-      } else {
-        Swal.fire({
-          icon: 'success',
-          title: 'Emisión generada',
-          text: 'La emisión se generó exitosamente.',
-          timer: 2500,
-          showConfirmButton: false,
-        })
-      }
+      mostrarResumenGeneracion(response.data)
     }
   } catch (error) {
     const data = error.response?.data
@@ -448,25 +425,152 @@ const mostrarAdvertenciaAportes = (items) => {
 }
 
 // Aviso NO bloqueante: SAC (concepto ARCA 12xxxx) que venía sin días y se completó con 30 para
-// que ARCA lo incluya en las bases topeadas (BI 1/4/5). El archivo ya se generó y descargó.
-const mostrarAvisoSacAutocompletado = (items) => {
-  const tipoLiqNombre = (t) => ({ 1: 'Normal', 2: '1er Quincena', 3: '2da Quincena', 4: 'SAC', 5: 'Liq. Final', 6: 'DIF.HAB.' }[t] || '—')
-  const filas = items.map(i => `
-    <tr>
-      <td style="padding:4px 8px;border:1px solid #dee2e6;font-family:monospace;">${escapeHtml(i.legajo)}</td>
-      <td style="padding:4px 8px;border:1px solid #dee2e6;font-family:monospace;">${escapeHtml(i.cuil)}</td>
-      <td style="padding:4px 8px;border:1px solid #dee2e6;">${escapeHtml(i.nombre || '—')}</td>
-      <td style="padding:4px 8px;border:1px solid #dee2e6;">${escapeHtml(i.concepto)} · ${escapeHtml(i.descripcion || '')}</td>
-      <td style="padding:4px 8px;border:1px solid #dee2e6;text-align:center;">${escapeHtml(tipoLiqNombre(i.tipoliq))}</td>
-      <td style="padding:4px 8px;border:1px solid #dee2e6;text-align:right;">${escapeHtml(formatMoney(i.importe))}</td>
-    </tr>
-  `).join('')
+const fmtFechaDMY = (d) => {
+  if (!d) return ''
+  const [y, m, day] = String(d).slice(0, 10).split('-')
+  return (y && m && day) ? `${day}/${m}/${y}` : String(d)
+}
 
-  const html = `
-    <div style="text-align:left;font-size:14px;">
-      <p style="margin-bottom:8px;">El archivo <strong>ya se generó y se descargó</strong>. Se detectaron conceptos de <strong>SAC sin días</strong> que ARCA excluiría de las bases imponibles topeadas (BI 1/4/5). Para que ARCA los cuente, se informaron con <strong>30 días</strong> (mes completo) en el archivo.</p>
-      <p style="margin-bottom:8px;color:#664d03;">Verificá en ARCA que la BI 1/4/5 quede correcta; si el prorrateo del tope de SAC pidiera otro valor de días, avisá.</p>
-      <div style="max-height:300px;overflow:auto;">
+// Excel de los empleados activos que no tenían liquidación y quedaron fuera del archivo.
+const exportarActivosSinLiquidacionXLSX = (items) => {
+  const ws = XLSX.utils.json_to_sheet(items.map(i => ({
+    'Legajo': i.legajo,
+    'CUIL': i.cuil || '',
+    'Empleado': i.nombre || '',
+    'Fecha de alta': fmtFechaDMY(i.alta),
+  })))
+  ws['!cols'] = [{ wch: 10 }, { wch: 15 }, { wch: 40 }, { wch: 14 }]
+  const wb = XLSX.utils.book_new()
+  XLSX.utils.book_append_sheet(wb, ws, 'Activos sin liquidación')
+  const fecha = new Date().toISOString().slice(0, 10)
+  XLSX.writeFile(wb, `activos_sin_liquidacion_${formulario.periodo_id}_${fecha}.xlsx`)
+}
+
+// Excel de los conceptos de sue090s que no estaban en el catálogo (sue102s) y se dieron de alta.
+const exportarConceptosNuevosXLSX = (items) => {
+  const ws = XLSX.utils.json_to_sheet(items.map(c => ({
+    'Código': c.concepto,
+    'Descripción': c.descripcion || '',
+    'Tipo': c.tipo || 'sin tipo',
+    'Cód. ARCA': c.concepto_arca || 'sin código',
+    'Veces usado': c.veces ?? 0,
+    'Legajos afectados': c.legajos ?? 0,
+    'Total importe': c.total ?? 0,
+  })))
+  ws['!cols'] = [{ wch: 10 }, { wch: 40 }, { wch: 10 }, { wch: 12 }, { wch: 14 }, { wch: 18 }, { wch: 18 }]
+  const range = XLSX.utils.decode_range(ws['!ref'])
+  for (let row = range.s.r + 1; row <= range.e.r; row++) {
+    const ref = XLSX.utils.encode_cell({ c: 6, r: row })
+    if (ws[ref]) {
+      ws[ref].t = 'n'
+      ws[ref].z = '"$"#,##0.00'
+    }
+  }
+  const wb = XLSX.utils.book_new()
+  XLSX.utils.book_append_sheet(wb, ws, 'Conceptos nuevos')
+  const fecha = new Date().toISOString().slice(0, 10)
+  XLSX.writeFile(wb, `conceptos_nuevos_${formulario.periodo_id}_${fecha}.xlsx`)
+}
+
+// Renglón del resumen: texto + botón de descarga a Excel (sin grilla).
+const lineaConDescarga = (id, texto, titulo) => `
+  <div style="display:flex;align-items:center;justify-content:space-between;gap:12px;">
+    <p style="margin:0;">${texto}</p>
+    <button type="button" id="${id}" class="btn btn-sm btn-outline-success rounded-pill px-3 text-nowrap" title="${titulo}">
+      <i class="ri-download-2-line me-1"></i>Excel
+    </button>
+  </div>
+`
+
+// Diálogo final: todo lo que pasó durante la generación, en un solo lugar.
+//
+// Se arman las secciones que correspondan y se muestra un único resumen; si no pasó
+// nada que contar, queda el toast de éxito de siempre. Los activos sin liquidación no
+// informados (switch lsd_ocultar_activos) y los conceptos nuevos dados de alta solos
+// (lsd_no_conceptos apagado) no se listan en grilla: se informa la cantidad y el
+// detalle se descarga en Excel.
+const mostrarResumenGeneracion = (data) => {
+  const tipoLiqNombre = (t) => ({ 1: 'Normal', 2: '1er Quincena', 3: '2da Quincena', 4: 'SAC', 5: 'Liq. Final', 6: 'DIF.HAB.' }[t] || '—')
+  const creados = Array.isArray(data.conceptos_generados) ? data.conceptos_generados : []
+  const excluidos = Array.isArray(data.legajos_excluidos) ? data.legajos_excluidos : []
+  const sacAuto = Array.isArray(data.sac_autocompletado) ? data.sac_autocompletado : []
+  const activosSinLiq = Array.isArray(data.activos_no_informados) ? data.activos_no_informados : []
+
+  if (!creados.length && !excluidos.length && !sacAuto.length && !activosSinLiq.length) {
+    Swal.fire({
+      icon: 'success',
+      title: 'Emisión generada',
+      text: 'La emisión se generó exitosamente.',
+      timer: 2500,
+      showConfirmButton: false,
+    })
+    return
+  }
+
+  const secciones = []
+  // Lo que hay que revisar después: un concepto creado sin código ARCA no se puede
+  // informar en el Reg 03, y sin tipo no se clasifica como H/NR/D.
+  const sinArca = creados.filter(c => !c.concepto_arca)
+  const sinTipo = creados.filter(c => !c.tipo)
+
+  if (activosSinLiq.length) {
+    secciones.push(lineaConDescarga(
+      'res-dl-activos',
+      `Se detectaron <b>${activosSinLiq.length}</b> empleado(s) activo(s) sin liquidación en el período y no se informaron en el archivo.`,
+      'Descargar en Excel los empleados activos sin liquidación',
+    ))
+  }
+
+  if (creados.length) {
+    const avisos = []
+    if (sinArca.length) {
+      avisos.push(`<b>${sinArca.length}</b> quedaron <b>sin código ARCA</b>: sin él no se pueden informar en el Reg 03 ` +
+                  `y ARCA rechazaría el archivo. Asignalo en Liquidación &gt; Conceptos o importá la parametrización en /arca/importar.`)
+    }
+    if (sinTipo.length) {
+      avisos.push(`<b>${sinTipo.length}</b> quedaron <b>sin tipo</b> porque su código no cae en ningún rango de parametrización ` +
+                  `(Config &gt; Parametrizaciones): revisá si corresponde H, NR o D.`)
+    }
+
+    secciones.push(`
+      ${lineaConDescarga(
+        'res-dl-conceptos',
+        `Se detectaron <b>${creados.length}</b> concepto(s) nuevo(s) en la liquidación que no estaban en la tabla de conceptos y se dieron de alta automáticamente.`,
+        'Descargar en Excel los conceptos nuevos',
+      )}
+      ${avisos.length ? `<div style="background:#fff3cd;border:1px solid #ffe69c;border-radius:4px;padding:8px;margin-top:8px;font-size:13px;">${avisos.join('<br>')}</div>` : ''}
+    `)
+  }
+
+  if (excluidos.length) {
+    secciones.push(`
+      <h6 style="margin:0 0 6px;">Legajos excluidos (${excluidos.length})</h6>
+      <p style="margin:0 0 8px;color:#6c757d;font-size:13px;">
+        Tenían datos SICOSS incompletos y <b>no se informan</b> en este LSD. Completalos y regenerá si corresponde.
+      </p>
+      <div style="font-family:monospace;font-size:12px;word-break:break-all;">${escapeHtml(excluidos.join(', '))}</div>
+    `)
+  }
+
+  if (sacAuto.length) {
+    const filas = sacAuto.map(i => `
+      <tr>
+        <td style="padding:4px 8px;border:1px solid #dee2e6;font-family:monospace;">${escapeHtml(i.legajo)}</td>
+        <td style="padding:4px 8px;border:1px solid #dee2e6;font-family:monospace;">${escapeHtml(i.cuil)}</td>
+        <td style="padding:4px 8px;border:1px solid #dee2e6;">${escapeHtml(i.nombre || '—')}</td>
+        <td style="padding:4px 8px;border:1px solid #dee2e6;">${escapeHtml(i.descripcion || i.concepto || '—')}</td>
+        <td style="padding:4px 8px;border:1px solid #dee2e6;text-align:center;">${escapeHtml(tipoLiqNombre(i.tipoliq))}</td>
+        <td style="padding:4px 8px;border:1px solid #dee2e6;text-align:right;">${escapeHtml(formatMoney(i.importe))}</td>
+      </tr>
+    `).join('')
+
+    secciones.push(`
+      <h6 style="margin:0 0 6px;">SAC completado con días (${sacAuto.length})</h6>
+      <p style="margin:0 0 8px;color:#6c757d;font-size:13px;">
+        Conceptos de SAC <b>sin días</b> que ARCA excluiría de las bases topeadas (BI 1/4/5). Se informaron con
+        <b>30 días</b> (mes completo) para que las cuente. Verificá en ARCA que la BI 1/4/5 quede correcta.
+      </p>
+      <div style="max-height:220px;overflow:auto;">
         <table style="width:100%;border-collapse:collapse;font-size:12px;">
           <thead style="position:sticky;top:0;background:#f8f9fa;">
             <tr>
@@ -481,15 +585,25 @@ const mostrarAvisoSacAutocompletado = (items) => {
           <tbody>${filas}</tbody>
         </table>
       </div>
-    </div>
-  `
+    `)
+  }
+
+  // El archivo ya se generó y descargó: el resumen informa, no pide permiso.
+  const hayQueRevisar = sinArca.length > 0 || sinTipo.length > 0 || excluidos.length > 0 || activosSinLiq.length > 0
 
   Swal.fire({
-    icon: 'info',
-    title: 'Emisión generada — SAC completado con días',
-    html,
-    width: 900,
+    icon: hayQueRevisar ? 'warning' : 'info',
+    title: 'Emisión generada',
+    html: `<div style="text-align:left;font-size:14px;">
+      <p style="margin-bottom:12px;">El archivo <b>ya se generó y se descargó</b>. Esto es lo que pasó durante la generación:</p>
+      ${secciones.join('<hr style="margin:14px 0;border:0;border-top:1px solid #dee2e6;">')}
+    </div>`,
+    width: 920,
     confirmButtonText: 'Entendido',
+    didOpen: () => {
+      document.getElementById('res-dl-activos')?.addEventListener('click', () => exportarActivosSinLiquidacionXLSX(activosSinLiq))
+      document.getElementById('res-dl-conceptos')?.addEventListener('click', () => exportarConceptosNuevosXLSX(creados))
+    },
   })
 }
 
