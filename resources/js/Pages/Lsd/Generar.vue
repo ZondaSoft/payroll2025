@@ -408,7 +408,7 @@ const mostrarAdvertenciaAportes = (items) => {
     icon: 'warning',
     title: 'Diferencias en aportes (posible tope desactualizado)',
     html,
-    width: 950,
+    width: 1150,
     showConfirmButton: false,
     showCancelButton: false,
     didOpen: () => {
@@ -431,15 +431,24 @@ const fmtFechaDMY = (d) => {
   return (y && m && day) ? `${day}/${m}/${y}` : String(d)
 }
 
+// "Grupo empresario" de un activo sin liquidación: código - detalle (sue001s.grupo_emp -> sue086s).
+const grupoTexto = (i) => {
+  const cod = i.grupo_emp ?? ''
+  const det = i.grupo_detalle ?? ''
+  if (cod !== '' && det !== '') return `${cod} - ${det}`
+  return det || (cod !== '' ? `${cod} - (sin detalle)` : '—')
+}
+
 // Excel de los empleados activos que no tenían liquidación y quedaron fuera del archivo.
 const exportarActivosSinLiquidacionXLSX = (items) => {
   const ws = XLSX.utils.json_to_sheet(items.map(i => ({
     'Legajo': i.legajo,
     'CUIL': i.cuil || '',
     'Empleado': i.nombre || '',
+    'Grupo empresario': grupoTexto(i) === '—' ? '' : grupoTexto(i),
     'Fecha de alta': fmtFechaDMY(i.alta),
   })))
-  ws['!cols'] = [{ wch: 10 }, { wch: 15 }, { wch: 40 }, { wch: 14 }]
+  ws['!cols'] = [{ wch: 10 }, { wch: 15 }, { wch: 40 }, { wch: 35 }, { wch: 14 }]
   const wb = XLSX.utils.book_new()
   XLSX.utils.book_append_sheet(wb, ws, 'Activos sin liquidación')
   const fecha = new Date().toISOString().slice(0, 10)
@@ -621,6 +630,7 @@ const mostrarActivosSinLiquidacion = (items) => {
       <td style="padding:4px 8px;border:1px solid #dee2e6;font-family:monospace;">${escapeHtml(i.legajo)}</td>
       <td style="padding:4px 8px;border:1px solid #dee2e6;font-family:monospace;">${escapeHtml(i.cuil)}</td>
       <td style="padding:4px 8px;border:1px solid #dee2e6;">${escapeHtml(i.nombre || '—')}</td>
+      <td style="padding:4px 8px;border:1px solid #dee2e6;">${escapeHtml(grupoTexto(i))}</td>
       <td style="padding:4px 8px;border:1px solid #dee2e6;text-align:center;">${escapeHtml(fmtFecha(i.alta))}</td>
       <td style="padding:4px 8px;border:1px solid #dee2e6;text-align:center;">
         <input type="checkbox" class="chk-activo" data-legajo="${escapeHtml(i.legajo)}" checked
@@ -652,6 +662,7 @@ const mostrarActivosSinLiquidacion = (items) => {
               <th style="padding:6px 8px;border:1px solid #dee2e6;text-align:left;">Legajo</th>
               <th style="padding:6px 8px;border:1px solid #dee2e6;text-align:left;">CUIL</th>
               <th style="padding:6px 8px;border:1px solid #dee2e6;text-align:left;">Empleado</th>
+              <th style="padding:6px 8px;border:1px solid #dee2e6;text-align:left;">Grupo empresario</th>
               <th style="padding:6px 8px;border:1px solid #dee2e6;text-align:center;">Alta</th>
               <th style="padding:6px 8px;border:1px solid #dee2e6;text-align:center;">Incluir</th>
               <th style="padding:6px 8px;border:1px solid #dee2e6;text-align:center;">Ver</th>
@@ -667,7 +678,7 @@ const mostrarActivosSinLiquidacion = (items) => {
     icon: 'question',
     title: 'Empleados activos sin liquidación',
     html,
-    width: 900,
+    width: 1050,
     showCancelButton: true,
     reverseButtons: true,                 // Cancelar a la izquierda, primario a la derecha
     buttonsStyling: false,                // usamos clases Bootstrap/MD3 (botones ovalados)

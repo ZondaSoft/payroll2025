@@ -36,3 +36,54 @@ body {
 .icon-16px {
     font-size: 16px;
 }
+
+/* SweetAlert2 en modo oscuro. sweetalert2 inyecta su propio CSS (fondo blanco) y el
+   theme-default-dark.css del template no lo cubre. Los !important pisan los colores
+   claros que varios modales (p. ej. LSD > Generar) traen como estilos en línea. */
+.dark-style .swal2-popup {
+    background: var(--bs-modal-bg, #30334e);
+    color: var(--bs-body-color, #b2b3ca);
+}
+.dark-style .swal2-title {
+    color: var(--bs-heading-color, #d7d8ed);
+}
+.dark-style .swal2-html-container,
+.dark-style .swal2-validation-message {
+    color: var(--bs-body-color, #b2b3ca);
+}
+.dark-style .swal2-validation-message {
+    background: var(--bs-secondary-bg, rgba(234, 234, 255, 0.12));
+}
+.dark-style .swal2-popup thead {
+    background: #3a3d5c !important; /* opaco: el encabezado es sticky sobre las filas */
+}
+.dark-style .swal2-popup th,
+.dark-style .swal2-popup td {
+    border-color: var(--bs-border-color, #464963) !important;
+    color: var(--bs-body-color, #b2b3ca);
+}
+.dark-style .swal2-popup th {
+    color: var(--bs-heading-color, #d7d8ed);
+}
+.dark-style .swal2-popup hr {
+    border-top-color: var(--bs-border-color, #464963) !important;
+}
+.dark-style .swal2-popup [style*="#fff3cd"] {
+    background: rgba(255, 180, 0, 0.16) !important;
+    border-color: rgba(255, 180, 0, 0.4) !important;
+}
+.dark-style .swal2-popup .swal2-input,
+.dark-style .swal2-popup .swal2-textarea,
+.dark-style .swal2-popup .swal2-select {
+    background: transparent;
+    color: var(--bs-body-color, #b2b3ca);
+    border-color: var(--bs-border-color, #464963);
+}
+
+/* SweetAlert2 por encima del menú lateral. El contenedor trae z-index 1060 y el
+   .layout-menu del template llega a 1100 (los modales Bootstrap no sufren esto porque
+   body.modal-open baja el menú, pero SweetAlert no agrega esa clase). Los modales anchos,
+   como "Diferencias en aportes" de LSD > Generar, quedaban tapados a la izquierda. */
+.swal2-container {
+    z-index: 1110;
+}
