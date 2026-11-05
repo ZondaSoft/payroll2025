@@ -11,6 +11,8 @@ class Sue074 extends Model
 
     protected $fillable = [
         'legajo_codigo',
+        'periodo',
+        'categoria_campo',
         'acontecimiento',
         'usuario',
         'dato_original',
