@@ -200,3 +200,8 @@ body {
   
   /*# sourceMappingURL=bd-wizard.css.map */
   
+/* Modo oscuro (Materio agrega .dark-style al <html>) */
+.dark-style .wizard .content .section-heading,
+.dark-style .wizard .content p,
+.dark-style .wizard .content .purpose-radio .purpose-radio-label .label-icon,
+.dark-style .wizard .content .purpose-radio .purpose-radio-label .label-text { color: #ffffff; }
