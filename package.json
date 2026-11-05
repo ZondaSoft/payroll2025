@@ -22,6 +22,7 @@
     },
     "dependencies": {
         "@vueform/multiselect": "^2.6.11",
+        "pdfjs-dist": "4.10.38",
         "sweetalert2": "^11.26.24",
         "vue-select": "^3.20.4",
         "xlsx": "^0.18.5"

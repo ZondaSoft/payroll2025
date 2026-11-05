@@ -7,6 +7,7 @@ import InputError from '@/Components/InputError.vue';
 import FloatMultiselect from '@/Components/FloatMultiselect.vue';
 import { Link, router, useForm, usePage } from '@inertiajs/vue3';
 import BotonEditar from '@/Components/BotonEditar.vue';
+import DocumentosMiniaturas from '@/Components/DocumentosMiniaturas.vue';
 import { reactive, ref, onMounted, watch, computed } from 'vue';
 import { PAISES } from '@/Data/paises';
 import Swal from 'sweetalert2';
@@ -1832,9 +1833,18 @@ watch(() => props.agregar, () => {
                             </div>
 
                             <br><br>
-                            <a href="/import-rubros" type="button" class="btn btn-label-success waves-effect">
-                                <span class="tf-icons ri-file-excel-2-line ri-16px me-2"></span>Importar desde excel
-                            </a>
+                            <!-- Importar a la izquierda; miniaturas de los documentos del legajo a la derecha -->
+                            <div class="d-flex flex-wrap justify-content-between align-items-end gap-3">
+                                <a href="/import-rubros" type="button" class="btn btn-label-success waves-effect">
+                                    <span class="tf-icons ri-file-excel-2-line ri-16px me-2"></span>Importar desde excel
+                                </a>
+                                <DocumentosMiniaturas
+                                    v-if="props.legajo?.id"
+                                    class="ms-auto"
+                                    :legajo-id="props.legajo.id"
+                                    :refrescar="props.legajo"
+                                />
+                            </div>
 
                         </div>
                     </div>
