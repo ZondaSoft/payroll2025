@@ -2,10 +2,10 @@
 
 @section('styles')
 <link rel="stylesheet" href="{{ asset('css/bs-stepper.min.css') }}">
-<link rel="stylesheet" href="{{ asset('css/bd-wizard.css') }}">
+<link rel="stylesheet" href="{{ asset('css/bd-wizard.css') }}?v=2">
 
 <style>
-    .form-control {
+    html:not(.dark-style) .form-control {
         background-color: #ffffff !important;
     }
     .tab-content {
@@ -103,6 +103,9 @@
     }
     /* Pasos bloqueados al terminar la importación */
     .wizard .steps > ul li.disabled a { cursor: not-allowed; }
+    /* Botones Anterior/Finalizar mientras corre la importación: jquery.steps no mira la clase
+       .disabled del <a> (solo la del <li>), así que el bloqueo visual y del click va acá. */
+    #wizard .actions a.disabled { opacity: .5; pointer-events: none; cursor: not-allowed; }
     /* Wizard en violeta (bd-wizard.css trae verde #00d69f) */
     .wizard .steps > ul li.current span.number,
     .wizard .steps > ul li.done span.number,
@@ -181,13 +184,13 @@
 
                 <div id="mensaje-procesando"
                     style="display:none; position:fixed; top:50%; left:50%; transform:translate(-50%, -50%);
-                            background:#fff; padding:20px; border-radius:10px; box-shadow:0 0 15px rgba(0,0,0,0.3);
+                            background:var(--bs-body-bg); color:var(--bs-heading-color); padding:20px; border-radius:10px; box-shadow:0 0 15px rgba(0,0,0,0.3);
                             font-size:18px; font-weight:bold;">
                     Procesando...
                 </div>
 
                 <!-- Vertical Steppers -->
-                <nav class="navbar navbar-expand-sm navbar-light bg-white mt-8 pt-4">
+                <nav class="navbar navbar-expand-sm mt-8 pt-4">
                     <div class="container mt-6 ml-5" style="margin-left: 56px;">
                         <div id="wizard" style="height: 600px;">
                             <h3 hidden>Step 1 Title</h3>
@@ -205,7 +208,7 @@
                                                 id="empresa"
                                                 name="empresa"
                                                 autofocus
-                                                style="padding-left: 16px;padding-top: 6px;padding-bottom: 6px;height: 36px;background-color: #ffffff;">
+                                                style="padding-left: 16px;padding-top: 6px;padding-bottom: 6px;height: 36px;">
 
                                                 @foreach ($empresas as $empresa)
                                                     <option value="{{ $empresa->id }}">{{ $empresa->detalle }}</option>
@@ -1088,6 +1091,22 @@
         }
 
 
+        // Bloquea la navegación del wizard (Anterior, Finalizar y los pasos de la izquierda)
+        // mientras la importación está en curso; al fallar se libera para poder reintentar.
+        function bloquearNavegacion(bloquear) {
+            $(".actions a[href$='#previous'], .actions a[href$='#finish']")
+                .toggleClass('disabled', bloquear).attr('aria-disabled', bloquear ? 'true' : 'false');
+            if (bloquear) {
+                // Se llama desde el paso 2, justo antes de que jquery.steps avance al 3: se bloquean
+                // todos menos el último (el de proceso), incluido el 2 que todavía es el actual.
+                $('#wizard .steps li').not(':last').not('.disabled')
+                    .attr('data-bloqueado', '1').addClass('disabled').attr('aria-disabled', 'true');
+            } else {
+                $('#wizard .steps li[data-bloqueado]')
+                    .removeAttr('data-bloqueado').removeClass('disabled').attr('aria-disabled', 'false');
+            }
+        }
+
         // Función para subir el archivo (para usar con AJAX si es necesario)
         // Cierre del paso 3 con la respuesta del import. Se resuelve acá (y no en jquery.steps.js,
         // que compara window.location.pathname sin el prefijo /payroll2025 y nunca coincidía).
@@ -1104,6 +1123,7 @@
                 registrosErr.removeAttribute('hidden');
                 btnErr.innerText = 'Descargar registros rechazados';
                 btnErr.removeAttribute('hidden');
+                bloquearNavegacion(false);
                 return;
             }
 
@@ -1162,6 +1182,7 @@
             ['btn-ok', 'btn-err', 'registrosOk', 'registrosErr'].forEach(id =>
                 document.getElementById(id)?.setAttribute('hidden', true));
             loadingDiv.removeAttribute('hidden');
+            bloquearNavegacion(true);
 
             // Realizar upload con fetch
             fetch("{{ route('arca.importar2') }}", {
@@ -1190,6 +1211,7 @@
             })
             .catch(error => {
                 loadingDiv.setAttribute('hidden', true);
+                bloquearNavegacion(false);
 
                 console.error('Error:', error);
                 mostrarErrores(['Error al subir el archivo: ' + error.message]);
