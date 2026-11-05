@@ -111,8 +111,10 @@ const props = defineProps({
 const user = usePage().props.legajo;
 
 // Fecha de baja del legajo formateada dd/mm/aaaa (vacío si el empleado está activo).
+// Lee props.legajo (reactivo) y no `user`, que es una copia tomada al montar: así, cuando la
+// baja redirige a legajos.show con los datos nuevos, la pastilla "Baja el …" aparece sola.
 const legajoBaja = computed(() => {
-    const b = user?.baja;
+    const b = props.legajo?.baja;
     if (!b) return '';
     const [y, m, d] = String(b).slice(0, 10).split('-');
     return (y && m && d) ? `${d}/${m}/${y}` : String(b);
@@ -121,6 +123,13 @@ const legajoBaja = computed(() => {
 // Datos de la baja (solo lectura) para mostrar en el formulario cuando el empleado está de baja.
 const sicossBaja = ref(user?.sicoss_baja != null ? String(user.sicoss_baja) : '');
 const bajaDet = ref(user?.baja_det ?? '');
+watch(
+    () => [props.legajo?.sicoss_baja, props.legajo?.baja_det],
+    ([motivo, det]) => {
+        sicossBaja.value = motivo != null ? String(motivo) : '';
+        bajaDet.value = det ?? '';
+    },
+);
 
 const form = useForm({
     // id: user.id,
@@ -463,6 +472,10 @@ const confirmarBaja = () => {
         preserveScroll: true,
         onSuccess: () => {
             cerrarModalBaja();
+            // La baja redirige a legajos.show: Inertia ya trajo el legajo actualizado y la pastilla
+            // "Baja el …", el botón Baja deshabilitado y los datos de la baja se refrescan solos.
+            bajaForm.reset('baja_det', 'archivo_baja');
+            if (inputArchivoBaja.value) inputArchivoBaja.value.value = '';
             Swal.fire({
                 icon: 'success',
                 title: 'Baja registrada',
@@ -470,9 +483,6 @@ const confirmarBaja = () => {
                 confirmButtonText: 'Aceptar',
                 buttonsStyling: false,
                 customClass: { confirmButton: 'btn btn-primary rounded-pill px-4' },
-            }).then(() => {
-                // Refrescar la pantalla con los datos actualizados (muestra el cartel de baja).
-                router.reload();
             });
         },
     });
