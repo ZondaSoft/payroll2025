@@ -430,7 +430,20 @@ const bajaForm = useForm({
     fecha_baja: hoyISOBaja(),
     sicoss_baja: '',
     baja_det: '',
+    // Constancia opcional: con un File adentro, Inertia manda el form como multipart.
+    archivo_baja: null,
 });
+
+// Constancia de BAJA: se guarda en la digitalización del legajo (portal) como documento tipo BAJA.
+const inputArchivoBaja = ref(null);
+const elegirArchivoBaja = (e) => {
+    bajaForm.archivo_baja = e.target.files?.[0] ?? null;
+    bajaForm.clearErrors('archivo_baja');
+};
+const quitarArchivoBaja = () => {
+    bajaForm.archivo_baja = null;
+    if (inputArchivoBaja.value) inputArchivoBaja.value.value = '';
+};
 // Cierra el modal de baja y limpia los artefactos que Bootstrap a veces deja al navegar con
 // Inertia (backdrop gris + scroll bloqueado del body).
 const cerrarModalBaja = () => {
@@ -1901,6 +1914,42 @@ watch(() => props.agregar, () => {
                                 ></textarea>
                             </div>
 
+                            <div class="mb-3">
+                                <label class="form-label d-block">Constancia de BAJA <small class="text-muted">(opcional)</small></label>
+                                <input
+                                    ref="inputArchivoBaja"
+                                    type="file"
+                                    accept=".jpg,.jpeg,.png,.pdf"
+                                    class="d-none"
+                                    @change="elegirArchivoBaja"
+                                />
+                                <div
+                                    class="baja-filepick"
+                                    :class="{ 'is-invalid': bajaForm.errors.archivo_baja, 'tiene-archivo': bajaForm.archivo_baja }"
+                                    role="button"
+                                    tabindex="0"
+                                    @click="inputArchivoBaja?.click()"
+                                    @keydown.enter.prevent="inputArchivoBaja?.click()"
+                                    @keydown.space.prevent="inputArchivoBaja?.click()"
+                                >
+                                    <span class="baja-filepick-icon"><i class="ri-attachment-2"></i></span>
+                                    <span class="baja-filepick-text">
+                                        <span class="baja-filepick-nombre">{{ bajaForm.archivo_baja ? bajaForm.archivo_baja.name : 'Seleccionar archivo...' }}</span>
+                                        <small class="baja-filepick-ayuda">JPG, PNG o PDF — máx. 8 MB · se guarda como documento tipo BAJA</small>
+                                    </span>
+                                    <button
+                                        v-if="bajaForm.archivo_baja"
+                                        type="button"
+                                        class="btn btn-sm btn-icon btn-text-secondary rounded-pill ms-auto"
+                                        title="Quitar archivo"
+                                        @click.stop="quitarArchivoBaja"
+                                    >
+                                        <i class="ri-close-line ri-20px"></i>
+                                    </button>
+                                </div>
+                                <div v-if="bajaForm.errors.archivo_baja" class="invalid-feedback d-block">{{ bajaForm.errors.archivo_baja }}</div>
+                            </div>
+
                             <div class="alert alert-info d-flex align-items-center mb-0" role="alert">
                                 <i class="ri-information-line ri-22px me-2"></i>
                                 <span>No se borra el legajo: sigue disponible para el Libro de Sueldo Digital y el historial. Podés revertirlo editando el legajo.</span>
@@ -1932,3 +1981,74 @@ watch(() => props.agregar, () => {
     </div> -->
 </template>
 
+
+<style scoped>
+/* Selector de la constancia de BAJA (mismo diseño que el modal de baja del portal Drakma). */
+.baja-filepick {
+    display: flex;
+    align-items: center;
+    gap: 14px;
+    cursor: pointer;
+    border: 1px dashed #c4c7c5;
+    border-radius: 12px;
+    padding: 14px 16px;
+    transition: border-color .15s, background .15s;
+}
+.baja-filepick:hover,
+.baja-filepick:focus-visible {
+    border-color: #1976d2;
+    background: #f5f8ff;
+    outline: none;
+}
+.baja-filepick.tiene-archivo {
+    border-style: solid;
+    border-color: #1976d2;
+}
+.baja-filepick.is-invalid {
+    border-color: var(--bs-danger, #ff4d49);
+}
+.baja-filepick-icon {
+    width: 44px;
+    height: 44px;
+    border-radius: 50%;
+    background: #e8f0fe;
+    color: #1976d2;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+    font-size: 22px;
+}
+.baja-filepick-text {
+    display: flex;
+    flex-direction: column;
+    min-width: 0;
+    line-height: 1.35;
+}
+.baja-filepick-nombre {
+    font-size: .95rem;
+    color: var(--bs-heading-color, #1d1b20);
+    word-break: break-word;
+}
+.baja-filepick-ayuda {
+    font-size: .75rem;
+    color: var(--bs-secondary-color, #8a8d93);
+}
+</style>
+
+<style>
+/* Modo oscuro del selector de la constancia de BAJA (sin scoped: .dark-style vive en <html>). */
+.dark-style .baja-filepick {
+    border-color: var(--bs-border-color, #464963);
+}
+.dark-style .baja-filepick:hover,
+.dark-style .baja-filepick:focus-visible,
+.dark-style .baja-filepick.tiene-archivo {
+    border-color: #64a5ec;
+    background: rgba(100, 165, 236, .08);
+}
+.dark-style .baja-filepick-icon {
+    background: rgba(100, 165, 236, .16);
+    color: #64a5ec;
+}
+</style>

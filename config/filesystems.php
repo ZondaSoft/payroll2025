@@ -47,6 +47,19 @@ return [
             'report' => false,
         ],
 
+        // Storage público del portal RRHH Drakma (swnov2024). Los documentos del legajo
+        // (sue111s) se guardan ahí porque es el portal el que los muestra y descarga:
+        // nom_arch queda relativo a este root ("documentos/<archivo>"), igual que cuando
+        // los sube el propio portal. En otro servidor, PORTAL_STORAGE_PATH apunta a su
+        // storage/app/public.
+        'portal' => [
+            'driver' => 'local',
+            'root' => env('PORTAL_STORAGE_PATH', base_path('../swnov2024/storage/app/public')),
+            'visibility' => 'public',
+            'throw' => true,
+            'report' => false,
+        ],
+
         's3' => [
             'driver' => 's3',
             'key' => env('AWS_ACCESS_KEY_ID'),

@@ -31,6 +31,8 @@ use App\Models\Sue052;
 use App\Models\Fza002;
 use App\Models\SicossCodigosBaja;
 use App\Models\Sue074;
+use App\Models\Sue111;
+use Illuminate\Support\Facades\Storage;
 use App\Models\Datoempr;
 use Illuminate\Http\Request;
 use Inertia\Inertia;
@@ -584,56 +586,107 @@ class LegajosController extends Controller
             'fecha_baja'  => 'required|date',
             'sicoss_baja' => 'required',
             'baja_det'    => 'nullable|string|max:255',
+            'archivo_baja' => 'nullable|file|mimes:pdf,jpg,jpeg,png|max:8192',
         ], [
             'fecha_baja.required'  => 'La fecha de baja es obligatoria.',
             'fecha_baja.date'      => 'La fecha de baja no es válida.',
             'sicoss_baja.required' => 'El motivo de baja es obligatorio.',
+            'archivo_baja.file'    => 'La constancia de baja no es un archivo válido.',
+            'archivo_baja.mimes'   => 'La constancia debe ser JPG, PNG o PDF.',
+            'archivo_baja.max'     => 'La constancia no puede superar los 8 MB.',
         ]);
 
         $fecha   = $request->input('fecha_baja');
         $motivo  = $request->input('sicoss_baja');
         $detalle = $request->input('baja_det');
 
-        DB::transaction(function () use ($legajo, $fecha, $motivo, $detalle) {
-            // 1) Marca de baja en el legajo activo (NO se borra).
-            $legajo->baja = $fecha;
-            if ($detalle !== null && $detalle !== '') {
-                $legajo->baja_det = $detalle;
+        // Constancia de BAJA (opcional). Va al storage del portal Drakma, que es quien la
+        // muestra en la digitalización del legajo, con el mismo esquema que cuando la sube
+        // el propio portal: documentos/<timestamp>_<nombre original>. El archivo se escribe
+        // antes de la transacción y se borra si esta falla, para no dejar huérfanos.
+        $archivoBaja = null;
+        if ($request->hasFile('archivo_baja')) {
+            $file = $request->file('archivo_baja');
+            // nom_arch es varchar(254): se recorta el nombre original para que entre con el prefijo.
+            $archivoBaja = 'documentos/'.time().'_'.mb_substr($file->getClientOriginalName(), -200);
+            try {
+                Storage::disk('portal')->putFileAs('documentos', $file, basename($archivoBaja));
+            } catch (\Throwable $e) {
+                return back()->withErrors(['archivo_baja' => 'No se pudo guardar la constancia de baja: '.$e->getMessage()]);
             }
-            $legajo->save();
+        }
 
-            // 2) Copia del legajo al archivo de bajas (sue070s), donde vive el motivo (sicoss_baja).
-            //    `codigo` es UNIQUE en sue070s → updateOrInsert por codigo (un registro de baja por
-            //    empleado). Se copian TODAS las columnas homónimas, truncando cada string al tamaño
-            //    de la columna destino (sue001s y sue070s difieren en tamaños; sin esto falla, ej. `banco`).
-            $meta = collect(DB::select(
-                "SELECT COLUMN_NAME, CHARACTER_MAXIMUM_LENGTH
-                 FROM INFORMATION_SCHEMA.COLUMNS
-                 WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'sue070s'"
-            ))->keyBy('COLUMN_NAME');
+        try {
+            DB::transaction(function () use ($legajo, $fecha, $motivo, $detalle, $archivoBaja) {
+                // 1) Marca de baja en el legajo activo (NO se borra).
+                $legajo->baja = $fecha;
+                if ($detalle !== null && $detalle !== '') {
+                    $legajo->baja_det = $detalle;
+                }
+                $legajo->save();
 
-            $attrs = $legajo->getAttributes();
-            $attrs['baja']        = $fecha;
-            $attrs['sicoss_baja'] = $motivo;
-            $attrs['baja_det']    = $detalle;
+                // 2) Copia del legajo al archivo de bajas (sue070s), donde vive el motivo (sicoss_baja).
+                //    `codigo` es UNIQUE en sue070s → updateOrInsert por codigo (un registro de baja por
+                //    empleado). Se copian TODAS las columnas homónimas, truncando cada string al tamaño
+                //    de la columna destino (sue001s y sue070s difieren en tamaños; sin esto falla, ej. `banco`).
+                $meta = collect(DB::select(
+                    "SELECT COLUMN_NAME, CHARACTER_MAXIMUM_LENGTH
+                     FROM INFORMATION_SCHEMA.COLUMNS
+                     WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'sue070s'"
+                ))->keyBy('COLUMN_NAME');
 
-            $data = [];
-            foreach ($meta as $col => $info) {
-                if (in_array($col, ['id', 'codigo', 'created_at', 'updated_at'], true)) {
-                    continue; // id/codigo: clave; timestamps: los maneja la DB
+                $attrs = $legajo->getAttributes();
+                $attrs['baja']        = $fecha;
+                $attrs['sicoss_baja'] = $motivo;
+                $attrs['baja_det']    = $detalle;
+
+                $data = [];
+                foreach ($meta as $col => $info) {
+                    if (in_array($col, ['id', 'codigo', 'created_at', 'updated_at'], true)) {
+                        continue; // id/codigo: clave; timestamps: los maneja la DB
+                    }
+                    if (!array_key_exists($col, $attrs)) {
+                        continue; // columna que no existe en sue001s → queda con su default
+                    }
+                    $val = $attrs[$col];
+                    if (is_string($val) && $info->CHARACTER_MAXIMUM_LENGTH !== null) {
+                        $val = mb_substr($val, 0, (int) $info->CHARACTER_MAXIMUM_LENGTH);
+                    }
+                    $data[$col] = $val;
                 }
-                if (!array_key_exists($col, $attrs)) {
-                    continue; // columna que no existe en sue001s → queda con su default
+
+                DB::table('sue070s')->updateOrInsert(['codigo' => $legajo->codigo], $data);
+
+                // 3) Constancia como documento tipo BAJA del legajo + su rastro en el historial (sue074s).
+                if ($archivoBaja !== null) {
+                    Sue111::create([
+                        'carpeta'    => Sue111::CARPETA_LEGAJO,
+                        'legajo'     => $legajo->codigo,
+                        'nom_arch'   => $archivoBaja,
+                        'origen'     => 'BAJA',
+                        'fecha_alta' => now(),
+                        'fecha'      => now(),
+                        'user_id'    => auth()->id(),
+                    ]);
+
+                    $periodoActivo = DB::table('sue071s')->where('activo', 'Si')->value('periodo');
+                    Sue074::create([
+                        'legajo_codigo'   => $legajo->codigo,
+                        'periodo'         => $periodoActivo ? str_replace('/', '-', $periodoActivo) : null,
+                        'categoria_campo' => 'alta_baja',
+                        'acontecimiento'  => 'Constancia de Baja cargada',
+                        'usuario'         => auth()->user()->name ?? 'sistema',
+                        'dato_original'   => '',
+                        'dato_nuevo'      => mb_substr(basename($archivoBaja), 0, 254),
+                    ]);
                 }
-                $val = $attrs[$col];
-                if (is_string($val) && $info->CHARACTER_MAXIMUM_LENGTH !== null) {
-                    $val = mb_substr($val, 0, (int) $info->CHARACTER_MAXIMUM_LENGTH);
-                }
-                $data[$col] = $val;
+                });
+        } catch (\Throwable $e) {
+            if ($archivoBaja !== null) {
+                Storage::disk('portal')->delete($archivoBaja);
             }
-
-            DB::table('sue070s')->updateOrInsert(['codigo' => $legajo->codigo], $data);
-        });
+            throw $e;
+        }
 
         return redirect()->route('legajos.show', $legajo->id)
             ->with('success', 'Empleado dado de baja el ' . Carbon::parse($fecha)->format('d/m/Y') . '.');
