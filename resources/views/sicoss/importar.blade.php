@@ -2,11 +2,15 @@
 
 @section('styles')
     <link rel="stylesheet" href="{{ asset('css/bs-stepper.min.css') }}">
-    <link rel="stylesheet" href="{{ asset('css/bd-wizard.css') }}">
+    <link rel="stylesheet" href="{{ asset('css/bd-wizard.css') }}?v=2">
 
     <style>
-        .form-control {
+        html:not(.dark-style) .form-control {
             background-color: #ffffff !important;
+        }
+
+        html:not(.dark-style) #empresa_cuit {
+            background-color: #ced4da !important;
         }
 
         .tab-content {
@@ -102,13 +106,13 @@
                             @endif
 
                             <div id="mensaje-procesando" style="display:none; position:fixed; top:50%; left:50%; transform:translate(-50%, -50%);
-                                                    background:#fff; padding:20px; border-radius:10px; box-shadow:0 0 15px rgba(0,0,0,0.3);
+                                                    background:var(--bs-body-bg); color:var(--bs-heading-color); padding:20px; border-radius:10px; box-shadow:0 0 15px rgba(0,0,0,0.3);
                                                     font-size:18px; font-weight:bold;">
                                 Procesando...
                             </div>
 
                             <!-- Vertical Steppers -->
-                            <nav class="navbar navbar-expand-sm navbar-light bg-white mt-8 pt-4">
+                            <nav class="navbar navbar-expand-sm mt-8 pt-4">
                                 <div class="container-fluid mt-6" style="margin-left: 20px; margin-right: 20px;">
                                     <div id="wizard" style="height: 600px;">
                                         <h3 hidden>Step 1 Title</h3>
@@ -142,7 +146,7 @@
                                                                 style="padding-top: 0px">CUIT</label>
                                                             <input class="form-control" type="text" id="empresa_cuit"
                                                                 disabled
-                                                                style="padding-left: 16px;padding-right: 16px;padding-top: 6px;padding-bottom: 6px;height: 36px;background-color: #ced4da;"
+                                                                style="padding-left: 16px;padding-right: 16px;padding-top: 6px;padding-bottom: 6px;height: 36px;"
                                                                 value="{{ $empresas->first()?->cuit }}">
                                                         </div>
                                                     </div>
