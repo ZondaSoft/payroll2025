@@ -1039,21 +1039,28 @@ class LsdController extends Controller
             ->map(fn ($l) => (string) $l)
             ->all();
 
+        // sue001s.grupo_emp -> sue086s.codigo (grupo empresario), para mostrar su detalle en el diálogo.
         $query = DB::table('sue001s')
-            ->whereNull('baja')
-            ->when(! empty($conLiquidacion), fn ($q) => $q->whereNotIn('codigo', $conLiquidacion));
+            ->leftJoin('sue086s', 'sue086s.codigo', '=', 'sue001s.grupo_emp')
+            ->whereNull('sue001s.baja')
+            ->when(! empty($conLiquidacion), fn ($q) => $q->whereNotIn('sue001s.codigo', $conLiquidacion));
         if ($codEmpresa !== null && $codEmpresa !== '') {
-            $query->where('grupo_emp', $codEmpresa);
+            $query->where('sue001s.grupo_emp', $codEmpresa);
         }
 
-        $rows = $query->orderByRaw('CAST(codigo AS UNSIGNED)')
-            ->get(['id', 'codigo', 'cuil', 'detalle', 'nombres', 'alta']);
+        $rows = $query->orderByRaw('CAST(sue001s.codigo AS UNSIGNED)')
+            ->get([
+                'sue001s.id', 'sue001s.codigo', 'sue001s.cuil', 'sue001s.detalle', 'sue001s.nombres', 'sue001s.alta',
+                'sue001s.grupo_emp', 'sue086s.detalle as grupo_detalle',
+            ]);
 
         return $rows->map(fn ($r) => [
             'legajo' => (string) $r->codigo,
             'legajo_id' => $r->id !== null ? (int) $r->id : null,
             'cuil' => (string) ($r->cuil ?? ''),
             'nombre' => trim(((string) ($r->detalle ?? '')).' '.((string) ($r->nombres ?? ''))),
+            'grupo_emp' => $r->grupo_emp !== null ? (string) $r->grupo_emp : '',
+            'grupo_detalle' => (string) ($r->grupo_detalle ?? ''),
             'alta' => $r->alta,
         ])->values()->all();
     }
