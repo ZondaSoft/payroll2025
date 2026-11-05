@@ -163,6 +163,7 @@ class ArcaImportarController extends Controller
         //$tipoliq = (int) $request->input('tipoliq');
         $idEmpresa = (int) $request->input('empresa');
         $generar = $request->input('generar') === '1'; // true o false
+        $actualizar = $request->input('actualizar') === '1'; // actualizar Sue102.concepto_arca de conceptos existentes
         $comenta1 = $request->input('comenta1');
         $nom_arch = $request->input('nom_arch');
         $tam_arch = $request->input('tam_arch');
@@ -213,7 +214,8 @@ class ArcaImportarController extends Controller
                 $idEmpresa,
                 $nom_arch,
                 $tam_arch,
-                $generar
+                $generar,
+                $actualizar
             );
 
             // Ejecutar la importación
@@ -224,6 +226,7 @@ class ArcaImportarController extends Controller
             $rechazados = $import->getRejectedCount();
             $total = $import->getTotalCount();
             $nuevos = $import->getNuevosCount();
+            $actualizados = $import->getActualizadosCount();
 
         } catch (\Throwable $e) {
             return response()->json([
@@ -241,6 +244,7 @@ class ArcaImportarController extends Controller
                 'count'       => $count,
                 'rechazados'  => $rechazados,
                 'nuevos'      => $nuevos,
+                'actualizados'=> $actualizados,
                 'msg'         => "Se importaron $count registros y se rechazaron $rechazados.",
             ]);
         }

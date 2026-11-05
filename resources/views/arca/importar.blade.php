@@ -103,9 +103,9 @@
     }
     /* Pasos bloqueados al terminar la importación */
     .wizard .steps > ul li.disabled a { cursor: not-allowed; }
-    /* Botones Anterior/Finalizar mientras corre la importación: jquery.steps no mira la clase
-       .disabled del <a> (solo la del <li>), así que el bloqueo visual y del click va acá. */
-    #wizard .actions a.disabled { opacity: .5; pointer-events: none; cursor: not-allowed; }
+    /* Anterior/Finalizar ocultos mientras corre la importación. Con !important porque
+       jquery.steps vuelve a mostrar Finalizar (show()) al entrar al paso 3. */
+    #wizard .actions li.oculto-importando { display: none !important; }
     /* Wizard en violeta (bd-wizard.css trae verde #00d69f) */
     .wizard .steps > ul li.current span.number,
     .wizard .steps > ul li.done span.number,
@@ -256,6 +256,25 @@
                                                     @checked(old('generar', '1') == '1')
                                                 />
                                                 <label class="form-check-label" for="generar">Generar concepto de liquidación interno si no existe ?</label>
+                                            </div>
+                                        </div>
+
+                                        <div class="col-lg-12 pt-2">
+                                            <div class="form-check form-switch mt-2">
+                                                <input
+                                                    type="hidden"
+                                                    name="actualizar"
+                                                    value="0"
+                                                />
+                                                <input
+                                                    type="checkbox"
+                                                    id="actualizar"
+                                                    name="actualizar"
+                                                    value="1"
+                                                    class="form-check-input"
+                                                    @checked(old('actualizar', '1') == '1')
+                                                />
+                                                <label class="form-check-label" for="actualizar">Actualizar asociación con código de ARCA ?</label>
                                             </div>
                                         </div>
 
@@ -676,6 +695,13 @@
 @section('scripts')
 <script src="{{ asset('js/jquery.steps.js') }}"></script>
 <script src="{{ asset('js/bd-wizard.js') }}"></script>
+<script>
+    // "Finalizar": bd-wizard.js (compartido) redirige a '/', que es la raíz del dominio y no la
+    // de payroll2025. Acá se reemplaza ese handler para volver al inicio de la app.
+    $('#wizard').off('finished').on('finished', function () {
+        window.location.href = @json(url('/'));
+    });
+</script>
 
 <script>
     // Cargar CUIT al seleccionar empresa
@@ -1091,11 +1117,12 @@
         }
 
 
-        // Bloquea la navegación del wizard (Anterior, Finalizar y los pasos de la izquierda)
-        // mientras la importación está en curso; al fallar se libera para poder reintentar.
+        // Bloquea la navegación del wizard mientras la importación está en curso: oculta
+        // Anterior y Finalizar y deshabilita los pasos de la izquierda. Al fallar se libera
+        // para poder reintentar.
         function bloquearNavegacion(bloquear) {
             $(".actions a[href$='#previous'], .actions a[href$='#finish']")
-                .toggleClass('disabled', bloquear).attr('aria-disabled', bloquear ? 'true' : 'false');
+                .closest('li').toggleClass('oculto-importando', bloquear);
             if (bloquear) {
                 // Se llama desde el paso 2, justo antes de que jquery.steps avance al 3: se bloquean
                 // todos menos el último (el de proceso), incluido el 2 que todavía es el actual.
@@ -1130,6 +1157,7 @@
             const count = Number(data.count) || 0;
             const rechazados = Number(data.rechazados) || 0;
             const nuevos = Number(data.nuevos) || 0;
+            const actualizados = Number(data.actualizados) || 0;
 
             titulo.innerText = 'Importación finalizada';
 
@@ -1139,7 +1167,8 @@
             registrosErr.setAttribute('hidden', true);
 
             btnOk.innerText = 'Descargar registros importados (' + count +
-                (nuevos > 0 ? ' · ' + nuevos + (nuevos === 1 ? ' concepto interno creado' : ' conceptos internos creados') : '') + ')';
+                (nuevos > 0 ? ' · ' + nuevos + (nuevos === 1 ? ' concepto interno creado' : ' conceptos internos creados') : '') +
+                (actualizados > 0 ? ' · ' + actualizados + (actualizados === 1 ? ' asociación ARCA actualizada' : ' asociaciones ARCA actualizadas') : '') + ')';
             btnOk.removeAttribute('hidden');
 
             if (rechazados > 0) {
@@ -1154,7 +1183,8 @@
             $(".actions a[href$='#previous']").closest('li').hide();
             $('#wizard .steps li').not('.current')
                 .removeClass('done').addClass('disabled').attr('aria-disabled', 'true');
-            $(".actions a[href$='#finish']").removeClass('disabled');
+            $(".actions a[href$='#finish']").removeClass('disabled')
+                .closest('li').removeClass('oculto-importando');
         }
 
         window.subirArchivo = function(callback) {
@@ -1175,6 +1205,7 @@
             formData.append('nom_arch', document.getElementById('nom_arch').value);
             formData.append('tam_arch', document.getElementById('tam_arch').value);
             formData.append('generar', document.getElementById('generar').checked ? '1' : '0');
+            formData.append('actualizar', document.getElementById('actualizar').checked ? '1' : '0');
 
             // Estado "en curso": título de proceso, sin botones ni leyendas de un resultado
             // anterior, y la animación de importación visible hasta que responda el servidor.

@@ -18,6 +18,7 @@ class ConceptosArcaImport
     private int $count = 0;
     private int $rechazados = 0;
     private int $nuevos = 0;
+    private int $actualizados = 0;
     /** codigo_contribuyente => [codigo_afip, descripcion ARCA, línea] ya importados en esta corrida */
     private array $importados = [];
     private bool $headerProcessed = false;
@@ -28,7 +29,8 @@ class ConceptosArcaImport
         private int $idEmpresa,
         private string $nom_arch,
         private int $tam_arch,
-        private bool $generar
+        private bool $generar,
+        private bool $actualizar = true
     ) {}
 
     /**
@@ -236,6 +238,14 @@ class ConceptosArcaImport
                 }
             }
 
+            // Si el concepto ya existía y el switch "Actualizar asociación con código de ARCA" está
+            // activo, alineo Sue102.concepto_arca con el código ARCA que informa el archivo.
+            if ($existeConcepto && $this->actualizar) {
+                $this->actualizados += Sue102::where('codigo', $codigoContribuyente)
+                    ->where(fn ($q) => $q->whereNull('concepto_arca')->orWhere('concepto_arca', '<>', $codigoAfip))
+                    ->update(['concepto_arca' => $codigoAfip]);
+            }
+
             // Guardar en la base de datos
             Conceptosarca::create($conceptosData);
             $this->importados[$codigoContribuyente] = [$codigoAfip, $descripcion, $lineNum];
@@ -309,6 +319,14 @@ class ConceptosArcaImport
     public function getNuevosCount(): int
     {
         return $this->nuevos;
+    }
+
+    /**
+     * Retorna la cantidad de conceptos de liquidación (Sue102) cuyo concepto_arca se actualizó
+     */
+    public function getActualizadosCount(): int
+    {
+        return $this->actualizados;
     }
 
     /**
