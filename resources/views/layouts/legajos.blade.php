@@ -245,7 +245,7 @@
                     <div data-i18n="Importar legajos Sicoss">Importar legajos Sicoss</div>
                   </a>
                 </li>
-                <li class="menu-item {{ request()->routeIs('arca.conceptos.*') ? 'active' : '' }}">
+                <li class="menu-item {{ request()->routeIs('arca.conceptos.*') || request()->routeIs('arca.importar*') || request()->routeIs('arca.empresa.*') ? 'active' : '' }}">
                   <a href="{{ url('/arca/conceptos') }}" class="menu-link">
                     <div data-i18n="Conceptos ARCA">Conceptos ARCA</div>
                   </a>
