@@ -75,6 +75,9 @@ Route::middleware('auth')->group(function () {
     Route::get('legajos/{id}/next', [LegajosController::class, 'next'])->name('legajos.next');
     // Dar de baja (setea sue001s.baja, no borra). Distinto de destroy (borrado físico).
     Route::post('legajos/{id}/baja', [LegajosController::class, 'baja'])->name('legajos.baja');
+    Route::get('legajos/{id}/documentos', [LegajosController::class, 'documentos'])->name('legajos.documentos');
+    Route::get('legajos/{id}/documentos/{doc}', [LegajosController::class, 'documentoArchivo'])
+        ->whereNumber('doc')->name('legajos.documentos.archivo');
 
     // Empleados Routes - rutas literales ANTES del resource
     Route::get('bajas/first', [BajasController::class, 'first'])->name('bajas.first');

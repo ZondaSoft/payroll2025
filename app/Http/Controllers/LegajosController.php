@@ -578,6 +578,59 @@ class LegajosController extends Controller
      * Dar de BAJA al empleado: setea sue001s.baja (fecha) sin borrar el registro. El legajo se
      * conserva para el LSD/F931, liquidaciones históricas, etc. Reversible desde la edición del legajo.
      */
+    /**
+     * Documentos digitalizados del legajo (sue111s del portal Drakma) para las miniaturas de la
+     * ficha. Solo los personales (sue111s.legajo = código del empleado), con el nombre de su
+     * carpeta (sue115s). El archivo se sirve por documentoArchivo(): el portal no lo publica.
+     */
+    public function documentos($id)
+    {
+        $legajo = Sue001::findOrFail($id);
+
+        $docs = DB::table('sue111s')
+            ->leftJoin('sue115s', 'sue115s.id', '=', 'sue111s.carpeta')
+            ->where('sue111s.legajo', $legajo->codigo)
+            ->whereNotNull('sue111s.nom_arch')
+            ->orderByDesc('sue111s.fecha')
+            ->orderByDesc('sue111s.id')
+            ->get(['sue111s.id', 'sue111s.nom_arch', 'sue111s.fecha', 'sue111s.origen', 'sue115s.detalle as carpeta']);
+
+        return response()->json($docs->map(function ($d) use ($legajo) {
+            $archivo = basename((string) $d->nom_arch);
+            $ext = strtolower(pathinfo($archivo, PATHINFO_EXTENSION));
+
+            return [
+                'id' => (int) $d->id,
+                // Sin el prefijo numérico que agrega la subida (<timestamp>_<nombre original>).
+                'nombre' => preg_replace('/^\d+_/', '', $archivo),
+                'ext' => $ext,
+                'tipo' => $ext === 'pdf' ? 'pdf' : (in_array($ext, ['jpg', 'jpeg', 'png', 'gif', 'webp'], true) ? 'imagen' : 'otro'),
+                'carpeta' => $d->carpeta,
+                'origen' => $d->origen,
+                'fecha' => $d->fecha,
+                'url' => route('legajos.documentos.archivo', [$legajo->id, $d->id]),
+            ];
+        })->values());
+    }
+
+    /** Sirve (inline) un documento del legajo desde el storage del portal. */
+    public function documentoArchivo($id, $doc)
+    {
+        $legajo = Sue001::findOrFail($id);
+
+        $nomArch = DB::table('sue111s')
+            ->where('id', $doc)
+            ->where('legajo', $legajo->codigo)     // el documento tiene que ser de este legajo
+            ->value('nom_arch');
+
+        abort_if(! $nomArch || str_contains($nomArch, '..'), 404);
+        abort_unless(Storage::disk('portal')->exists($nomArch), 404, 'El archivo no está en el storage del portal.');
+
+        return Storage::disk('portal')->response($nomArch, basename($nomArch), [
+            'Cache-Control' => 'private, max-age=3600',
+        ], 'inline');
+    }
+
     public function baja(Request $request, $id)
     {
         $legajo = Sue001::findOrFail($id);
