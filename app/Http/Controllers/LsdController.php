@@ -897,6 +897,39 @@ class LsdController extends Controller
      * Aportes del trabajador a controlar: alícuota oficial y código ARCA del concepto de descuento.
      * Jubilación 11% (810000), PAMI/INSSJyP 3% (810001), Obra Social 3% (810002).
      */
+    /**
+     * Conceptos cuyos días NO llevan detracción (Ley 27.541 art. 22): la detracción se proporciona
+     * sobre un mes de 30 días descontando los días de suspensión y de faltas injustificadas que el
+     * concepto trae en `cantidad`. Las ausencias justificadas y las vacaciones no restan días.
+     * Por ahora fijo; si hace falta, pasa a ser una marca del concepto en sue102s.
+     */
+    private const CONCEPTOS_DIAS_SIN_DETRACCION = [
+        100, // SUSPENSION
+        101, // Ausencia Injustificada
+    ];
+
+    /**
+     * Detracción del empleado antes del tope a la base: la mensual proporcionada por los días con
+     * detracción (30 − días de suspensión/faltas injustificadas) y, en mes con SAC, el medio
+     * adicional del aguinaldo entero (el SAC no se proporciona por las faltas del mes).
+     *
+     * @return array{0: float, 1: float} [detracción, días sin detracción]
+     */
+    private function detraccionPorDias($filasEmpleado, bool $tieneSac, float $mensual, float $conSac): array
+    {
+        $diasSin = (float) collect($filasEmpleado)
+            ->filter(fn ($row) => in_array((int) ($row->concepto ?? 0), self::CONCEPTOS_DIAS_SIN_DETRACCION, true))
+            ->sum(fn ($row) => abs((float) ($row->cantidad ?? 0)));
+        $diasSin = min(30.0, $diasSin);
+
+        $detraccion = $mensual * (30.0 - $diasSin) / 30.0;
+        if ($tieneSac) {
+            $detraccion += max(0.0, $conSac - $mensual);
+        }
+
+        return [$detraccion, $diasSin];
+    }
+
     private const APORTES_CONTROL = [
         ['nombre' => 'Jubilación',     'arca' => '810000', 'alicuota' => 0.11],
         ['nombre' => 'PAMI (INSSJyP)', 'arca' => '810001', 'alicuota' => 0.03],
@@ -1900,7 +1933,10 @@ class LsdController extends Controller
             $tieneSac = $datos->where('cuil', $registro->cuil)->contains(
                 fn ($row) => str_starts_with((string) ($row->concepto_arca ?? ''), '12')
             );
-            $detraccionMensual = $tieneSac ? $importeDetraerSacNumerico : $importeDetraerNumerico;
+            // Suspensiones y faltas injustificadas: la detracción se proporciona por días (mes de 30).
+            [$detraccionMensual] = $this->detraccionPorDias(
+                $datos->where('cuil', $registro->cuil), $tieneSac, $importeDetraerNumerico, $importeDetraerSacNumerico
+            );
             // Jornada parcial: la detracción se prorratea por horas (factorParcial = horas_semana/48).
             $detraccionEmpleado = round($detraccionMensual * $factorParcial, 2);
             // Tope estructural de ARCA para tiempo parcial: la detracción no puede superar el 67% del valor
@@ -2132,7 +2168,10 @@ class LsdController extends Controller
                 $tieneSac05 = $datos->where('cuil', $registro->cuil)->contains(
                     fn ($row) => str_starts_with((string) ($row->concepto_arca ?? ''), '12')
                 );
-                $detraccionMensual05 = $tieneSac05 ? $importeDetraerSacNumerico : $importeDetraerNumerico;
+                // Suspensiones y faltas injustificadas: proporcional por días (ver Reg 04).
+                [$detraccionMensual05] = $this->detraccionPorDias(
+                    $datos->where('cuil', $registro->cuil), $tieneSac05, $importeDetraerNumerico, $importeDetraerSacNumerico
+                );
                 $detraccionEmpleado05 = round($detraccionMensual05 * $factorParcial05, 2); // prorrateo por jornada parcial
                 // Tope estructural ARCA para parcial: máx. 67% del valor (ver Reg 04).
                 if ($esJornadaParcial05) {
