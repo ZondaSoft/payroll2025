@@ -1683,7 +1683,9 @@ class LsdController extends Controller
             $conyugue = str_pad((string) ($registro->conyugue ?? 0), 1, '0', STR_PAD_LEFT);
             $hijos = str_pad((string) ($registro->hijos ?? 0), 2, '0', STR_PAD_LEFT);
             $cct = str_pad((string) ($registro->cct ?? 0), 1, '0', STR_PAD_LEFT);
-            $scvo = str_pad((string) ($registro->sicoss_cob_scvo ?? 0), 1, '0', STR_PAD_LEFT);
+            // Marca SCVO (pos. 18): por ahora FIJA en 1 para todos. sue001s.sicoss_cob_scvo queda sin
+            // usar hasta que se defina cómo hacerla dinámica (hoy está en 0/NULL en todos los legajos).
+            $scvo = '1';
             $reduccion = str_pad((string) ($registro->sicoss_reduccion ?? 0), 1, '0', STR_PAD_LEFT);
             $tipoempresa = $tipoEmpleadorLsd;
             $tipoOperacion = '0';
@@ -1906,7 +1908,8 @@ class LsdController extends Controller
                 $conyugue = str_pad((string) ($registro->conyugue ?? 0), 1, '0', STR_PAD_LEFT);
                 $hijos = str_pad((string) ($registro->hijos ?? 0), 2, '0', STR_PAD_LEFT);
                 $cct = str_pad((string) ($registro->cct ?? 0), 1, '0', STR_PAD_LEFT);
-                $scvo = str_pad((string) ($registro->sicoss_cob_scvo ?? 0), 1, '0', STR_PAD_LEFT);
+                // Marca SCVO (pos. 18): fija en 1, igual que en el Reg 04.
+                $scvo = '1';
                 $reduccion = str_pad((string) ($registro->sicoss_reduccion ?? 0), 1, '0', STR_PAD_LEFT);
                 $tipoempresa = $tipoEmpleadorLsd;
                 $tipoOperacion = '0';
