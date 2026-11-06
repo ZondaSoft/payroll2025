@@ -994,6 +994,8 @@ class LsdController extends Controller
             }
             if ($arca !== '') {
                 $porGrupo[$clave]['aportes'][$arca] = ($porGrupo[$clave]['aportes'][$arca] ?? 0.0) + abs((float) ($row->importe ?? 0));
+                // Código(s) del concepto de sue090s que informan ese aporte (para mostrarlo en el diálogo).
+                $porGrupo[$clave]['conceptos'][$arca][(string) $row->concepto] = true;
             }
         }
 
@@ -1043,6 +1045,7 @@ class LsdController extends Controller
                         // sospechoso (¿haberes cargados en otro tipoliq?). Se resalta para revisar antes
                         // de ajustar (el ajuste lo llevaría a $0).
                         'sin_haberes' => $bruto <= 0,
+                        'concepto' => implode(', ', array_keys($data['conceptos'][$ap['arca']] ?? [])),
                         'aporte' => $ap['nombre'],
                         'arca' => $ap['arca'],
                         'alicuota' => $ap['alicuota'],

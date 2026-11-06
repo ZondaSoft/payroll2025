@@ -276,6 +276,7 @@ const exportarAportesXLSX = (items) => {
     'CUIL': i.cuil,
     'Empleado': i.nombre || '',
     'Tipo liq.': i.tipo_liq || '',
+    'Concepto': i.concepto || '',
     'Aporte': i.aporte,
     'Alícuota': `${(Number(i.alicuota) * 100).toFixed(2)}%`,
     'Bruto': Number(i.bruto),
@@ -287,12 +288,12 @@ const exportarAportesXLSX = (items) => {
   }))
 
   const ws = XLSX.utils.json_to_sheet(data)
-  ws['!cols'] = [{ wch: 10 }, { wch: 14 }, { wch: 28 }, { wch: 12 }, { wch: 16 }, { wch: 10 }, { wch: 16 }, { wch: 18 }, { wch: 16 }, { wch: 16 }, { wch: 14 }, { wch: 40 }]
+  ws['!cols'] = [{ wch: 10 }, { wch: 14 }, { wch: 28 }, { wch: 12 }, { wch: 12 }, { wch: 16 }, { wch: 10 }, { wch: 16 }, { wch: 18 }, { wch: 16 }, { wch: 16 }, { wch: 14 }, { wch: 40 }]
 
-  // Formato moneda en columnas Bruto..Diferencia (índices 6..10)
+  // Formato moneda en columnas Bruto..Diferencia (índices 7..11)
   const range = XLSX.utils.decode_range(ws['!ref'])
   for (let row = range.s.r + 1; row <= range.e.r; row++) {
-    for (const c of [6, 7, 8, 9, 10]) {
+    for (const c of [7, 8, 9, 10, 11]) {
       const ref = XLSX.utils.encode_cell({ c, r: row })
       if (ws[ref]) { ws[ref].t = 'n'; ws[ref].z = '"$"#,##0.00' }
     }
@@ -369,6 +370,7 @@ const mostrarAdvertenciaAportes = (items, tope = null) => {
       <td style="padding:4px 8px;border:1px solid #dee2e6;font-family:monospace;">${escapeHtml(i.cuil)}</td>
       <td style="padding:4px 8px;border:1px solid #dee2e6;">${escapeHtml(i.nombre || '—')}</td>
       <td style="padding:4px 8px;border:1px solid #dee2e6;white-space:nowrap;">${escapeHtml(i.tipo_liq || '—')}${i.sin_haberes ? ' <span title="Aporte descontado en una liquidación sin haberes (bruto $0)">⚠️</span>' : ''}</td>
+      <td style="padding:4px 8px;border:1px solid #dee2e6;font-family:monospace;white-space:nowrap;">${escapeHtml(i.concepto || '—')}</td>
       <td style="padding:4px 8px;border:1px solid #dee2e6;">${escapeHtml(i.aporte)}</td>
       <td style="padding:4px 8px;border:1px solid #dee2e6;text-align:right;">${escapeHtml(formatMoney(i.bruto))}</td>
       <td style="padding:4px 8px;border:1px solid #dee2e6;text-align:right;">${escapeHtml(formatMoney(i.esperado))}</td>
@@ -409,6 +411,7 @@ const mostrarAdvertenciaAportes = (items, tope = null) => {
               <th style="padding:6px 8px;border:1px solid #dee2e6;text-align:left;">CUIL</th>
               <th style="padding:6px 8px;border:1px solid #dee2e6;text-align:left;">Empleado</th>
               <th style="padding:6px 8px;border:1px solid #dee2e6;text-align:left;">Tipo liq.</th>
+              <th style="padding:6px 8px;border:1px solid #dee2e6;text-align:left;">Concepto</th>
               <th style="padding:6px 8px;border:1px solid #dee2e6;text-align:left;">Aporte</th>
               <th style="padding:6px 8px;border:1px solid #dee2e6;text-align:right;">Bruto</th>
               <th style="padding:6px 8px;border:1px solid #dee2e6;text-align:right;">Esperado</th>
@@ -417,7 +420,7 @@ const mostrarAdvertenciaAportes = (items, tope = null) => {
               <th style="padding:6px 8px;border:1px solid #dee2e6;text-align:center;">Revisar</th>
             </tr>
           </thead>
-          <tbody>${filas}</tbody>
+          <tbody style="font-size:11px;">${filas}</tbody>
         </table>
       </div>
       <div style="display:flex;justify-content:space-between;align-items:center;gap:8px;margin-top:16px;">
