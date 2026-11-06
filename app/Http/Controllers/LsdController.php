@@ -80,6 +80,51 @@ class LsdController extends Controller
     }
 
     /**
+     * Conceptos que aparecen más de una vez en el mismo recibo (legajo + período + tipoliq) entre
+     * los legajos que entran al LSD: mismo filtro de baja y de empresa que los demás pre-checks.
+     * Una fila por legajo + tipoliq + concepto, con los importes de cada repetición.
+     */
+    private function conceptosDuplicados(string $periodoStr, ?array $tiposLiq, $codEmpresa): \Illuminate\Support\Collection
+    {
+        return DB::table('sue090s')
+            ->join('sue001s', 'sue090s.legajo', '=', 'sue001s.codigo')
+            ->leftJoin('sue102s', 'sue090s.concepto', '=', 'sue102s.codigo')
+            ->where('sue090s.periodo', $periodoStr)
+            ->when($tiposLiq, fn ($q) => $q->whereIn('sue090s.tipoliq', $tiposLiq))
+            ->where(fn ($q) => $q->whereNull('sue001s.baja')->orWhere('sue001s.baja', '>=', $this->inicioPeriodo($periodoStr)))
+            ->when($codEmpresa !== null && $codEmpresa !== '', fn ($q) => $q->where('sue001s.grupo_emp', $codEmpresa))
+            ->groupBy('sue090s.legajo', 'sue090s.tipoliq', 'sue090s.concepto')
+            ->havingRaw('COUNT(*) > 1')
+            ->select(
+                'sue090s.legajo',
+                'sue090s.tipoliq',
+                'sue090s.concepto',
+                DB::raw('MAX(sue001s.id) as legajo_id'),
+                DB::raw("MAX(TRIM(CONCAT(COALESCE(sue001s.detalle, ''), ' ', COALESCE(sue001s.nombres, '')))) as nombre"),
+                DB::raw('MAX(COALESCE(sue102s.detalle, sue090s.descripcion)) as descripcion'),
+                DB::raw('COUNT(*) as veces'),
+                DB::raw("GROUP_CONCAT(sue090s.importe ORDER BY sue090s.id SEPARATOR '|') as importes"),
+                DB::raw('COUNT(DISTINCT sue090s.importe) as importes_distintos'),
+            )
+            ->orderBy('sue090s.legajo')
+            ->orderBy('sue090s.tipoliq')
+            ->orderByRaw('CAST(sue090s.concepto AS UNSIGNED)')
+            ->get()
+            ->map(fn ($d) => [
+                'legajo' => (int) $d->legajo,
+                'legajo_id' => $d->legajo_id !== null ? (int) $d->legajo_id : null,
+                'nombre' => $d->nombre ?? '',
+                'tipoliq' => (int) $d->tipoliq,
+                'concepto' => (string) $d->concepto,
+                'descripcion' => $d->descripcion ?? '',
+                'veces' => (int) $d->veces,
+                'importes' => array_map('floatval', explode('|', (string) $d->importes)),
+                // false = copia exacta (recarga duplicada); true = la repetición trae otro importe.
+                'distintos' => (int) $d->importes_distintos > 1,
+            ]);
+    }
+
+    /**
      * Mostrar la página para generar LSD
      */
     public function generar()
@@ -150,6 +195,30 @@ class LsdController extends Controller
             // Conceptos creados solos durante esta generación (ver pre-check 1): quedan en la
             // emisión y se muestran en el resumen final.
             $conceptosGenerados = [];
+
+            // Pre-check 0 (va antes que todos): el mismo concepto más de una vez en un mismo recibo
+            // (legajo + período + tipoliq). Pasa cuando una liquidación se vuelve a cargar sin borrar
+            // la anterior y duplica todos los importes, las bases y los aportes del TXT. Corre también
+            // en 'RE' porque infla las bases del Reg 04. El usuario puede seguir bajo su
+            // responsabilidad (ignorar_conceptos_duplicados) si la repetición es legítima.
+            if (! $request->boolean('ignorar_conceptos_duplicados')) {
+                $duplicados = $this->conceptosDuplicados($periodoStr, $tiposLiq, $empresa->codigo ?? $empresa->id ?? null);
+
+                if ($duplicados->isNotEmpty()) {
+                    return response()->json([
+                        'success' => false,
+                        'tipo_error' => 'conceptos_duplicados',
+                        'message' => sprintf(
+                            'Hay %d legajo(s) con conceptos repetidos en un mismo recibo (%d concepto(s) en total). '.
+                            'Suele pasar cuando la liquidación se vuelve a cargar sin borrar la anterior, y duplica '.
+                            'los importes, las bases y los aportes del LSD. Revisá la liquidación antes de generar.',
+                            $duplicados->pluck('legajo')->unique()->count(),
+                            $duplicados->count()
+                        ),
+                        'duplicados' => $duplicados->values(),
+                    ], 422);
+                }
+            }
 
             // Pre-check: conceptos huérfanos en sue090s que no existen en sue102s.
             // En modo 'RE' no se emiten Reg 02/03 (no aplica el chequeo).

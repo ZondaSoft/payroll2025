@@ -128,7 +128,10 @@ const generarEmision = async (opts = {}) => {
     }
   } catch (error) {
     const data = error.response?.data
-    if (data?.tipo_error === 'conceptos_huerfanos' && Array.isArray(data?.huerfanos)) {
+    if (data?.tipo_error === 'conceptos_duplicados' && Array.isArray(data?.duplicados)) {
+      // Primer control: el mismo concepto repetido en un recibo (liquidación recargada sin borrar).
+      mostrarConceptosDuplicados(data.message, data.duplicados)
+    } else if (data?.tipo_error === 'conceptos_huerfanos' && Array.isArray(data?.huerfanos)) {
       mostrarErrorHuerfanos(data.message, data.huerfanos)
     } else if (data?.tipo_error === 'conceptos_sin_arca' && Array.isArray(data?.sin_arca)) {
       mostrarErrorSinArca(data.message, data.sin_arca)
@@ -738,6 +741,127 @@ const mostrarActivosSinLiquidacion = (items) => {
       // Regenerar informando que ya se revisó, con los legajos elegidos (posible lista vacía).
       generarEmision({ activos_revisados: true, activos_incluidos: incluidos })
     }
+  })
+}
+
+const TIPOS_LIQ_NOMBRE = { 1: 'Normal', 2: '1er. Quincena', 3: '2da. Quincena', 4: 'SAC', 5: 'Liq. Final', 6: 'DIF.HAB.' }
+const nombreTipoLiq = (t) => TIPOS_LIQ_NOMBRE[t] ?? `Tipo ${t}`
+
+const exportarDuplicadosXLSX = (items) => {
+  const data = items.map(d => ({
+    'Legajo': d.legajo,
+    'Empleado': d.nombre || '',
+    'Liquidación': nombreTipoLiq(d.tipoliq),
+    'Concepto': d.concepto,
+    'Descripción': d.descripcion || '',
+    'Veces': d.veces,
+    'Importes': d.importes.map(formatMoney).join(' | '),
+    'Importes distintos': d.distintos ? 'Sí' : 'No',
+  }))
+
+  const ws = XLSX.utils.json_to_sheet(data)
+  ws['!cols'] = [{ wch: 10 }, { wch: 34 }, { wch: 14 }, { wch: 10 }, { wch: 34 }, { wch: 8 }, { wch: 40 }, { wch: 18 }]
+  const wb = XLSX.utils.book_new()
+  XLSX.utils.book_append_sheet(wb, ws, 'Conceptos duplicados')
+
+  const fecha = new Date().toISOString().slice(0, 10)
+  XLSX.writeFile(wb, `conceptos_duplicados_${formulario.periodo_id}_${fecha}.xlsx`)
+}
+
+// Modal del primer control: conceptos que aparecen más de una vez en el mismo recibo
+// (legajo + período + tipoliq). La lupa abre ese recibo en la liquidación individual.
+const mostrarConceptosDuplicados = (mensaje, items) => {
+  const legajos = new Set(items.map(d => d.legajo)).size
+
+  const filas = items.map(d => {
+    const urlRecibo = d.legajo_id
+      ? route('liquidacion.individual.index', { legajo_id: d.legajo_id, periodo: formulario.periodo_id, tipoliq: d.tipoliq })
+      : null
+    return `
+    <tr>
+      <td style="padding:4px 8px;border:1px solid #dee2e6;font-family:monospace;white-space:nowrap;">${escapeHtml(d.legajo)}</td>
+      <td style="padding:4px 8px;border:1px solid #dee2e6;">${escapeHtml(d.nombre || '—')}</td>
+      <td style="padding:4px 8px;border:1px solid #dee2e6;white-space:nowrap;">${escapeHtml(nombreTipoLiq(d.tipoliq))}</td>
+      <td style="padding:4px 8px;border:1px solid #dee2e6;font-family:monospace;">${escapeHtml(d.concepto)}</td>
+      <td style="padding:4px 8px;border:1px solid #dee2e6;">${escapeHtml(d.descripcion || '—')}</td>
+      <td style="padding:4px 8px;border:1px solid #dee2e6;text-align:right;">${d.veces}</td>
+      <td style="padding:4px 8px;border:1px solid #dee2e6;text-align:right;white-space:nowrap;${d.distintos ? 'color:#dc3545;font-weight:600;' : ''}"
+          title="${d.distintos ? 'Las repeticiones tienen importes distintos' : 'Copias exactas'}">
+        ${d.importes.map(i => escapeHtml(formatMoney(i))).join('<br>')}
+      </td>
+      <td style="padding:4px 8px;border:1px solid #dee2e6;text-align:center;">
+        ${urlRecibo ? `<a href="${urlRecibo}" class="lupa-concepto" target="_blank" rel="noopener"
+           title="Ver el recibo del legajo ${escapeHtml(d.legajo)}"><i class="ri-search-line"></i></a>` : '—'}
+      </td>
+    </tr>`
+  }).join('')
+
+  const html = `
+    <style>
+      .lupa-concepto{display:inline-flex;align-items:center;justify-content:center;width:30px;height:30px;border-radius:50%;border:1px solid var(--bs-secondary, #6c757d);color:var(--bs-secondary, #6c757d);background:transparent;text-decoration:none;transition:all .15s ease;}
+      .lupa-concepto:hover,.lupa-concepto:focus{background:var(--bs-primary, #696cff);border-color:var(--bs-primary, #696cff);color:#fff;outline:none;}
+    </style>
+    <div style="text-align:left;font-size:14px;">
+      <p style="margin-bottom:8px;">${escapeHtml(mensaje)}</p>
+      <p style="margin-bottom:12px;font-size:12px;color:#6c757d;">
+        ${legajos} legajo(s) · ${items.length} concepto(s) repetido(s). En rojo, las repeticiones con importes distintos.
+      </p>
+      <div style="max-height:340px;overflow:auto;">
+        <table style="width:100%;border-collapse:collapse;font-size:12px;">
+          <thead style="position:sticky;top:0;background:#f8f9fa;">
+            <tr>
+              <th style="padding:6px 8px;border:1px solid #dee2e6;text-align:left;">Legajo</th>
+              <th style="padding:6px 8px;border:1px solid #dee2e6;text-align:left;">Empleado</th>
+              <th style="padding:6px 8px;border:1px solid #dee2e6;text-align:left;">Liquidación</th>
+              <th style="padding:6px 8px;border:1px solid #dee2e6;text-align:left;">Concepto</th>
+              <th style="padding:6px 8px;border:1px solid #dee2e6;text-align:left;">Descripción</th>
+              <th style="padding:6px 8px;border:1px solid #dee2e6;text-align:right;">Veces</th>
+              <th style="padding:6px 8px;border:1px solid #dee2e6;text-align:right;">Importes</th>
+              <th style="padding:6px 8px;border:1px solid #dee2e6;text-align:center;">Recibo</th>
+            </tr>
+          </thead>
+          <tbody>${filas}</tbody>
+        </table>
+      </div>
+      <div style="display:flex;justify-content:space-between;align-items:center;gap:8px;margin-top:16px;">
+        <button type="button" id="dup-exportar" class="btn btn-success">
+          <i class="ri-file-excel-2-line me-1"></i> Exportar Excel
+        </button>
+        <div style="display:flex;gap:8px;align-items:center;">
+          <button type="button" id="dup-cerrar" class="btn btn-outline-secondary">Cancelar</button>
+          <button type="button" id="dup-reintentar" class="btn btn-warning">
+            <i class="ri-refresh-line me-1"></i> Reintentar
+          </button>
+          <button type="button" id="dup-continuar" class="btn btn-primary">Continuar igual</button>
+        </div>
+      </div>
+    </div>
+  `
+
+  Swal.fire({
+    icon: 'error',
+    title: 'Conceptos duplicados en un mismo recibo',
+    html,
+    width: 1150,
+    showConfirmButton: false,
+    showCancelButton: false,
+    didOpen: () => {
+      // Igual que el de inconsistencias: por encima del sidebar fijo.
+      const cont = Swal.getContainer()
+      if (cont) cont.style.zIndex = '99999'
+      document.getElementById('dup-exportar')?.addEventListener('click', () => exportarDuplicadosXLSX(items))
+      document.getElementById('dup-cerrar')?.addEventListener('click', () => Swal.close())
+      // Tras corregir la liquidación vuelve a chequear desde cero.
+      document.getElementById('dup-reintentar')?.addEventListener('click', () => {
+        Swal.close()
+        generarEmision()
+      })
+      // Generar con los duplicados, bajo responsabilidad del usuario (repetición legítima).
+      document.getElementById('dup-continuar')?.addEventListener('click', () => {
+        Swal.close()
+        generarEmision({ ignorar_conceptos_duplicados: true })
+      })
+    },
   })
 }
 

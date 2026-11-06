@@ -77,4 +77,50 @@ final class EsquemaAppMinimo
             $t->timestamps();
         });
     }
+
+    /**
+     * Lo mínimo de una liquidación para los pre-checks del LSD que corren antes de armar el TXT:
+     * empresa, período, legajo y el detalle liquidado. También las crea el portal; sólo se
+     * declaran las columnas que esos controles leen.
+     */
+    public static function crearLiquidacion(): void
+    {
+        Schema::create('sue086s', function (Blueprint $t) {
+            $t->id();
+            $t->integer('codigo')->nullable();
+            $t->string('detalle', 100)->nullable();
+            $t->string('cuit', 20)->nullable();
+            $t->timestamps();
+        });
+
+        Schema::create('sue100s', function (Blueprint $t) {
+            $t->id();
+            $t->string('periodo', 6);
+            $t->integer('tipoliq')->nullable();
+            $t->timestamps();
+        });
+
+        Schema::create('sue001s', function (Blueprint $t) {
+            $t->id();
+            $t->integer('codigo');
+            $t->string('detalle', 100)->nullable();
+            $t->string('nombres', 100)->nullable();
+            $t->string('cuil', 20)->nullable();
+            $t->integer('grupo_emp')->nullable();
+            $t->date('baja')->nullable();
+            $t->timestamps();
+        });
+
+        Schema::create('sue090s', function (Blueprint $t) {
+            $t->id();
+            $t->string('periodo', 6)->nullable();
+            $t->string('tipoliq', 6)->nullable();
+            $t->integer('legajo')->nullable();
+            $t->string('concepto', 6)->nullable();
+            $t->string('descripcion', 50)->nullable();
+            $t->decimal('cantidad', 10, 2)->nullable();
+            $t->decimal('importe', 10, 2)->nullable();
+            $t->timestamps();
+        });
+    }
 }
