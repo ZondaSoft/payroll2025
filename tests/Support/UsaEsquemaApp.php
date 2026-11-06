@@ -29,6 +29,7 @@ trait UsaEsquemaApp
             Schema::dropAllTables();
             EsquemaAppMinimo::crearTablasCompartidas();
             EsquemaAppMinimo::crearCatalogoLiquidacion();
+            EsquemaAppMinimo::crearLiquidacion();
             $this->artisan('migrate', [
                 '--path' => [
                     'database/migrations/0001_01_01_000000_create_users_table.php',
