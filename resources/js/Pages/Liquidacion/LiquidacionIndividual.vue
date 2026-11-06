@@ -422,6 +422,66 @@ const netoTotal = computed(() =>
     + totales.value.no_remunerativo
 );
 
+// Eliminar el concepto de la fila seleccionada (botón de la barra lateral de la tabla).
+const eliminandoConcepto = ref(false);
+const eliminarConceptoSeleccionado = async () => {
+    const item = selectedRowIndex.value !== null ? conceptosLocal.value[selectedRowIndex.value] : null;
+    if (tablaLimpia.value || !item || eliminandoConcepto.value) {
+        Swal.fire({
+            icon: 'info',
+            title: 'Seleccioná un concepto',
+            text: 'Hacé clic en la fila del concepto que querés eliminar.',
+            confirmButtonText: 'Aceptar',
+            buttonsStyling: false,
+            customClass: { confirmButton: 'btn btn-primary rounded-pill px-4' },
+        });
+        return;
+    }
+
+    const res = await Swal.fire({
+        icon: 'warning',
+        title: '¿Está seguro de eliminar el concepto?',
+        html: `<span class="font-monospace">${escapeHtmlConcepto(item.codigo)}</span> — ${escapeHtmlConcepto(item.detalle || '')}`,
+        showCancelButton: true,
+        reverseButtons: true,                 // "No" a la izquierda, "Sí" a la derecha
+        focusCancel: true,
+        confirmButtonText: 'Sí',
+        cancelButtonText: 'No',
+        buttonsStyling: false,
+        customClass: {
+            actions: 'w-100 justify-content-end px-4',
+            confirmButton: 'btn btn-danger rounded-pill px-4',
+            cancelButton: 'btn btn-outline-secondary rounded-pill px-4 me-2',
+        },
+    });
+    if (!res.isConfirmed) return;
+
+    const [periodoStr, tipoliqStr] = String(selectedPeriodoKey.value || '').split('|');
+    eliminandoConcepto.value = true;
+    try {
+        await axios.delete(route('liquidacion.individual.eliminarConcepto'), {
+            data: {
+                id: item.id,
+                legajo_codigo: props.empleado.codigo,
+                periodo: periodoStr || props.periodo,
+                tipoliq: tipoliqStr || props.tipoliq,
+            },
+        });
+        // Se saca la fila ya (los totales se recalculan solos) y se refresca desde el servidor.
+        conceptosLocal.value.splice(selectedRowIndex.value, 1);
+        selectedRowIndex.value = conceptosLocal.value.length
+            ? Math.min(selectedRowIndex.value, conceptosLocal.value.length - 1)
+            : null;
+        Swal.fire({ icon: 'success', title: 'Concepto eliminado', timer: 1200, showConfirmButton: false, toast: true, position: 'top-end' });
+        router.reload({ only: ['conceptos', 'historial'], preserveScroll: true, preserveState: true });
+    } catch (e) {
+        Swal.fire({ icon: 'error', title: 'No se pudo eliminar', text: e.response?.data?.message || e.message });
+    } finally {
+        eliminandoConcepto.value = false;
+    }
+};
+const escapeHtmlConcepto = (v) => String(v ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+
 // Modal confirmación de eliminación
 const mostrarModalEliminar = ref(false);
 const eliminando = ref(false);
@@ -762,6 +822,8 @@ const confirmarEliminar = async () => {
                                             class="btn btn-icon btn-sm"
                                             title="Eliminar"
                                             data-bs-toggle="tooltip"
+                                            :disabled="eliminandoConcepto"
+                                            @click="eliminarConceptoSeleccionado"
                                         >
                                             <i class="ri-delete-bin-line ri-20px text-primary"></i>
                                         </button>

@@ -415,6 +415,61 @@ class LiquidacionIndividualController extends Controller
         ]);
     }
 
+    /**
+     * Elimina UN concepto (una fila de sue090s) de la liquidación individual y asienta la baja en el
+     * histórico de correcciones (importe anterior → 0). La fila se busca por id y además por legajo,
+     * período y tipoliq, para no borrar una de otra liquidación si el cliente manda un id ajeno.
+     */
+    public function eliminarConcepto(Request $request)
+    {
+        $request->validate([
+            'id'            => 'required|integer',
+            'legajo_codigo' => 'required',
+            'periodo'       => 'required',
+            'tipoliq'       => 'required',
+        ], [
+            'id.required' => 'Seleccioná el concepto a eliminar.',
+        ]);
+
+        $fila = DB::table('sue090s')
+            ->where('id', $request->id)
+            ->where('legajo', $request->legajo_codigo)
+            ->where('periodo', $request->periodo)
+            ->where('tipoliq', $request->tipoliq)
+            ->first(['id', 'concepto', 'descripcion', 'cantidad', 'valor', 'importe']);
+
+        if (! $fila) {
+            return response()->json(['success' => false, 'message' => 'No se encontró el concepto en la liquidación.'], 404);
+        }
+
+        $legajo = Sue001::where('codigo', $request->legajo_codigo)->first(['cuil']);
+        $conceptoArca = DB::table('sue102s')->where('codigo', $fila->concepto)->value('concepto_arca');
+        $fmt = fn ($v) => number_format((float) $v, 2, ',', '.');
+
+        DB::transaction(function () use ($request, $fila, $legajo, $conceptoArca, $fmt) {
+            DB::table('sue090s')->where('id', $fila->id)->delete();
+
+            LiquidacionCorreccion::registrar([
+                'periodo'          => $request->periodo,
+                'tipoliq'          => (int) $request->tipoliq,
+                'legajo'           => (string) $request->legajo_codigo,
+                'cuil'             => $legajo->cuil ?? null,
+                'concepto'         => (string) $fila->concepto,
+                'concepto_arca'    => $conceptoArca,
+                'sue090_id'        => $fila->id,
+                'importe_anterior' => (float) $fila->importe,
+                'importe_nuevo'    => 0,
+                'motivo'           => "Concepto eliminado (cantidad {$fmt($fila->cantidad)}, valor {$fmt($fila->valor)}, importe {$fmt($fila->importe)}) (liquidación individual)",
+                'origen'           => 'liquidacion_individual',
+            ]);
+        });
+
+        return response()->json([
+            'success' => true,
+            'message' => 'Concepto eliminado.',
+        ]);
+    }
+
     public function eliminar(Request $request)
     {
         $request->validate([
