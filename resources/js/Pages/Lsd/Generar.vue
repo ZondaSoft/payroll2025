@@ -5,6 +5,7 @@ import { router } from '@inertiajs/vue3'
 import Swal from 'sweetalert2'
 import * as XLSX from 'xlsx'
 import { avisarAjustesTipos } from '@/utils/avisarAjustesTipos'
+import { abrirExplicacionAporte } from '@/utils/explicarDiferenciaAporte'
 
 const props = defineProps({
   empresas: Array,
@@ -364,7 +365,11 @@ const mostrarAdvertenciaAportes = (items, tope = null) => {
   // Casos "bruto $0": aporte descontado en una liquidación sin haberes — se resaltan para revisión.
   const sinHaberes = ordenados.filter(i => i.sin_haberes)
 
-  const filas = ordenados.map(i => `
+  const urlLiquidacion = (i) => i.legajo_id
+    ? route('liquidacion.individual.index', { legajo_id: i.legajo_id, periodo: formulario.periodo_id, ...(i.tipoliq != null ? { tipoliq: i.tipoliq } : {}) })
+    : null
+
+  const filas = ordenados.map((i, idx) => `
     <tr${i.sin_haberes ? ' style="background:#fff3cd;"' : ''}>
       <td style="padding:4px 8px;border:1px solid #dee2e6;font-family:monospace;">${escapeHtml(i.legajo)}</td>
       <td style="padding:4px 8px;border:1px solid #dee2e6;font-family:monospace;">${escapeHtml(i.cuil)}</td>
@@ -377,8 +382,13 @@ const mostrarAdvertenciaAportes = (items, tope = null) => {
       <td style="padding:4px 8px;border:1px solid #dee2e6;text-align:right;">${escapeHtml(formatMoney(i.informado))}</td>
       <td style="padding:4px 8px;border:1px solid #dee2e6;text-align:right;color:#dc3545;font-weight:600;">${escapeHtml(formatMoney(i.diferencia))}</td>
       <td style="padding:4px 8px;border:1px solid #dee2e6;text-align:center;">
+        <button type="button" class="lupa-concepto info-aporte" style="cursor:pointer;padding:0;" data-idx="${idx}" title="Explicación de la diferencia">
+          <i class="ri-information-line"></i>
+        </button>
+      </td>
+      <td style="padding:4px 8px;border:1px solid #dee2e6;text-align:center;">
         ${i.legajo_id
-          ? `<a href="${route('liquidacion.individual.index', { legajo_id: i.legajo_id, periodo: formulario.periodo_id, ...(i.tipoliq != null ? { tipoliq: i.tipoliq } : {}) })}"
+          ? `<a href="${urlLiquidacion(i)}"
                 class="lupa-concepto"
                 target="_blank"
                 rel="noopener"
@@ -417,6 +427,7 @@ const mostrarAdvertenciaAportes = (items, tope = null) => {
               <th style="padding:6px 8px;border:1px solid #dee2e6;text-align:right;">Esperado</th>
               <th style="padding:6px 8px;border:1px solid #dee2e6;text-align:right;">Informado</th>
               <th style="padding:6px 8px;border:1px solid #dee2e6;text-align:right;">Diferencia</th>
+              <th style="padding:6px 8px;border:1px solid #dee2e6;text-align:center;">Info</th>
               <th style="padding:6px 8px;border:1px solid #dee2e6;text-align:center;">Revisar</th>
             </tr>
           </thead>
@@ -448,6 +459,11 @@ const mostrarAdvertenciaAportes = (items, tope = null) => {
     showConfirmButton: false,
     showCancelButton: false,
     didOpen: () => {
+      // Botón de info de cada fila: explicación de la diferencia en un diálogo encima de este.
+      Swal.getHtmlContainer()?.querySelectorAll('.info-aporte').forEach(btn => btn.addEventListener('click', () => {
+        const item = ordenados[Number(btn.dataset.idx)]
+        if (item) abrirExplicacionAporte(item, urlLiquidacion(item))
+      }))
       document.getElementById('ap-exportar')?.addEventListener('click', () => exportarAportesXLSX(ordenados))
       document.getElementById('ap-cerrar')?.addEventListener('click', () => Swal.close())
       document.getElementById('ap-ajustar')?.addEventListener('click', () => ajustarAportes(ordenados))

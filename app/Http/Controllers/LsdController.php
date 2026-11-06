@@ -963,6 +963,7 @@ class LsdController extends Controller
             'sue001s.nombres as nombres',
             'sue001s.jornada_id as jornada_id',
             'sue090s.concepto',
+            'sue090s.descripcion as concepto_desc',
             'sue090s.importe',
             'sue090s.tipoliq',
             'sue102s.concepto_arca',
@@ -981,7 +982,7 @@ class LsdController extends Controller
             if (! isset($porGrupo[$clave])) {
                 // Empleado = apellido (detalle) + nombres.
                 $nombreCompleto = trim(((string) ($row->apellido ?? '')).' '.((string) ($row->nombres ?? '')));
-                $porGrupo[$clave] = ['legajo' => $leg, 'tipoliq' => $tipoliqRow, 'legajo_id' => $row->legajo_id, 'cuil' => $row->cuil, 'nombre' => $nombreCompleto, 'jornada_id' => $row->jornada_id, 'bruto' => 0.0, 'brutoSac' => 0.0, 'aportes' => []];
+                $porGrupo[$clave] = ['legajo' => $leg, 'tipoliq' => $tipoliqRow, 'legajo_id' => $row->legajo_id, 'cuil' => $row->cuil, 'nombre' => $nombreCompleto, 'jornada_id' => $row->jornada_id, 'bruto' => 0.0, 'brutoSac' => 0.0, 'aportes' => [], 'nr' => []];
             }
             $arca = (string) ($row->concepto_arca ?? '');
             if ($tiporemPorConcepto($row->concepto) === 'H') {
@@ -991,6 +992,14 @@ class LsdController extends Controller
                 if (str_starts_with($arca, '12')) {
                     $porGrupo[$clave]['brutoSac'] += $imp;
                 }
+            }
+            // No remunerativos del recibo: no entran en la base del control, pero el liquidador de origen
+            // puede haberlos sumado a la base de algún aporte (ej. suma NR con aporte a obra social por
+            // acuerdo). Se envían para que el diálogo explique la diferencia.
+            if ($tiporemPorConcepto($row->concepto) === 'NR' && (float) ($row->importe ?? 0) != 0.0) {
+                $cod = (string) $row->concepto;
+                $porGrupo[$clave]['nr'][$cod] ??= ['concepto' => $cod, 'descripcion' => trim((string) ($row->concepto_desc ?? '')), 'importe' => 0.0];
+                $porGrupo[$clave]['nr'][$cod]['importe'] += (float) $row->importe;
             }
             if ($arca !== '') {
                 $porGrupo[$clave]['aportes'][$arca] = ($porGrupo[$clave]['aportes'][$arca] ?? 0.0) + abs((float) ($row->importe ?? 0));
@@ -1050,6 +1059,9 @@ class LsdController extends Controller
                         'arca' => $ap['arca'],
                         'alicuota' => $ap['alicuota'],
                         'bruto' => round($bruto, 2),
+                        'bruto_sac' => round($brutoSac, 2),
+                        'tope' => $tope > 0 ? round($tope, 2) : null,
+                        'no_remunerativos' => array_values(array_map(fn ($n) => [...$n, 'importe' => round($n['importe'], 2)], $data['nr'])),
                         'base' => round($base, 2),
                         'esperado' => $esperado,
                         'informado' => round($informado, 2),
