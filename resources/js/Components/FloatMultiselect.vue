@@ -102,4 +102,33 @@ const emit = defineEmits(['update:modelValue']);
 .ms-float-outline .multiselect.is-disabled .multiselect-placeholder {
     color: #000 !important;
 }
+
+/* ── Modo oscuro (.dark-style en <html>): el valor elegido en blanco, gris si está deshabilitado,
+      y el desplegable con el fondo de la tarjeta en lugar del blanco del tema por defecto. ── */
+.dark-style .ms-float-outline .multiselect {
+    --ms-border-color:          var(--bs-border-color, #474a6a);
+    --ms-placeholder-color:     #7a7c98;
+    --ms-caret-color:           #b2b3ca;
+    --ms-clear-color:           #b2b3ca;
+    --ms-clear-color-hover:     #fff;
+    --ms-dropdown-bg:           var(--bs-paper-bg, var(--bs-card-bg, #30334e));
+    --ms-dropdown-border-color: var(--bs-border-color, #474a6a);
+    --ms-option-bg-pointed:     rgba(234, 234, 255, 0.08);
+    --ms-option-color-pointed:  #fff;
+    --ms-option-color-disabled: #7a7c98;
+    --ms-empty-color:           #b2b3ca;
+    color: #fff;
+}
+.dark-style .ms-float-outline .multiselect-single-label,
+.dark-style .ms-float-outline .multiselect-search,
+.dark-style .ms-float-outline .multiselect-option {
+    color: #fff;
+}
+.dark-style .ms-float-outline .multiselect-search {
+    background: transparent;
+}
+.dark-style .ms-float-outline .multiselect.is-disabled .multiselect-single-label,
+.dark-style .ms-float-outline .multiselect.is-disabled .multiselect-placeholder {
+    color: #b2b3ca !important;
+}
 </style>
