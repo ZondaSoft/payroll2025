@@ -420,6 +420,8 @@ class LsdController extends Controller
                             count($diferenciasAportes)
                         ),
                         'diferencias' => $diferenciasAportes,
+                        // Topes con los que se calculó la base, para mostrarlos en el diálogo.
+                        'tope' => $this->topeUsadoEnControl($periodoStr),
                     ], 422);
                 }
             }
@@ -837,6 +839,26 @@ class LsdController extends Controller
      * contra el esperado = min(bruto, tope vigente) × alícuota. Sirve para detectar liquidaciones de origen
      * calculadas con un tope desactualizado. Devuelve una fila por (legajo, aporte) con diferencia.
      */
+    /**
+     * Topes que usa detectarDiferenciasAportes() para el período: el mensual de lsd_topes vigente
+     * (el periodo_desde más reciente <= período) y el del SAC (la mitad). `del_periodo` = false
+     * cuando no hay tope cargado para el propio mes y se usó el de un mes anterior.
+     */
+    private function topeUsadoEnControl(string $periodoStr): array
+    {
+        $vigente = LsdTope::vigenteParaPeriodo($periodoStr);
+        $tope = (float) ($vigente?->tope_aportes ?? 0);
+
+        return [
+            'periodo' => $periodoStr,
+            'periodo_desde' => $vigente?->periodo_desde !== null ? (string) $vigente->periodo_desde : null,
+            'del_periodo' => $vigente !== null && (string) $vigente->periodo_desde === $periodoStr,
+            'normativa' => $vigente?->normativa,
+            'tope_aportes' => $tope > 0 ? round($tope, 2) : null,
+            'tope_sac' => $tope > 0 ? round($tope / 2, 2) : null,
+        ];
+    }
+
     private function detectarDiferenciasAportes($empresa, string $periodoStr, ?array $tiposLiq): array
     {
         $codEmpresa = $empresa->codigo ?? $empresa->id ?? null;

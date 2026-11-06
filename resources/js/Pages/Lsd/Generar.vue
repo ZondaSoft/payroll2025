@@ -138,7 +138,7 @@ const generarEmision = async (opts = {}) => {
       mostrarErrorInconsistencias(data.message, data.inconsistencias)
     } else if (data?.tipo_error === 'diferencias_aportes' && Array.isArray(data?.diferencias)) {
       // Control bloqueante POR LIQUIDACIÓN (Normal/SAC/Final por separado): el TXT no se generó.
-      mostrarAdvertenciaAportes(data.diferencias)
+      mostrarAdvertenciaAportes(data.diferencias, data.tope)
     } else if (data?.tipo_error === 'activos_sin_liquidacion' && Array.isArray(data?.activos_sin_liquidacion)) {
       // Diálogo para elegir qué activos sin liquidación se incluyen (con bases en 0).
       mostrarActivosSinLiquidacion(data.activos_sin_liquidacion)
@@ -325,7 +325,36 @@ const ajustarAportes = async (items) => {
   }
 }
 
-const mostrarAdvertenciaAportes = (items) => {
+// Bloque con los topes que usó el control (lsd_topes): mensual y SAC (½), de qué período
+// vienen y si faltaba el del propio mes. Sin tope cargado, la base es el bruto sin topear.
+const htmlTopesUsados = (tope) => {
+  if (!tope) return ''
+  const fmtPer = (p) => (p && String(p).length >= 6) ? `${String(p).slice(4, 6)}/${String(p).slice(0, 4)}` : (p || '—')
+  if (!tope.tope_aportes) {
+    return `
+      <div style="margin-bottom:8px;padding:8px 10px;border:1px solid rgba(220,53,69,.45);background:rgba(220,53,69,.08);border-radius:6px;">
+        <strong>Topes utilizados:</strong> no hay tope de aportes cargado para ${escapeHtml(fmtPer(tope.periodo))} ni para un período anterior,
+        así que la base se tomó como el <strong>bruto sin topear</strong>. Cargalo en <a href="${route('sicoss.topes.index')}" target="_blank" rel="noopener">SICOSS &gt; Topes</a>.
+      </div>`
+  }
+  const aviso = tope.del_periodo ? '' : `
+      <div style="margin-top:6px;color:#b54708;">
+        ⚠️ No hay tope cargado para <strong>${escapeHtml(fmtPer(tope.periodo))}</strong>: se usó el vigente desde
+        ${escapeHtml(fmtPer(tope.periodo_desde))}. Si cambió, cargalo en <a href="${route('sicoss.topes.index')}" target="_blank" rel="noopener">SICOSS &gt; Topes</a> y volvé a generar.
+      </div>`
+  return `
+    <div style="margin-bottom:8px;padding:8px 10px;border:1px solid rgba(105,108,255,.35);background:rgba(105,108,255,.06);border-radius:6px;">
+      <div style="font-weight:600;margin-bottom:4px;">Topes utilizados</div>
+      <div style="display:flex;flex-wrap:wrap;gap:4px 24px;">
+        <span>Tope mensual: <strong>${escapeHtml(formatMoney(tope.tope_aportes))}</strong></span>
+        <span>Tope SAC (½): <strong>${escapeHtml(formatMoney(tope.tope_sac))}</strong></span>
+        <span>Vigente desde: <strong>${escapeHtml(fmtPer(tope.periodo_desde))}</strong></span>
+        ${tope.normativa ? `<span>Normativa: <strong>${escapeHtml(tope.normativa)}</strong></span>` : ''}
+      </div>${aviso}
+    </div>`
+}
+
+const mostrarAdvertenciaAportes = (items, tope = null) => {
   const ordenados = [...items]
 
   // Casos "bruto $0": aporte descontado en una liquidación sin haberes — se resaltan para revisión.
@@ -363,6 +392,7 @@ const mostrarAdvertenciaAportes = (items) => {
     </style>
     <div style="text-align:left;font-size:14px;">
       <p style="margin-bottom:8px;">El archivo <strong>todavía no se generó</strong>. Se detectaron diferencias entre el aporte descontado y <strong>base × alícuota</strong> (base = mín. entre bruto y tope vigente), controladas <strong>por liquidación</strong> (Normal, SAC y Liq. Final por separado). Suele deberse a un <strong>tope desactualizado en el liquidador de origen</strong>.</p>
+      ${htmlTopesUsados(tope)}
       ${sinHaberes.length ? `
       <p style="margin-bottom:8px;padding:6px 10px;background:#fff3cd;border:1px solid #ffe69c;border-radius:6px;">
         ⚠️ <strong>${sinHaberes.length} caso(s)</strong> con aporte descontado en una liquidación <strong>sin haberes (bruto $0)</strong> — resaltados en amarillo.
