@@ -571,6 +571,8 @@ Route::middleware('auth')->group(function () {
         ->name('liquidacion.individual.lista.pdf');
     Route::delete('liquidacion/individual/eliminar', [LiquidacionIndividualController::class, 'eliminar'])
         ->name('liquidacion.individual.eliminar');
+    Route::delete('liquidacion/individual/eliminar-concepto', [LiquidacionIndividualController::class, 'eliminarConcepto'])
+        ->name('liquidacion.individual.eliminarConcepto');
     Route::post('liquidacion/individual/actualizar-concepto', [LiquidacionIndividualController::class, 'actualizarConcepto'])
         ->name('liquidacion.individual.actualizarConcepto');
 
