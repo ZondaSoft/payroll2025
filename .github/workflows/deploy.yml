@@ -33,6 +33,18 @@ jobs:
       - name: Instalar dependencias de Node
         run: npm ci --no-audit --no-fund
 
+      # resources/js/app.js importa Ziggy desde vendor/tightenco/ziggy (paquete PHP). No se
+      # hace un composer install completo porque zonda/hub-connector es un repositorio path
+      # privado (../hubadmin) que no está en el runner: se baja solo Ziggy, en la versión del lock.
+      - name: Ziggy para el build (vendor/tightenco/ziggy)
+        run: |
+          ZV=$(php -r 'foreach(json_decode(file_get_contents("composer.lock"),true)["packages"] as $p) if($p["name"]==="tightenco/ziggy") echo $p["version"];')
+          echo "Ziggy $ZV"
+          mkdir -p /tmp/ziggy && cd /tmp/ziggy
+          composer require --no-interaction --no-progress --ignore-platform-reqs "tightenco/ziggy:$ZV"
+          mkdir -p "$GITHUB_WORKSPACE/vendor/tightenco"
+          cp -r vendor/tightenco/ziggy "$GITHUB_WORKSPACE/vendor/tightenco/"
+
       # vite.config.js ya trae base '/payroll2025/build/' (la app vive en una subcarpeta).
       - name: Compilar assets
         run: npm run build
