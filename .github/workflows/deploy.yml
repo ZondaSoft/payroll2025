@@ -57,12 +57,20 @@ jobs:
           path: public/build
           retention-days: 3
 
+  # Un deploy por servidor: la variable de repo PRODUCCION_ENTORNOS (JSON) lista los
+  # environments (cada uno con sus secrets SSH y su PRODUCCION_URL). Sin la variable,
+  # despliega sólo a "produccion". Si falla un servidor, los demás siguen.
   deploy:
-    name: Deploy a producción
+    name: Producción — ${{ matrix.entorno }}
     needs: build
     runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      max-parallel: 2
+      matrix:
+        entorno: ${{ fromJSON(vars.PRODUCCION_ENTORNOS || '["produccion"]') }}
     environment:
-      name: produccion
+      name: ${{ matrix.entorno }}
       url: ${{ vars.PRODUCCION_URL }}
 
     steps:
