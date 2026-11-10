@@ -1,0 +1,93 @@
+# Deploy de payroll2025: cada push a master compila los assets (Vite) y despliega en producción.
+#
+#   push a master ─► Build de assets (Node) ─► Deploy a producción (SSH + deploy.sh) ─► smoke test
+#
+# El servidor no tiene Node: los assets compilados se copian a public/build_nuevo y
+# deploy.sh los pone en su lugar. Secrets del environment "produccion" (Settings →
+# Environments): SSH_HOST, SSH_USUARIO, RUTA_APP, SSH_CLAVE_PRIVADA, SSH_KNOWN_HOSTS
+# (opcional SSH_PUERTO) y la variable PRODUCCION_URL (URL base, sin "/" final).
+name: Deploy a producción
+
+on:
+  push:
+    branches: [master]
+  workflow_dispatch:
+
+concurrency:
+  group: deploy-produccion
+  cancel-in-progress: false
+
+jobs:
+  build:
+    name: Build de assets (Vite)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Configurar Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+
+      - name: Instalar dependencias de Node
+        run: npm ci --no-audit --no-fund
+
+      # vite.config.js ya trae base '/payroll2025/build/' (la app vive en una subcarpeta).
+      - name: Compilar assets
+        run: npm run build
+        env:
+          VITE_APP_NAME: ${{ vars.VITE_APP_NAME || 'Payroll2025' }}
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: build
+          path: public/build
+          retention-days: 3
+
+  deploy:
+    name: Deploy a producción
+    needs: build
+    runs-on: ubuntu-latest
+    environment:
+      name: produccion
+      url: ${{ vars.PRODUCCION_URL }}
+
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          name: build
+          path: build
+
+      - name: Configurar acceso SSH
+        run: |
+          mkdir -p ~/.ssh
+          echo "${{ secrets.SSH_CLAVE_PRIVADA }}" > ~/.ssh/id_deploy
+          chmod 600 ~/.ssh/id_deploy
+          echo "${{ secrets.SSH_KNOWN_HOSTS }}" > ~/.ssh/known_hosts
+
+      - name: Copiar assets al servidor (public/build_nuevo)
+        run: |
+          SSH="ssh -i $HOME/.ssh/id_deploy -p ${{ secrets.SSH_PUERTO || 22 }}"
+          $SSH "${{ secrets.SSH_USUARIO }}@${{ secrets.SSH_HOST }}" "rm -rf '${{ secrets.RUTA_APP }}/public/build_nuevo'"
+          scp -i ~/.ssh/id_deploy -P "${{ secrets.SSH_PUERTO || 22 }}" -r build \
+              "${{ secrets.SSH_USUARIO }}@${{ secrets.SSH_HOST }}:${{ secrets.RUTA_APP }}/public/build_nuevo"
+
+      # git pull antes de deploy.sh: así siempre corre la última versión del script.
+      - name: Ejecutar deploy.sh en el servidor
+        run: |
+          ssh -i ~/.ssh/id_deploy -p "${{ secrets.SSH_PUERTO || 22 }}" \
+              "${{ secrets.SSH_USUARIO }}@${{ secrets.SSH_HOST }}" \
+              "cd '${{ secrets.RUTA_APP }}' && git pull --ff-only && MAINTENANCE=1 ./deploy.sh"
+
+      - name: Smoke test
+        if: vars.PRODUCCION_URL != ''
+        run: |
+          for i in 1 2 3 4 5; do
+            CODE=$(curl -s -o /dev/null -w '%{http_code}' -m 20 "${{ vars.PRODUCCION_URL }}/login" || true)
+            echo "GET /login → $CODE"
+            [ "$CODE" = "200" ] && exit 0
+            sleep 5
+          done
+          echo "::error::${{ vars.PRODUCCION_URL }}/login no responde 200 después del deploy."
+          exit 1
